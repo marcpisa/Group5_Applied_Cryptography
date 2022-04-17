@@ -1,1 +1,0 @@
-# Group5_Applied_Cryptography
