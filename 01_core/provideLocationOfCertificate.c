@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "socketClient.c"
 
 int askCertClient() {
     
@@ -47,6 +48,7 @@ int askCertClient() {
     }
  
     fclose(ptr);
+    socketClient(NULL, NULL);
     return 0;
 
 }
