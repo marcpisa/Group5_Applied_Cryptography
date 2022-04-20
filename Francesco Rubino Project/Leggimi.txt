@@ -1,0 +1,6 @@
+Il comando make, oltre a creare gli eseguibili 'peer' e 'ds', crea l'eseguibile 'initCovid'.
+Prima di testare il funzionamento del programma lanciare l'eseguibile 'initCovid' che ha lo scopo di salvare i register chiusi relativi agli ultimi 5 giorni passati.
+I register vengono caricati in /tmp/covid-FrancescoRubino/portXXXX/totali_giornalieri dove XXXX sta per il numero di porta. 
+Ovviamente ogni peer non possiede tutti i registri, in modo da poter testare il flood_for_entries.
+Inoltre 'make clean' provvederà anche ad eliminare i file creati da 'initCovid' e quelli creati eventualmente durante l'esecuzione.
+
