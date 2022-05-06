@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
                     sscanf(buffer, "%s", bufferSupp1);
                     
                     
-                    // ************ LOGIN REQUEST ***********
+                    // ************ LOGIN REQUEST MANAGER ***********
                     if (strcmp(bufferSupp1, LOGIN) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    //************ LOGOUT REQUEST ************
+                    //************ LOGOUT REQUEST MANAGER ************
                     else if (strcmp(bufferSupp1, LOGOUT) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -154,7 +154,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // ************* LIST REQUEST ***************
+                    // ************* LIST REQUEST MANAGER ***************
                     else if (strcmp(bufferSupp1, LIST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    //*************** RENAME REQUEST *****************
+                    //*************** RENAME REQUEST MANAGER *****************
                     else if (strcmp(bufferSupp1, RENAME) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -210,7 +210,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // **************** DELETE REQUEST ******************
+                    // **************** DELETE REQUEST MANAGER ******************
                     else if (strcmp(bufferSupp1, DELETE) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -238,7 +238,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // *************** DOWNLOAD REQUEST ****************
+                    // *************** DOWNLOAD REQUEST MANAGER ****************
                     else if (strcmp(bufferSupp1, DOWNLOAD) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // *************** UPLOAD REQUEST ***************
+                    // *************** UPLOAD REQUEST MANAGER ***************
                     else if (strcmp(bufferSupp1, UPLOAD) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // **************** SHARE REQUEST ****************
+                    // **************** SHARE REQUEST MANAGER ****************
                     else if (strcmp(bufferSupp1, SHARE) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
