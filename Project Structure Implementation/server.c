@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA login request has comed...\n\n");
+                            printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA logout request has comed...\n\n");
+                            printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA list request has comed...\n\n");
+                            printf("\nA list request has came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -198,7 +198,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA rename request has comed...\n\n");
+                            printf("\nA rename request has came up...\n\n");
                             // RENAME MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA delete request has comed...\n\n");
+                            printf("\nA delete request has came up...\n\n");
                             // DELETE MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA download request has comed...\n\n");
+                            printf("\nA download request has came up...\n\n");
                             // DOWNLOAD MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nAn upload request has comed...\n\n");
+                            printf("\nAn upload request has came up...\n\n");
                             // UPLOAD MANAGER: SERVER SIDE
                             
                             // Do stuff
@@ -310,7 +310,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA share request has comed...\n\n");
+                            printf("\nA share request has came up...\n\n");
                             // SHARE MANAGER: SERVER SIDE
                             
                             // Do stuff
