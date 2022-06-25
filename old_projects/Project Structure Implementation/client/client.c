@@ -1,5 +1,5 @@
 #include "intclient.h"
-#include "sanitization.c"
+#include "../sanitization.c"
 
 int main(int argc, char* argv[])
 {
