@@ -8,12 +8,15 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <dirent.h>
+#include <search.h>
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
 #define COM_LEN 10
 #define MAX_LEN_USR 20
+#define COMM_NUMB 8
 
 #define LOGIN "login"
 #define LOGOUT "logout"
