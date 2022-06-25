@@ -2,6 +2,7 @@
     "files.associations": {
         "stdio.h": "c",
         "string.h": "c",
-        "providelocationofcertificate.h": "c"
+        "providelocationofcertificate.h": "c",
+        "intclient.h": "c"
     }
 }
