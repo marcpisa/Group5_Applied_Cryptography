@@ -17,6 +17,7 @@
 #define COM_LEN 10
 #define MAX_LEN_USR 20
 #define COMM_NUMB 8
+#define MAX_CANONICA_LEN 1024
 
 #define LOGIN "login"
 #define LOGOUT "logout"

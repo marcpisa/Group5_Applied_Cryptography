@@ -2,7 +2,7 @@
 
 #include <util.h>
 
-static char *commands[] = {"login", "logout", "list", "rename", "delete", "download", "upload", "share"};
+static char *commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE};
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-./"};
 
 
