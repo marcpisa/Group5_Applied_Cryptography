@@ -56,7 +56,7 @@ int listServer(int sd, char* rec_mex)
 
     // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
-    ret = send(i, bufferSupp2, strlen(bufferSupp2), 0);
+    ret = send(sd, bufferSupp2, strlen(bufferSupp2), 0);
     if (ret == -1)
     {
         printf("Read operation gone bad\n");
