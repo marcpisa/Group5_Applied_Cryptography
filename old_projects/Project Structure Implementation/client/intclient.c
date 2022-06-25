@@ -10,17 +10,17 @@ int createSocket()
     return sock;
 }
 
-int LoginClient(...)
+int LoginClient()
 {
 
 }
 
-int LogoutClient(...)
+int LogoutClient()
 {
 
 }
 
-int listClient(char* username, struct sockaddr_in srv_addr, )
+int listClient(char* username, struct sockaddr_in srv_addr)
 {
     
     int sock, ret;
@@ -65,27 +65,27 @@ int listClient(char* username, struct sockaddr_in srv_addr, )
     printf("%s\n", buffer);
 }
 
-int renameClient(...)
+int renameClient()
 {
 
 }
 
-int deleteClient(...)
+int deleteClient()
 {
 
 }
 
-int downloadClient(...)
+int downloadClient()
 {
 
 }
 
-int uploadClient(...)
+int uploadClient()
 {
 
 }
 
-int shareClient(...)
+int shareClient()
 {
     
 }
