@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
     char command1[MAX_LEN_CMD];
     char command2[MAX_LEN_CMD];
     char command3[MAX_LEN_CMD];
+    char username[MAX_LEN_USR];
 
     // Timeout Variables
     struct timeval tv;
@@ -32,6 +33,9 @@ int main(int argc, char* argv[])
     }
     printf("\n+++++++++++ FILE CLOUD MANAGER +++++++++++\n");
     printf("File Cloud Manager booted correctly...\n");
+
+    // CHECKING USERNAME LENGTH
+    if (strlen(argv[2]) > MAX_LEN_USR)
 
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
@@ -135,7 +139,12 @@ int main(int argc, char* argv[])
                         break;
 
                         case 2: //*********** LOGOUT ************
-                        
+
+                        if (connected == 0)
+                        {
+                           printf("Not active connection. Login please!\n\n");
+                           break;
+                        }
                         // Stuff to do
                         
                         break;
@@ -143,35 +152,63 @@ int main(int argc, char* argv[])
                         case 3: //************ LIST *************
                         
                         // Stuff to do
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
+
+                        ret = intClient(username, srv_addr);
+                        if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
                         
                         break;
                         
                         case 4: //*********** RENAME ************
-
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
                         // Stuff to do
 
                         break;
 
                         case 5: //*********** DELETE **********
-
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
                         // Stuff to do
 
                         break;
 
                         case 6: //*********** DOWNLOAD ************
-
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
                         // Stuff to do
 
                         break;
 
                         case 7: //*********** UPLOAD *************
-
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
                         // Stuff to do
 
                         break;
 
                         case 8: //********** SHARE ************
-
+                        if (connected == 0)
+                        {
+                            printf("Not active connection. Login please!\n\n");
+                            break;
+                        }
                         //Stuff to do
 
                         break;

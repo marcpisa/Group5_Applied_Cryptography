@@ -13,6 +13,7 @@
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
 #define COM_LEN 10
+#define MAX_LEN_USR 20
 
 #define LOGIN "login"
 #define LOGOUT "logout"
