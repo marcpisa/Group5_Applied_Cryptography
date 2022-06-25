@@ -13,16 +13,11 @@ int main(int argc, char* argv[])
     struct sockaddr_in srv_addr, cl_addr;
     
     // Buffers
-<<<<<<< HEAD
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
-=======
-    char buffer[COM_LEN];
-    char bufferSupp1[COM_LEN];
-    char bufferSupp2[COM_LEN];
->>>>>>> 2190ab277d074dad92bee45fcf1e7fecdbd1584a
+
 
     // Timeout varible for the select function
     struct timeval tv;
