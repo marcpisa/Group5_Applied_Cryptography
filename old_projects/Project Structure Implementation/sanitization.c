@@ -1,8 +1,8 @@
 //IS THE SANIFICATION PROCESS DONE AT CLIENT LEVEL OR AT SERVER LEVEL???
 
-#include <util.h>
+#include "server/utilserver.h"
 
-static char *commands[] = {"login", "logout", "list", "rename", "delete", "download", "upload", "share"};
+static char *commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE};
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-./"};
 
 
@@ -28,7 +28,7 @@ RETURN:
 */
 int file_name_sanitization(const char* file_name[], const char* root_dir[], char* canon_file_name) {
 
-    char buf[MAX_CANONICA_LEN];
+    char buf[BUF_LEN];
 
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
     canon_file_name = realpath(file_name, buf);
