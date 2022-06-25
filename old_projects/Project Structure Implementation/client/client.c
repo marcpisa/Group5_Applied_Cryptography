@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
                             break;
                         }
 
-                        ret = intClient(username, srv_addr);
+                        ret = listClient(username, srv_addr);
                         if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
                         
                         break;
