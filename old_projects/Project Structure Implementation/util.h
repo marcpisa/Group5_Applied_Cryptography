@@ -8,17 +8,10 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+#include <search.h>
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
-#define BUF_LEN 1024
+#define MAX_CANONICA_LEN 1024
 #define COM_LEN 10
-
-#define LOGIN "login"
-#define LOGOUT "logout"
-#define RENAME "rename"
-#define DOWNLOAD "download"
-#define UPLOAD "upload"
-#define LIST "list"
-#define SHARE "share"
-#define DELETE "delete"
+#define COMM_NUMB 8
