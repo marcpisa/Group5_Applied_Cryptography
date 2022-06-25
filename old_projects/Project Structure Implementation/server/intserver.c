@@ -24,6 +24,7 @@ int listServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
+    struct dirent *files;
     int ret;
 
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
