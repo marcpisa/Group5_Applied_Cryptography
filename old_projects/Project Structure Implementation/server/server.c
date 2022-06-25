@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
 
     // Timeout varible for the select function
     struct timeval tv;
@@ -173,7 +174,9 @@ int main(int argc, char* argv[])
                             printf("\nA list request has came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
-                            // Do stuff
+                            
+
+                            //END COMMUNICATION
 
                             printf("End of list request management!\n\n");
                             close(i);

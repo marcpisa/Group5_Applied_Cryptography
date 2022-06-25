@@ -36,6 +36,10 @@ int main(int argc, char* argv[])
 
     // CHECKING USERNAME LENGTH
     if (strlen(argv[2]) > MAX_LEN_USR)
+    {
+        printf("Username too long... max length %s\n", MAX_LEN_USR);
+        exit(1);
+    }
 
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
