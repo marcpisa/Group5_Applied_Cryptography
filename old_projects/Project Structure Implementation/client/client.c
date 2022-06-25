@@ -1,4 +1,5 @@
 #include "intclient.h"
+#include "sanitization.c"
 
 int main(int argc, char* argv[])
 {
@@ -12,7 +13,7 @@ int main(int argc, char* argv[])
     socklen_t addrlen;
 
     //Buffers
-    char buffer[BUF_LEN];
+    char buffer[COM_LEN];
     char command1[MAX_LEN_CMD];
     char command2[MAX_LEN_CMD];
     char command3[MAX_LEN_CMD];
@@ -108,7 +109,7 @@ int main(int argc, char* argv[])
                 {
                     //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
                     strcpy(command1, ""); strcpy(command2, ""); strcpy(command3, "");
-                    fgets(buffer, BUF_LEN, stdin);
+                    fgets(buffer, COM_LEN, stdin);
                     sscanf(buffer, "%s %s %s", command1, command2, command3);
                     if (strcmp(command1, "") == 0)
                     {
@@ -125,22 +126,16 @@ int main(int argc, char* argv[])
                     UPLOAD = 7;
                     SHARE = 8;
                     WRONG COMMAND = 0;*/
-                    if (strcmp(command1, LOGIN) == 0) s = 1;
-                    else if (strcmp(command1, LOGOUT) == 0) s = 2;
-                    else if (strcmp(command1, LIST) == 0) s = 3;
-                    else if (strcmp(command1, RENAME) == 0) s = 4;
-                    else if (strcmp(command1, DELETE) == 0) s = 5;
-                    else if (strcmp(command1, DOWNLOAD) == 0) s = 6;
-                    else if (strcmp(command1, UPLOAD) == 0) s = 7;
-                    else if (strcmp(command1, SHARE) == 0) s = 8;
-                    else s = 0;
+
+                    s = input_sanitization_commands(command1);
+
                     switch(s)
                     {
                         case 1: //*********** LOGIN **************
 
                         // Stuff to do
 
-                        break;
+                            break;
 
                         case 2: //*********** LOGOUT ************
 
@@ -151,7 +146,7 @@ int main(int argc, char* argv[])
                         }
                         // Stuff to do
                         
-                        break;
+                            break;
 
                         case 3: //************ LIST *************
                         
@@ -165,7 +160,7 @@ int main(int argc, char* argv[])
                         ret = listClient(username, srv_addr);
                         if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
                         
-                        break;
+                            break;
                         
                         case 4: //*********** RENAME ************
                         if (connected == 0)
@@ -175,7 +170,7 @@ int main(int argc, char* argv[])
                         }
                         // Stuff to do
 
-                        break;
+                            break;
 
                         case 5: //*********** DELETE **********
                         if (connected == 0)
@@ -185,7 +180,7 @@ int main(int argc, char* argv[])
                         }
                         // Stuff to do
 
-                        break;
+                            break;
 
                         case 6: //*********** DOWNLOAD ************
                         if (connected == 0)
@@ -195,7 +190,7 @@ int main(int argc, char* argv[])
                         }
                         // Stuff to do
 
-                        break;
+                            break;
 
                         case 7: //*********** UPLOAD *************
                         if (connected == 0)
@@ -205,7 +200,7 @@ int main(int argc, char* argv[])
                         }
                         // Stuff to do
 
-                        break;
+                            break;
 
                         case 8: //********** SHARE ************
                         if (connected == 0)
@@ -215,7 +210,7 @@ int main(int argc, char* argv[])
                         }
                         //Stuff to do
 
-                        break;
+                            break;
 
                         default:
                             printf("Command inserted is wrong: retry...\n\n");
