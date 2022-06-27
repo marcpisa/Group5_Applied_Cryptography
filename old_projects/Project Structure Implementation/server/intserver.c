@@ -25,7 +25,7 @@ int listServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
-    
+    DIR* d;
     struct dirent *files;
     int ret;
 
@@ -46,8 +46,9 @@ int listServer(int sd, char* rec_mex)
     chdir("..");
 
     // WE ARE ASSUMING THAT WE DON'T NEED MORE THAN ONE MESSAGE TO LIST THE FILES
+    d = opendir(".");
     memset(bufferSupp1, 0, strlen(bufferSupp1));
-    while(files = readdir(bufferSupp2) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
+    while(files = readdir(d) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
     {
         strcat(bufferSupp1, files->d_name);
         strcat(bufferSupp1, "/");
