@@ -25,6 +25,7 @@ int listServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN+10]; // I'm creating a buffer a little longer to have the capacity to contain buffSupp1. We could fix the problem later, putting the end_string character at the end of the list
+    char path[BUF_LEN];
     DIR* d;
     struct dirent *files;
     int ret;
@@ -36,6 +37,7 @@ int listServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
+    sprintf(path, "%s", bufferSupp2);
     printf("The username is %s\n\n", bufferSupp2);
 
     if (chdir("/home/marc/Documents/database") == -1)
@@ -43,10 +45,10 @@ int listServer(int sd, char* rec_mex)
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
 
-    if (chdir(bufferSupp2) == -1)
+    if (chdir(path) == -1)
 	{
-		mkdir(bufferSupp2, S_IRWXU);
-		chdir(bufferSupp2);
+		mkdir(path, S_IRWXU);
+		chdir(path);
 	}
     if (ret == -1)
     {
