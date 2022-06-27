@@ -36,8 +36,9 @@ int listServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
+    printf("The username is %s\n\n", bufferSupp2);
 
-    chdir("/home/marc/Documents/Group5_Applied_Cryptography/old_projects/Project Structure Implementation/database/marc");
+    chdir("/home/marc/Documents/Group5_Applied_Cryptography/old_projects/Project Structure Implementation/database");
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
