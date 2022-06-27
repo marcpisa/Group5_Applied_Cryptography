@@ -36,12 +36,12 @@ int main(int argc, char* argv[])
     printf("File Cloud Manager booted correctly...\n");
 
     // CHECKING USERNAME LENGTH
-    if (strlen(argv[2]) > MAX_LEN_USR)
+    if (strlen(argv[1]) > MAX_LEN_USR)
     {
         printf("Username too long... max length %i\n", MAX_LEN_USR);
         exit(1);
     }
-    strcpy(username, argv[2]);
+    strcpy(username, argv[1]);
 
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
     printf("\nSocket TCP correctly allocated!\n");
 
     //SOCKET CONFIGURATION
-    port = atoi(argv[1]);
+    port = atoi(argv[2]);
     memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family = AF_INET;
     my_addr.sin_port = htons(port);
@@ -90,8 +90,8 @@ int main(int argc, char* argv[])
     while(1)
     {
         read_fds = master;
-        select(fdmax+1, &read_fds, NULL, NULL, 0);
         printf("Please, write a command..\n\n");
+        select(fdmax+1, &read_fds, NULL, NULL, 0);
         for (int i = 0; i <= fdmax; i++)
         {
             if (FD_ISSET(i, &read_fds))
