@@ -33,8 +33,8 @@ int listServer(int sd, char* rec_mex)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
 
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp1, 0, BUF_LEN);
+    memset(bufferSupp2, 0, BUF_LEN);
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
     printf("The username is %s, the length of the username is %li\n\n", bufferSupp2, strlen(bufferSupp2));
 

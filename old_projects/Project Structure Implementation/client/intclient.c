@@ -42,7 +42,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
     printf("I'm sending %s\n", buffer);
-    ret = send(sock, buffer, strlen(buffer), 0);
+    ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
         printf("Send operation gone bad\n");
