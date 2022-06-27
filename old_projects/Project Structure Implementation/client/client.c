@@ -90,6 +90,7 @@ int main(int argc, char* argv[])
     {
         read_fds = master;
         select(fdmax+1, &read_fds, NULL, NULL, &tv);
+        printf("Please, write a command..\n\n");
         for (int i = 0; i <= fdmax; i++)
         {
             if (FD_ISSET(i, &read_fds))
