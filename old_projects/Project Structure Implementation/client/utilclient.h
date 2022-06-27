@@ -12,7 +12,7 @@
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
-#define COM_LEN 10
+#define COM_LEN 16
 #define MAX_LEN_USR 20
 #define COMM_NUMB 8
 
@@ -27,3 +27,10 @@
 
 #define LIST_REQ "list_req"
 #define LIST_RESP "list_res"
+#define RENAME_REQUEST "renm_req"
+#define RENAME_ACCEPTED "renm_acc"
+#define RENAME_DENIED "renm_den"
+#define DELETE_REQUEST "dele_req"
+#define DELETE_ACCEPTED "dele_acc"
+#define DELETE_DENIED "dele_den"
+#define DOWNLOAD_REQUEST "down_req"

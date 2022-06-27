@@ -128,7 +128,6 @@ int main(int argc, char* argv[])
                     WRONG COMMAND = 0;*/
 
                     s = input_sanitization_commands(command1);
-
                     switch(s)
                     {
                         case 1: //*********** LOGIN **************
@@ -139,76 +138,81 @@ int main(int argc, char* argv[])
 
                         case 2: //*********** LOGOUT ************
 
-                        if (connected == 0)
-                        {
-                           printf("Not active connection. Login please!\n\n");
-                           break;
-                        }
-                        // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
+                            // Stuff to do
                         
                             break;
 
                         case 3: //************ LIST *************
                         
-                        // Stuff to do
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
+                            // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
 
-                        ret = listClient(username, srv_addr);
-                        if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
+                            ret = listClient(username, srv_addr);
+                            if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
                         
                         case 4: //*********** RENAME ************
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
-                        // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
 
+                            ret = renameClient(username, command1, command2, srv_addr);
+                            if (ret == -1)
+                            {
+                                printf("Error during the rename operation request!\n\n");
+                                exit(1);
+                            }
                             break;
 
                         case 5: //*********** DELETE **********
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
-                        // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
+                            // Stuff to do
 
                             break;
 
                         case 6: //*********** DOWNLOAD ************
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
-                        // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
+                            // Stuff to do
 
                             break;
 
                         case 7: //*********** UPLOAD *************
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
-                        // Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
+                            // Stuff to do
 
                             break;
 
                         case 8: //********** SHARE ************
-                        if (connected == 0)
-                        {
-                            printf("Not active connection. Login please!\n\n");
-                            break;
-                        }
-                        //Stuff to do
+                            if (connected == 0)
+                            {
+                                printf("Not active connection. Login please!\n\n");
+                                break;
+                            }
+                            //Stuff to do
 
                             break;
 

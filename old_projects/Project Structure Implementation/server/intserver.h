@@ -1,7 +1,7 @@
 #include "utilserver.h"
 int createSocket();
 int listServer(int sd, char* rec_mex);
-int renameServer();
+int renameServer(int sd, char *rec_mex);
 int deleteServer();
 int downloadServer();
 int uploadServer();
