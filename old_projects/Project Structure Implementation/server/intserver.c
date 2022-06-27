@@ -28,7 +28,7 @@ int listServer(int sd, char* rec_mex)
     DIR* d;
     struct dirent *files;
     int ret;
-    printf("I received a message from a client saying: %s\n\\n", rec_mex);
+    printf("I received a message from a client saying: %s\n\n", rec_mex);
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
@@ -42,13 +42,17 @@ int listServer(int sd, char* rec_mex)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
-    ret = chdir(bufferSupp2);
+
+    if (chdir(bufferSupp2) == -1)
+	{
+		mkdir(bufferSupp2, S_IRWXU);
+		chdir(bufferSupp2);
+	}
     if (ret == -1)
     {
         printf("Error: username doesn't exists...\n");
         exit(1);
     }
-    chdir("..");
 
     // WE ARE ASSUMING THAT WE DON'T NEED MORE THAN ONE MESSAGE TO LIST THE FILES
     d = opendir(".");
