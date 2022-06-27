@@ -37,7 +37,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     
     // SET LIST REQUEST BUFFER
     memset(buffer, 0, BUF_LEN);
-    sprintf(buffer, "%7s %15s", LIST_REQ, username);
+    sprintf(buffer, "%s %s", LIST_REQ, username);
     buffer[BUF_LEN-1] = '\0';
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
