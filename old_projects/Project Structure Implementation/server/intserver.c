@@ -36,7 +36,7 @@ int listServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
-    printf("The username is %s\n\n", bufferSupp2);
+    printf("The username is %s, the length of the username is %i\n\n", bufferSupp2, strlen(bufferSupp2));
 
     if (chdir("/home/marc/Documents/database") == -1)
 	{
