@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
                     
                     
                     // ************ LOGIN REQUEST MANAGER ***********
-                    if (strcmp(bufferSupp1, LOGIN) == 0)
+                    if (strcmp(bufferSupp1, LOGIN_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 
 
                     //************ LOGOUT REQUEST MANAGER ************
-                    else if (strcmp(bufferSupp1, LOGOUT) == 0)
+                    else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
 
 
                     // ************* LIST REQUEST MANAGER ***************
-                    else if (strcmp(bufferSupp1, LIST) == 0)
+                    else if (strcmp(bufferSupp1, LIST_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -202,7 +202,7 @@ int main(int argc, char* argv[])
 
 
                     //*************** RENAME REQUEST MANAGER *****************
-                    else if (strcmp(bufferSupp1, RENAME) == 0)
+                    else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
 
 
                     // **************** DELETE REQUEST MANAGER ******************
-                    else if (strcmp(bufferSupp1, DELETE) == 0)
+                    else if (strcmp(bufferSupp1, DELETE_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
 
 
                     // *************** DOWNLOAD REQUEST MANAGER ****************
-                    else if (strcmp(bufferSupp1, DOWNLOAD) == 0)
+                    else if (strcmp(bufferSupp1, DOWNLOAD_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
 
 
                     // *************** UPLOAD REQUEST MANAGER ***************
-                    else if (strcmp(bufferSupp1, UPLOAD) == 0)
+                    else if (strcmp(bufferSupp1, UPLOAD_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -319,7 +319,7 @@ int main(int argc, char* argv[])
 
 
                     // **************** SHARE REQUEST MANAGER ****************
-                    else if (strcmp(bufferSupp1, SHARE) == 0)
+                    else if (strcmp(bufferSupp1, SHARE_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid

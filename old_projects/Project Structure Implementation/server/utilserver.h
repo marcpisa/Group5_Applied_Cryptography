@@ -28,8 +28,10 @@
 #define SHARE "share"
 #define DELETE "delete"
 
-#define LIST_REQ "list_req"
-#define LIST_RESP "list_res"
+#define LOGIN_REQUEST "logi_req"
+#define LOGOUT_REQUEST "logo_req"
+#define LIST_REQUEST "list_req"
+#define LIST_RESPONSE "list_res"
 #define RENAME_REQUEST "renm_req"
 #define RENAME_ACCEPTED "renm_acc"
 #define RENAME_DENIED "renm_den"
@@ -37,3 +39,6 @@
 #define DELETE_ACCEPTED "dele_acc"
 #define DELETE_DENIED "dele_den"
 #define DOWNLOAD_REQUEST "down_req"
+#define UPLOAD_REQUEST "upld_req"
+#define SHARE_REQUEST "shre_req"
+
