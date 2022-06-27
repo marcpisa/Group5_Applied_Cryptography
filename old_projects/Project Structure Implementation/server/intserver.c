@@ -24,7 +24,7 @@ int LogoutClient()
 int listServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
+    char bufferSupp2[BUF_LEN+10]; // I'm creating a buffer a little longer to have the capacity to contain buffSupp1. We could fix the problem later, putting the end_string character at the end of the list
     DIR* d;
     struct dirent *files;
     int ret;
