@@ -3,7 +3,8 @@
 int createSocket()
 {
     int sock;
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+    {
         printf("\n Socket creation error \n");
         return -1;
     }
@@ -27,9 +28,8 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     char buffer[BUF_LEN];
     sock = createSocket();
 
-    if (connect(sock, (struct sockaddr*)&srv_addr,
-                sizeof(srv_addr))
-        < 0) {
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
         printf("\nConnection Failed \n");
         exit(1);
     }
@@ -73,9 +73,8 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
     char bufferSupp2[BUF_LEN];
     sock = createSocket();
 
-    if (connect(sock, (struct sockaddr*)&srv_addr,
-                sizeof(srv_addr))
-        < 0) {
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
         printf("\nConnection Failed \n");
         exit(1);
     }

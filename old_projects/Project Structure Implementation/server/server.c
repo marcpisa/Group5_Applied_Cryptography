@@ -58,6 +58,14 @@ int main(int argc, char* argv[])
     }
     printf("Bind of the socket with address %i and port %i correctly executed", srv_addr.sin_addr.s_addr, SERVER_PORT);
     
+    ret = listen(listenerTCP, 10);
+    if (ret < 0)
+    {
+        perror("Error during listen function execution: ");
+        exit(-1);
+    }
+    printf("Bind phase correctly executed: port %i used!\n\n", SERVER_PORT);
+
     // CONFIGURATION DATA STRUCTURES FOR THE SELECT FUNCTION
     FD_ZERO(&master);
     FD_ZERO(&read_fds);
