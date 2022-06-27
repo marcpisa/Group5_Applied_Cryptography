@@ -16,6 +16,8 @@
 #define COM_LEN 16
 #define MAX_LEN_USR 20
 #define COMM_NUMB 8
+#define SERVER_PORT 9425
+#define LOCALHOST "127.0.0.1"
 
 #define LOGIN "login"
 #define LOGOUT "logout"

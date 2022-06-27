@@ -328,7 +328,7 @@ begin:	t = time(NULL);
 							srv_addr.sin_family = AF_INET;
 							port = atoi(comando3);
 							srv_addr.sin_port = htons(port);
-							inet_pton(AF_INET, comando2, &srv_addr.sin_addr);
+							inet_pton(AF_INET, "127.0.0.1", &srv_addr.sin_addr);
 
 						
 							//SALVO SU UNA STRUTTURA LE INFO DEL SERVER NEL CASO IN CUI MI DOVESSE SERVIRE IN SEGUITO

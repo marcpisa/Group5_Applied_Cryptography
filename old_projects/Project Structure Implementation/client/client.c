@@ -47,6 +47,13 @@ int main(int argc, char* argv[])
     tv.tv_sec = SELECT_SEC_TO_WAIT;
 	tv.tv_usec = 0;
 
+    // CONFIGURATION OF THE SERVER INFO
+    memset(&srv_addr, 0, sizeof(srv_addr));
+	srv_addr.sin_family = AF_INET;
+	port = SERVER_PORT;
+	srv_addr.sin_port = htons(port);
+	inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
+
     // SOCKET TCP DECLARATION
     listenerTCP = socket(AF_INET, SOCK_STREAM, 0);
     if (listenerTCP == -1)
@@ -164,11 +171,11 @@ int main(int argc, char* argv[])
                         case 3: //************ LIST *************
                         
                             // Stuff to do
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }
+                            }*/
 
                             ret = listClient(username, srv_addr);
                             if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
