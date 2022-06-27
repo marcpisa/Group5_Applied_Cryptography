@@ -84,7 +84,7 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
 
     // SET RENAME REQUEST BUFFER
     memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s %s %s", RENAME_REQ, username, filename, new_filename);
+    sprintf(buffer, "%s %s %s %s", RENAME_REQUEST, username, filename, new_filename);
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
 
