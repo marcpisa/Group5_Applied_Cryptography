@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 
     //********* END VARIABLES *********
 
-    if (argc != 2)
+    if (argc != 3)
     {
         printf("Error at the boot phase of the Client. The number of arguments is wrong...\n");
         exit(-1);
@@ -41,6 +41,7 @@ int main(int argc, char* argv[])
         printf("Username too long... max length %i\n", MAX_LEN_USR);
         exit(1);
     }
+    strcpy(username, argv[2]);
 
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
