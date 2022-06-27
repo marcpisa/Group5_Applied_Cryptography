@@ -65,7 +65,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     printf("%s\n", buffer);
 }
 
-int renameClient(char* username,char* filename, char* new_filename, struct sockaddr srv_addr)
+int renameClient(char* username,char* filename, char* new_filename, struct sockaddr_in srv_addr)
 {
     int sock, ret;
     char buffer[BUF_LEN];
