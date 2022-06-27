@@ -59,7 +59,7 @@ int listServer(int sd, char* rec_mex)
     
 
     memset(bufferSupp2, 0, strlen(bufferSupp2));
-    sprintf(bufferSupp2, "%s %s" LIST_RESP, bufferSupp1);
+    sprintf(bufferSupp2, "%s %s" LIST_RESP, &bufferSupp1);
 
     // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
