@@ -5,7 +5,7 @@ int main(int argc, char* argv[])
     // *********** VARIABLES ************
     
     // Socket management variables
-    int ret, pid, listenerTCP, len, port, i, nbytes, fdmax, new_sd, s;
+    int ret, pid, listenerTCP, len, i, nbytes, fdmax, new_sd, s;
     uint32_t addr_app;
     fd_set master;
     fd_set read_fds;
@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
 
     // ********** END VARIABLES *********
 
-    if (argc != 2)
+    if (argc != 1)
     {
         printf("Error during boot phase: number of arguments is wrong...\n\n");
         exit(-1);
@@ -45,8 +45,7 @@ int main(int argc, char* argv[])
     //SOCKET CONFIGURATION
     memset(&srv_addr, 0, sizeof(srv_addr));
     srv_addr.sin_family = AF_INET;
-    sscanf(argv[1], "%i", &port);
-    srv_addr.sin_port = htons(port);
+    srv_addr.sin_port = htons(SERVER_PORT);
     srv_addr.sin_addr.s_addr = INADDR_ANY;
 
     // BIND PHASE OF THE SOCKET
@@ -57,7 +56,7 @@ int main(int argc, char* argv[])
         perror("Error during bind phase: ");
         exit(-1);
     }
-    printf("Bind of the socket with address %i and port %i correctly executed", srv_addr.sin_addr.s_addr, port);
+    printf("Bind of the socket with address %i and port %i correctly executed", srv_addr.sin_addr.s_addr, SERVER_PORT);
     
     // CONFIGURATION DATA STRUCTURES FOR THE SELECT FUNCTION
     FD_ZERO(&master);
