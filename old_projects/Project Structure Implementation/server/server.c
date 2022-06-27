@@ -64,9 +64,10 @@ int main(int argc, char* argv[])
     FD_ZERO(&read_fds);
     FD_SET(listenerTCP, &master);
     fdmax = listenerTCP;
-
+    printf("I'm using the select function to attend for more than one event...\n\n");
     while(1)
     {
+        printf("Another turn of select has been done. It means that the software is behaving correctly..\n\n");
         read_fds = master;
         select (fdmax+1, &read_fds, NULL, NULL, &tv);
         for (i = 0; i <= fdmax; i++)
