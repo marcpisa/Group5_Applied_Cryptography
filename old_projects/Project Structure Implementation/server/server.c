@@ -91,6 +91,7 @@ int main(int argc, char* argv[])
                     new_sd = accept(listenerTCP, (struct sockaddr*)&cl_addr, &addrlen);
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
+                    printf("We received and accepted a client connection request...\n\n");
                 }
                 else //Manager for the accepted communications
                 {
