@@ -38,7 +38,10 @@ int listServer(int sd, char* rec_mex)
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
     printf("The username is %s\n\n", bufferSupp2);
 
-    chdir("/home/marc/Documents/Group5_Applied_Cryptography/old_projects/Project Structure Implementation/database");
+    if (chdir("/home/marc/Documents/database") == -1)
+	{
+		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+	}
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
