@@ -48,11 +48,15 @@ int listServer(int sd, char* rec_mex)
     // WE ARE ASSUMING THAT WE DON'T NEED MORE THAN ONE MESSAGE TO LIST THE FILES
     d = opendir(".");
     memset(bufferSupp1, 0, strlen(bufferSupp1));
-    while(files = readdir(d) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
+    if(d)
     {
-        strcat(bufferSupp1, files->d_name);
-        strcat(bufferSupp1, "/");
+        while((files = readdir(d)) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
+        {
+            strcat(bufferSupp1, files->d_name);
+            strcat(bufferSupp1, "/");
+        }
     }
+    
 
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sprintf(bufferSupp2, "%s %s" LIST_RESP, bufferSupp1);
