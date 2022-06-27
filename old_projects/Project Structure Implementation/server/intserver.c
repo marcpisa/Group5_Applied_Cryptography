@@ -28,7 +28,7 @@ int listServer(int sd, char* rec_mex)
     DIR* d;
     struct dirent *files;
     int ret;
-
+    printf("I received a message from a client saying: %s\n\\n", rec_mex);
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
@@ -36,6 +36,7 @@ int listServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
+
     chdir("C:Documents/CloudProject");
     ret = chdir(bufferSupp2);
     if (ret == -1)
@@ -60,7 +61,7 @@ int listServer(int sd, char* rec_mex)
 
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sprintf(bufferSupp2, "%s %s", LIST_RESP, bufferSupp1);
-
+    printf("I'm sendinf %s to the client...\n\n", bufferSupp2);
     // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
     ret = send(sd, bufferSupp2, strlen(bufferSupp2), 0);

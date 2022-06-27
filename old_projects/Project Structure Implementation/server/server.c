@@ -189,6 +189,7 @@ int main(int argc, char* argv[])
                                 printf("Something bad happened during the management of the client list request...\n\n");
                                 exit(1);
                             }
+                            else printf("I managed a list request and all was good!\n\n");
 
                             //END COMMUNICATION
 
