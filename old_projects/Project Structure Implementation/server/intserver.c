@@ -43,11 +43,7 @@ int listServer(int sd, char* rec_mex)
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
 
-    if (chdir(bufferSupp2) == -1)
-	{
-		mkdir(bufferSupp2, S_IRWXU);
-		chdir(bufferSupp2);
-	}
+    ret = chdir(bufferSupp2);
     if (ret == -1)
     {
         printf("Error: username doesn't exists...\n");

@@ -100,6 +100,7 @@ int main(int argc, char* argv[])
                     if (ret < 0)
                     {
                         perror("Errore in fase di ricezione: ");
+                        close(listenerTCP);
                         exit(-1);
                     }
 
