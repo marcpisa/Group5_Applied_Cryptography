@@ -41,7 +41,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     buffer[BUF_LEN-1] = '\0';
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
-
+    printf("I'm sending %s\n", buffer);
     ret = send(sock, buffer, strlen(buffer), 0);
     if (ret == -1)
     {
