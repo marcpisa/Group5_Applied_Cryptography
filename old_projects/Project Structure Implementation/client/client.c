@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
                             }*/
 
                             ret = listClient(username, srv_addr);
-                            if (ret == 1) {printf("Something bad happend\n\n"); exit(1);}
+                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
                         
