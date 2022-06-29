@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
                 {
                     //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
                     strcpy(command1, ""); strcpy(command2, ""); strcpy(command3, "");
-                    fgets(buffer, COM_LEN, stdin);
+                    fgets(buffer, 3*COM_LEN+3, stdin); //We should fix this later
                     sscanf(buffer, "%s %s %s", command1, command2, command3);
                     if (strcmp(command1, "") == 0)
                     {
