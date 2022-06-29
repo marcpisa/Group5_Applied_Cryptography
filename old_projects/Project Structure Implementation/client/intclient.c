@@ -85,6 +85,7 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
 
     // SET RENAME REQUEST BUFFER
     memset(buffer, 0, strlen(buffer));
+    printf("The new filename is %s\n\n", new_filename);
     sprintf(buffer, "%s %s %s %s", RENAME_REQUEST, username, filename, new_filename);
     printf("I'm sending to the server the mex %s\n\n", buffer);
 
