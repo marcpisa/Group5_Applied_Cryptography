@@ -127,6 +127,7 @@ int renameServer(int sd, char* rec_mex)
     return 1;
 }
 
+
 int deleteServer()
 {
 
@@ -137,6 +138,7 @@ int downloadServer()
 {
 
 }
+
 
 int uploadServer()
 {

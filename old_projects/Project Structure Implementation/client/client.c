@@ -183,13 +183,13 @@ int main(int argc, char* argv[])
                             break;
                         
                         case 4: //*********** RENAME ************
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }
+                            }*/
 
-                            ret = renameClient(username, command1, command2, srv_addr);
+                            ret = renameClient(username, command2, command3, srv_addr);
                             if (ret == -1)
                             {
                                 printf("Error during the rename operation request!\n\n");
