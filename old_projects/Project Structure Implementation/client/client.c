@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     socklen_t addrlen;
 
     //Buffers
-    char buffer[COM_LEN];
+    char buffer[BUF_LEN];
     char command1[MAX_LEN_CMD];
     char command2[MAX_LEN_CMD];
     char command3[MAX_LEN_CMD];
@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-
+                            printf("Command3 is %s\n", command3);
                             ret = renameClient(username, command2, command3, srv_addr);
                             if (ret == -1)
                             {
