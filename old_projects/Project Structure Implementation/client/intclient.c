@@ -135,9 +135,50 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
         }
 }
 
-int deleteClient()
-{
 
+
+int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
+{        
+    int sock, ret;
+    char buffer[BUF_LEN];
+    sock = createSocket();
+
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
+
+    
+    // SET DELETE REQUEST BUFFER
+    memset(buffer, 0, BUF_LEN);
+    sprintf(buffer, "%s %s %s", DELETE_REQUEST, username, filename);
+    buffer[BUF_LEN-1] = '\0';
+
+    // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
+    ret = send(sock, buffer, BUF_LEN, 0);
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    printf("Delete request message sent\n");
+    memset(buffer, 0, strlen(buffer));
+    ret = read(sock, buffer, BUF_LEN);
+    if (ret == -1)
+    {
+        printf("Read operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    // HERE USE DECRYPTION TO UNDERSTAND WHAT YOU RECEIVE
+
+    // END COMMUNICATION
+
+    printf("%s\n", buffer);
+    return 1;
 }
 
 int downloadClient()

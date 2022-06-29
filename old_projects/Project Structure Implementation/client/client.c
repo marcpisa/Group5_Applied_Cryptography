@@ -198,12 +198,13 @@ int main(int argc, char* argv[])
                             break;
 
                         case 5: //*********** DELETE **********
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }
-                            // Stuff to do
+                            }*/
+                            ret = deleteClient(username,command2, srv_addr);
+                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
 
                             break;
 

@@ -271,7 +271,13 @@ int main(int argc, char* argv[])
                             printf("\nA delete request has came up...\n\n");
                             // DELETE MANAGER: SERVER SIDE
                             
-                            // Do stuff
+                            ret = deleteServer(i, buffer);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client delete request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a delete request and all was good!\n\n");
 
                             printf("End of delete request management!\n\n");
                             close(i);
