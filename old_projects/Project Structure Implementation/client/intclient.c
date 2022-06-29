@@ -196,7 +196,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
     f1 = fopen(filename, "r");
-    if (f1 = -1) printf("Starting the download...\n\n");
+    if (f1 == -1) printf("Starting the download...\n\n");
     else
     {
         fclose(f1);
