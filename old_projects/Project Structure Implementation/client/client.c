@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            printf("Command3 is %s\n", command3);
+                            //printf("Command3 is %s\n", command3);
                             ret = renameClient(username, command2, command3, srv_addr);
                             if (ret == -1)
                             {

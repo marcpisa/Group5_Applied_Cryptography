@@ -28,7 +28,7 @@ int listServer(int sd, char* rec_mex)
     DIR* d;
     struct dirent *files;
     int ret;
-    printf("I received a message from a client saying: %s\n\n", rec_mex);
+  //  printf("I received a message from a client saying: %s\n\n", rec_mex);
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
@@ -36,7 +36,7 @@ int listServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, BUF_LEN);
     memset(bufferSupp2, 0, BUF_LEN);
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
-    printf("The username is %s, the length of the username is %li\n\n", bufferSupp2, strlen(bufferSupp2));
+    //printf("The username is %s, the length of the username is %li\n\n", bufferSupp2, strlen(bufferSupp2));
 
     if (chdir("/home/marc/Documents/database") == -1)
 	{
@@ -65,7 +65,7 @@ int listServer(int sd, char* rec_mex)
 
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sprintf(bufferSupp2, "%s %s", LIST_RESPONSE, bufferSupp1);
-    printf("I'm sendinf %s to the client...\n\n", bufferSupp2);
+    //printf("I'm sendinf %s to the client...\n\n", bufferSupp2);
     // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
     ret = send(sd, bufferSupp2, strlen(bufferSupp2), 0);
@@ -93,9 +93,9 @@ int renameServer(int sd, char* rec_mex)
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
-    printf("We received the messsage %s", rec_mex);
+    //printf("We received the messsage %s", rec_mex);
     sscanf(rec_mex, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4); //The format of the message received is: type_mex, username, filename, new_filename
-    printf("The username is %s, the old_filename is %s, the new_filename is %s\n\n", bufferSupp2, bufferSupp3, bufferSupp4);
+    //printf("The username is %s, the old_filename is %s, the new_filename is %s\n\n", bufferSupp2, bufferSupp3, bufferSupp4);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3 AND BUFFERSUPP4, otherwise send a message of error to the client
     chdir("/home/marc/Documents/database");
     ret = chdir(bufferSupp2);
