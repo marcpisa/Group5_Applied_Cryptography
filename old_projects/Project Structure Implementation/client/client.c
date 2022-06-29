@@ -85,6 +85,7 @@ int main(int argc, char* argv[])
         exit(-1);
     }
     printf("Bind phase correctly executed: port %i used!\n\n", port);
+    printf(RED "Write 'help' to see the manual.\n" RESET ); 
 
     // CONFIGURATION SET FOR THE SELECT FUNCTION
     FD_ZERO(&master);
@@ -147,6 +148,7 @@ int main(int argc, char* argv[])
                     else if (strcmp(command1, DOWNLOAD) == 0) s = 6;
                     else if (strcmp(command1, UPLOAD) == 0) s = 7;
                     else if (strcmp(command1, SHARE) == 0) s = 8;
+                    else if (strcmp(command1, HELP) == 0) s = 9; 
                     else s = 0;
 
                     switch(s)
@@ -238,6 +240,26 @@ int main(int argc, char* argv[])
                             //Stuff to do
 
                             break;
+
+                        
+                        case 9: //************HELP***************//
+                               if (connected == 0 || connected == 1) 
+                               { 
+                                    printf(GRN "This is the manual with the following commands:\n\n"); 
+                                    printf("Login: ' ' \n"); 
+                                    printf("Logout: ' ' \n"); 
+                                    printf("List all files: 'list'\n");
+                                    printf("Rename files: 'rename old_filename new_filename'\n"); 
+                                    printf("Delete file: 'delete filename'\n"); 
+                                    printf("Download file: 'download filename'\n"); 
+                                    printf("Upload file: 'upload file_location'\n"); 
+                                    printf("Share file with other user: 'share username filename'\n"); 
+                                    printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
+                                    break; 
+                               } 
+
+                               break; 
+
 
                         default:
                             printf("Command inserted is wrong: retry...\n\n");

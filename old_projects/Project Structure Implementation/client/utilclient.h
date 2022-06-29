@@ -28,6 +28,7 @@
 #define LIST "list"
 #define SHARE "share"
 #define DELETE "delete"
+#define HELP "help"
 
 #define LIST_REQ "list_req"
 #define LIST_RESP "list_res"
@@ -39,3 +40,6 @@
 #define DELETE_DENIED "dele_den"
 #define DOWNLOAD_REQUEST "down_req"
 
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define RESET "\x1B[0m"
