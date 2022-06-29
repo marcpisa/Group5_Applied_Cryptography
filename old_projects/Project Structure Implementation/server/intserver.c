@@ -10,12 +10,12 @@ int createSocket()
     return sock;
 }
 
-int LoginClient()
+int LoginServer()
 {
 
 }
 
-int LogoutClient()
+int LogoutServer()
 {
 
 }

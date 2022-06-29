@@ -214,7 +214,8 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            // Stuff to do
+                            ret = donwnloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
+                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
 
                             break;
 

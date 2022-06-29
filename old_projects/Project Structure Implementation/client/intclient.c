@@ -181,9 +181,78 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int downloadClient()
+int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
+    int sock, ret, nchunk, i;
+    char buffer[BUF_LEN];
+    FILE* f1;
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    sock = createSocket();
 
+    if (chdir("/home/marc/Documents/donwnload") == -1)
+	{
+		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+	}
+    f1 = fopen(filename, "r");
+    if (f1 = -1) printf("Starting the download...\n\n");
+    else
+    {
+        fclose(f1);
+        printf("Filename already exists. Download request over...\n\n");
+        return -1;
+    }
+
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
+
+    // SANITIZE FILENAME(VERY IMPORTANT)
+
+    // SET DOWNLOAD REQUEST BUFFER
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s %s", DOWNLOAD_REQUEST, username, filename);
+
+    // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
+
+    ret = send(sock, buffer, strlen(buffer), 0);
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    memset(buffer, 0, strlen(buffer));
+
+    // I'm going to receive a messsage with this format: download_accepted username number_of_chunk
+
+    ret = read(sock, buffer, BUF_LEN);
+    if (ret == -1)
+    {
+        printf("Read operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
+    nchunk = atoi(bufferSupp3);
+
+    f1 = fopen(filename, "w");
+    for (i; i < nchunk; i++)
+    {
+        memset(buffer, 0, strlen(buffer));
+        // I'm receveing a message with this format: download_chunk n_chunk payload
+        ret = read(sock, buffer, BUF_LEN);
+        if (ret == -1)
+        {
+            printf("Read operation gone bad\n");
+            // Change this later to manage properly the session
+            exit(1);
+        }
+        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    }
 }
 
 int uploadClient()
