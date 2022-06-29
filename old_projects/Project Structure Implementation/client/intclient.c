@@ -196,7 +196,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
     f1 = fopen(filename, "r");
-    if (f1 == -1) printf("Starting the download...\n\n");
+    if (f1 == NULL) printf("Starting the download...\n\n");
     else
     {
         fclose(f1);
@@ -253,7 +253,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
         sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
-        fwrite(bufferSupp3, strlen(bufferSupp3), f1); //I append the payload to the file
+        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
