@@ -17,6 +17,7 @@ int main(int argc, char* argv[])
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
+    char command1[BUF_LEN];
 
 
     // Timeout varible for the select function
@@ -69,8 +70,10 @@ int main(int argc, char* argv[])
     // CONFIGURATION DATA STRUCTURES FOR THE SELECT FUNCTION
     FD_ZERO(&master);
     FD_ZERO(&read_fds);
+    FD_SET(fileno(stdin), &master);
     FD_SET(listenerTCP, &master);
-    fdmax = listenerTCP;
+    if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
+    else fdmax = fileno(stdin);
     printf("I'm using the select function to attend for more than one event...\n\n");
     while(1)
     {
@@ -92,6 +95,20 @@ int main(int argc, char* argv[])
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
                     printf("We received and accepted a client connection request...\n\n");
+                }
+                else if (i == fileno(stdin))
+                {
+                    //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
+                    strcpy(command1, "");
+                    fgets(buffer, COM_LEN, stdin);
+                    sscanf(buffer, "%s", command1);
+                    if (strcmp(command1, "exit") == 0)
+                    {
+                        printf("Done!\n\n");
+                        close(listenerTCP);
+                        continue;
+                    }
+                    else printf("Unexpected input given...\n\n");
                 }
                 else //Manager for the accepted communications
                 {
