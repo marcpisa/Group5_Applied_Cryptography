@@ -64,6 +64,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     // END COMMUNICATION
 
     printf("%s\n", buffer);
+    return 1;
 }
 
 int renameClient(char* username,char* filename, char* new_filename, struct sockaddr_in srv_addr)
@@ -85,6 +86,7 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
     // SET RENAME REQUEST BUFFER
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s %s %s %s", RENAME_REQUEST, username, filename, new_filename);
+    printf("I'm sending to the server the mex %s\n\n", buffer);
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
 
