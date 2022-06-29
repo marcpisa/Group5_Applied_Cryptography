@@ -107,7 +107,7 @@ int renameServer(int sd, char* rec_mex)
     // CHECK IF THE FILE EXISTS, otherwise send a message of error to the client
 
     ret = rename(bufferSupp3, bufferSupp4);
-    if (ret != 0) 
+    if (ret == -1) 
     {
         printf("Something bad happened during the rename operation\n\n");
         exit(1);
