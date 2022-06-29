@@ -39,6 +39,7 @@
 #define DELETE_ACCEPTED "dele_acc"
 #define DELETE_DENIED "dele_den"
 #define DOWNLOAD_REQUEST "down_req"
+#define DOWNLOAD_FINISHED "down_fin"
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"

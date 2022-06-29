@@ -253,7 +253,21 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
         sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
+        fwrite(bufferSupp3, strlen(bufferSupp3), f1); //I append the payload to the file
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
     }
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
+    ret = send(sock, buffer, BUF_LEN, 0);
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    printf("Download completed!\n\n");
+    return 1;
 }
 
 int uploadClient()

@@ -42,6 +42,7 @@
 #define DELETE_ACCEPTED "dele_acc"
 #define DELETE_DENIED "dele_den"
 #define DOWNLOAD_REQUEST "down_req"
+#define DOWNLOAD_FINISHED "down_fin"
 #define UPLOAD_REQUEST "upld_req"
 #define SHARE_REQUEST "shre_req"
 
