@@ -94,7 +94,7 @@ int renameServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     sscanf(rec_mex, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4); //The format of the message received is: type_mex, username, filename, new_filename
-
+    printf("The username is%s, the old_filename is %s, the new file name is %s\n\n", bufferSupp2, bufferSupp3, bufferSupp4);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3 AND BUFFERSUPP4, otherwise send a message of error to the client
     chdir("C:Documents/CloudProject");
     ret = chdir(bufferSupp2);
