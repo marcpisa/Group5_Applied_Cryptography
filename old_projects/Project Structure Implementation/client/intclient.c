@@ -252,6 +252,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             exit(1);
         }
         sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+        // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
     }
 }
 
