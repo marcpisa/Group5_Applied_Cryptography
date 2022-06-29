@@ -191,7 +191,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
     sock = createSocket();
 
-    if (chdir("/home/marc/Documents/donwnload") == -1)
+    if (chdir("/home/marc/Documents/download") == -1)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
