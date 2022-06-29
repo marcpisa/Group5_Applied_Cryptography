@@ -81,6 +81,9 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
         exit(1);
     }
 
+
+    //Add: show message when filename is to long to user --> check server side though. 
+
     // SANITIZE FILENAME AND NEW_FILENAME (VERY IMPORTANT)
 
     // SET RENAME REQUEST BUFFER
