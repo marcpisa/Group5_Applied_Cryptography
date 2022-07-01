@@ -178,28 +178,32 @@ int deleteServer(int sd, char* rec_mex)
 
 int downloadServer(int sd, char* rec_mex)
 {
-    // We received a message with this format: download_request username filename
+    // We received a message with this format: download_request username filenameù
+    char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
+    char payload[CHUNK_SIZE+1];
+    char username[MAX_LEN_USR];
+    char filename[MAX_LEN_FILENAME];
     struct stat st;
     int i, nchunk, ret;
     FILE* fd;
 
-    sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp2 = username, bufferSupp3 = filename
+    sscanf(rec_mex, "%s %s %s", bufferSupp1, username, filename); // bufferSupp2 = username, bufferSupp3 = filename
     chdir(MAIN_FOLDER_SERVER);
-    ret = chdir(bufferSupp2);
+    ret = chdir(username);
     if (ret == -1)
     {
         printf("Error: username doesn't exists...\n");
         exit(1);
     }
-    if (!(fd = fopen(bufferSupp3, "r")))
+    if (!(fd = fopen(filename, "r")))
     {
-        printf("File %s doesn't exist...\n\n", bufferSupp3);
+        printf("File %s doesn't exist...\n\n", filename);
         return -1;
     }
-    stat(bufferSupp3, &st);
+    stat(filename, &st);
     nchunk = ceil(st.st_size/CHUNK_SIZE);
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
@@ -216,9 +220,14 @@ int downloadServer(int sd, char* rec_mex)
     for (i = 0; i < nchunk; i++)
     {
         memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
-        sprintf(bufferSupp1, "%s %d", DOWNLOAD_CHUNK, nchunk); //Format of the message sent is: type_mex n_chunk
+        memset(payload, 0, strlen(payload));
+        ret = fread(payload, CHUNK_SIZE, 1, fp);
+        if (ret == -1)
+        {
+            printf("Problem during the reading of the file to downlaod... \n\n");
+            return -1;
+        }
+        sprintf(bufferSupp1, "%s %d %s", DOWNLOAD_CHUNK, nchunk, payload); //Format of the message sent is: type_mex n_chunk
         ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
         if (ret == -1)
         {
@@ -227,6 +236,16 @@ int downloadServer(int sd, char* rec_mex)
             exit(1);
         }
     }
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    ret = read(sd, buffer, strlen(buffer));
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    if (!(strcmp(bufferSupp1, DOWNLOAD_FINISHED)==0) || !(strcmp(bufferSupp2, username)==0) || !(strcmp(bufferSupp3, filename)==0))
+    {
+        printf("Error in the last message sent: message of end download\n\n");
+        return -1;
+    }
+    printf("We have completed successfully the donwload operation!\n\n");
+    return 1;
 }
 
 

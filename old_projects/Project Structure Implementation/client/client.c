@@ -211,23 +211,32 @@ int main(int argc, char* argv[])
                             break;
 
                         case 6: //*********** DOWNLOAD ************
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }
+                            }*/
                             ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            if (ret == -1)
+                            {
+                                printf("Error during the download operation request!\n\n");
+                                exit(1);
+                            }
 
                             break;
 
                         case 7: //*********** UPLOAD *************
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
+                            }*/
+                            ret = uploadClient(username, command2, srv_addr);
+                            if (ret == -1)
+                            {
+                                printf("Error during the rename operation request!\n\n");
+                                exit(1);
                             }
-                            // Stuff to do
 
                             break;
 

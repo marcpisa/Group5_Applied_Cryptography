@@ -270,7 +270,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int uploadClient()
+int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
 
 }
