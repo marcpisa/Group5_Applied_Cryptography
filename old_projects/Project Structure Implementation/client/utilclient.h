@@ -19,6 +19,8 @@
 #define COMM_NUMB 8
 #define SERVER_PORT 9425
 #define LOCALHOST "127.0.0.1"
+#define MAIN_FOLDER_SERVER "/home/marc/Documents/database"
+#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download"
 
 #define LOGIN "login"
 #define LOGOUT "logout"
@@ -30,6 +32,8 @@
 #define DELETE "delete"
 #define HELP "help"
 
+#define LOGIN_REQUEST "logi_req"
+#define LOGOUT_REQUEST "logo_req"
 #define LIST_REQ "list_req"
 #define LIST_RESP "list_res"
 #define RENAME_REQUEST "renm_req"
@@ -39,7 +43,12 @@
 #define DELETE_ACCEPTED "dele_acc"
 #define DELETE_DENIED "dele_den"
 #define DOWNLOAD_REQUEST "down_req"
+#define DOWNLOAD_ACCEPTED "down_acc"
+#define DOWNLOAD_DENIED "down_den"
+#define DOWNLOAD_CHUNK "down_cnk"
 #define DOWNLOAD_FINISHED "down_fin"
+#define UPLOAD_REQUEST "upld_req"
+#define SHARE_REQUEST "shre_req"
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"

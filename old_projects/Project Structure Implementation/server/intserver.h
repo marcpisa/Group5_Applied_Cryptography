@@ -5,6 +5,6 @@ int logoutServer();
 int listServer(int sd, char* rec_mex);
 int renameServer(int sd, char* rec_mex);
 int deleteServer(int sd, char* rec_mex);
-int downloadServer();
-int uploadServer();
+int downloadServer(int sd, char* rec_mex);
+int uploadServer(int sd, char* rec_mex);
 int shareServer();

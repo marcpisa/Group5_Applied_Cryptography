@@ -303,9 +303,16 @@ int main(int argc, char* argv[])
                             //We are in the son part of code
                             close(listenerTCP);
                             printf("\nA download request has came up...\n\n");
+
                             // DOWNLOAD MANAGER: SERVER SIDE
                             
-                            // Do stuff
+                            ret = downloadServer(i, buffer);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client download request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a download request and all was good!\n\n");
 
                             printf("End of download request management!\n\n");
                             close(i);
@@ -333,7 +340,13 @@ int main(int argc, char* argv[])
                             printf("\nAn upload request has came up...\n\n");
                             // UPLOAD MANAGER: SERVER SIDE
                             
-                            // Do stuff
+                            ret = uploadServer(i, buffer);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client upload request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed an upload request and all was good!\n\n");
 
                             printf("End of upload request management!\n\n");
                             close(i);

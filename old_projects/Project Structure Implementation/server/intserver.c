@@ -38,7 +38,7 @@ int listServer(int sd, char* rec_mex)
     sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
     printf("The username is %s, the length of the username is %li\n\n", bufferSupp2, strlen(bufferSupp2));
 
-    if (chdir("/home/marc/Documents/database") == -1)
+    if (chdir(MAIN_FOLDER_SERVER) == -1)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
@@ -93,11 +93,11 @@ int renameServer(int sd, char* rec_mex)
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
-    printf("We received the message %s", rec_mex);
+    //printf("We received the message %s", rec_mex);
     sscanf(rec_mex, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4); //The format of the message received is: type_mex, username, filename, new_filename
-    printf("The username is %s, the old_filename is %s, the new_filename is %s\n\n", bufferSupp2, bufferSupp3, bufferSupp4);
+    //printf("The username is %s, the old_filename is %s, the new_filename is %s\n\n", bufferSupp2, bufferSupp3, bufferSupp4);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3 AND BUFFERSUPP4, otherwise send a message of error to the client
-    chdir("/home/marc/Documents/database");
+    chdir(MAIN_FOLDER_SERVER);
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
@@ -176,9 +176,57 @@ int deleteServer(int sd, char* rec_mex)
 }
 
 
-int downloadServer()
+int downloadServer(int sd, char* rec_mex)
 {
+    // We received a message with this format: download_request username filename
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    struct stat st;
+    int i, nchunk, ret;
+    FILE* fd;
 
+    sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp2 = username, bufferSupp3 = filename
+    chdir(MAIN_FOLDER_SERVER);
+    ret = chdir(bufferSupp2);
+    if (ret == -1)
+    {
+        printf("Error: username doesn't exists...\n");
+        exit(1);
+    }
+    if (!(fd = fopen(bufferSupp3, "r")))
+    {
+        printf("File %s doesn't exist...\n\n", bufferSupp3);
+        return -1;
+    }
+    stat(bufferSupp3, &st);
+    nchunk = ceil(st.st_size/CHUNK_SIZE);
+
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
+    ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    for (i = 0; i < nchunk; i++)
+    {
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        sprintf(bufferSupp1, "%s %d", DOWNLOAD_CHUNK, nchunk); //Format of the message sent is: type_mex n_chunk
+        ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
+        if (ret == -1)
+        {
+            printf("Send operation gone bad\n");
+            // Change this later to manage properly the session
+            exit(1);
+        }
+    }
 }
 
 

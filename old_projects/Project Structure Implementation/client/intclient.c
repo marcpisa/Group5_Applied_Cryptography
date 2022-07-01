@@ -191,7 +191,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
     sock = createSocket();
 
-    if (chdir("/home/marc/Documents/download") == -1)
+    if (chdir(MAIN_FOLDER_CLIENT) == -1)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
@@ -251,7 +251,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             // Change this later to manage properly the session
             exit(1);
         }
-        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
         fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
