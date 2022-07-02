@@ -22,8 +22,8 @@
 #define SERVER_PORT 9425
 #define CHUNK_SIZE 512
 #define LOCALHOST "127.0.0.1"
-#define MAIN_FOLDER_SERVER "/home/marc/Documents/database"
-#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download"
+#define MAIN_FOLDER_SERVER "/home/marc/Documents/database" // When you test the software on your pc change this variable
+#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download" // When you test the software on your pc change this variable
 
 #define LOGIN "login"
 #define LOGOUT "logout"

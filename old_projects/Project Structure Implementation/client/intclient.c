@@ -261,6 +261,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
     ret = send(sock, buffer, BUF_LEN, 0);
+    if (ret == -1)
     {
         printf("Send operation gone bad\n");
         // Change this later to manage properly the session

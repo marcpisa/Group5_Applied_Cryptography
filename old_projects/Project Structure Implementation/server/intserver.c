@@ -20,7 +20,6 @@ int LogoutServer()
 
 }
 
-
 int listServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
@@ -216,6 +215,9 @@ int downloadServer(int sd, char* rec_mex)
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
+    
+    //ENCRYPT THE MESSAGE SENT
+    
     ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
     if (ret == -1)
     {
@@ -272,7 +274,7 @@ int uploadServer(int sd, char* rec_mex)
     char filename[MAX_LEN_FILENAME];
     char username[MAX_LEN_USR];
 
-    sscanf(rec_mex, "%s %s %s %i", bufferSupp1, username, filename, bufferSupp2);
+    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, username, filename, bufferSupp2);
     nchunk = atoi(bufferSupp2);
 
     // SANITIZATION OF THE USERNAME AND THE FILENAME
@@ -280,7 +282,13 @@ int uploadServer(int sd, char* rec_mex)
     if (chdir(MAIN_FOLDER_SERVER) == -1)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+        return -1;
 	}
+    if (chdir(username) == -1)
+    {
+        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+        return -1;
+    }
     f1 = fopen(filename, "r");
     if (f1 == NULL) 
     {
@@ -309,7 +317,7 @@ int uploadServer(int sd, char* rec_mex)
         if (ret = -1) printf("Had some problem with the send operation...\n\n");
         return -1;
     }
-
+    f1 = fopen(filename, "w");
     for (i = 0; i < nchunk; i++)
     {
         memset(buffer, 0, strlen(buffer));
@@ -322,8 +330,27 @@ int uploadServer(int sd, char* rec_mex)
             printf("We had some problem with the recv function...\n\n");
             return -1;
         }
-        
+
+        // DECRYPT THE MESSAGE
+
+        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: upload_chunk filename payload
+        // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
+        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
     }
+    fclose(f1);
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    sprintf(buffer, "%s %s %s", UPLOAD_FINISHED, username, filename);
+    ret = send(sd, buffer, strlen(buffer), 0);
+    if (ret == -1)
+    {
+        printf("Something bad happened with the send function...\n\n");
+        return -1;
+    }
+    printf("Upload operation accomplished!\n\n");
+    return 1;
 }
 
 int shareServer()
