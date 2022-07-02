@@ -18,6 +18,7 @@
 #define MAX_LEN_USR 20
 #define MAX_LEN_FILENAME 20
 #define COMM_NUMB 8
+#define CHUNK_SIZE 512
 #define SERVER_PORT 9425
 #define LOCALHOST "127.0.0.1"
 #define MAIN_FOLDER_SERVER "/home/marc/Documents/database"  // When you test the software on your pc change this variable
@@ -51,6 +52,8 @@
 #define UPLOAD_REQUEST "upld_req"
 #define UPLOAD_ACCEPTED "upld_acc"
 #define UPLOAD_DENIED "upld_den"
+#define UPLOAD_CHUNK "upld_cnk"
+#define UPLOAD_FINISHED "upld_fin"
 #define SHARE_REQUEST "shre_req"
 
 #define RED   "\x1B[31m"

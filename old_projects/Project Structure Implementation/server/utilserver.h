@@ -52,5 +52,7 @@
 #define UPLOAD_REQUEST "upld_req"
 #define UPLOAD_ACCEPTED "upld_acc"
 #define UPLOAD_DENIED "upld_den"
+#define UPLOAD_CHUNK "upld_cnk"
+#define UPLOAD_FINISHED "upld_fin"
 #define SHARE_REQUEST "shre_req"
 

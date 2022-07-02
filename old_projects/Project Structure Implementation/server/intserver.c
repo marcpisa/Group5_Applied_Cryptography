@@ -235,7 +235,7 @@ int downloadServer(int sd, char* rec_mex)
             printf("Problem during the reading of the file to downlaod... \n\n");
             return -1;
         }
-        sprintf(bufferSupp1, "%s %d %s", DOWNLOAD_CHUNK, nchunk, payload); //Format of the message sent is: type_mex n_chunk
+        sprintf(bufferSupp1, "%s %s %s", DOWNLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex filename payload
         
         //ENCRYPT THE MESSAGE SENT
 
@@ -248,7 +248,12 @@ int downloadServer(int sd, char* rec_mex)
         }
     }
     memset(bufferSupp1, 0, strlen(bufferSupp1));
-    ret = read(sd, buffer, strlen(buffer));
+    ret = recv(sd, buffer, strlen(buffer));
+    if (ret == -1)
+    {
+        printf("Send operation gone bad!\n\n");
+        exit(1);
+    }
 
     // DECRYPT THE BUFFER
 

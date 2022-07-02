@@ -51,10 +51,10 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     }
     memset(buffer, 0, strlen(buffer));
     printf("List request message sent\n");
-    ret = read(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN);
     if (ret == -1)
     {
-        printf("Read operation gone bad\n");
+        printf("Receive operation gone bad\n");
         // Change this later to manage properly the session
         exit(1);
     }
@@ -103,10 +103,10 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
     }
     memset(buffer, 0, strlen(buffer));
     printf("Rename request message sent\n");
-    ret = read(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN);
     if (ret == -1)
     {
-        printf("Read operation gone bad\n");
+        printf("Receive operation gone bad\n");
         // Change this later to manage properly the session
         exit(1);
     }
@@ -165,10 +165,10 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
     }
     printf("Delete request message sent\n");
     memset(buffer, 0, strlen(buffer));
-    ret = read(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN);
     if (ret == -1)
     {
-        printf("Read operation gone bad\n");
+        printf("Receive operation gone bad\n");
         // Change this later to manage properly the session
         exit(1);
     }
@@ -229,10 +229,10 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
     // I'm going to receive a messsage with this format: download_accepted username number_of_chunk
 
-    ret = read(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN);
     if (ret == -1)
     {
-        printf("Read operation gone bad\n");
+        printf("Receive operation gone bad\n");
         // Change this later to manage properly the session
         exit(1);
     }
@@ -247,7 +247,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         ret = recv(sock, buffer, BUF_LEN);
         if (ret == -1)
         {
-            printf("Read operation gone bad\n");
+            printf("Receive operation gone bad\n");
             // Change this later to manage properly the session
             exit(1);
         }
@@ -273,7 +273,120 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
 int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
+    // We received a message with this format: download_request username filenameù
+    char buffer[BUF_LEN];
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    char payload[CHUNK_SIZE+1];
+    char username[MAX_LEN_USR];
+    char filename[MAX_LEN_FILENAME];
+    struct stat st;
+    int i, sock, nchunk, ret;
+    FILE* fd;
 
+    // SANIFICATION FILENAME
+    if (chdir(MAIN_FOLDER_CLIENT) == -1)
+    {
+        printf("Main folder of the client unaccessible...\n\n");
+        return -1;
+    }
+    if ((f1 = fopen(filename)) == NULL)
+    {
+        printf("The file doesn't exist\n\n");
+        return -1;
+    }
+    else
+    {
+        if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+        {
+            printf("\nConnection Failed \n");
+            exit(1);
+        }
+
+        stat(filename, &st);
+        nchunk = ceil(st.st_size/CHUNK_SIZE);
+
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        sprintf(buffer, "%s %s %s %i", UPLOAD_REQUEST, username, filename, nchunk);
+
+        // ENCRYPT THE BUFFER
+
+        ret = send(sock, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Send operation gone bad!\n\n");
+            exit(1);
+        }
+
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp2, 0, strlen(bufferSupp3));
+        ret = recv(sock, buffer, strlen(buffer));
+        if (ret == -1)
+        {
+            printf("Receive operation gone bad!\n\n");
+            exit(1);
+        }
+
+        // DECRYPT THE BUFFER
+
+        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+        if (strcmp(bufferSupp1, UPLOAD_ACCEPTED) != 0)
+        {
+            printf("Upload operation denied by the server!\n\n");
+            return -1;
+        }
+    }
+    f1 = fopen(filename, "r");
+    for (i = 0; i < nchunk; i++)
+    {
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        memset(payload, 0, strlen(payload));
+
+        ret = fread(payload, CHUNK_SIZE, 1, fp);
+        if (ret == -1)
+        {
+            printf("Problem during the reading of the file to upload... \n\n");
+            return -1;
+        }
+        sprintf(buffer, "%s %i %s", UPLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex n_chunk
+        
+        // ENCRYPT BUFFER
+
+        ret = send(sock, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Problem during the send operation... \n\n");
+            return -1;
+        }
+    }
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+
+    ret = recv(sock, buffer, strlen(buffer));
+    if (ret == -1)
+    {
+        printf("Problem during the send operation... \n\n");
+        return -1;
+    }
+    
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    if (!(strcmp(bufferSupp1, UPLOAD_FINISHED)==0) || !(strcmp(bufferSupp2, username)==0) || !(strcmp(bufferSupp3, filename)==0))
+    {
+        printf("Error in the last message sent: message of end upload\n\n");
+        return -1;
+    }
+    printf("We have completed successfully the upload operation!\n\n");
+    return 1;
 }
 
 int shareClient()
