@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
-#include <dirent.h>
 #include <inttypes.h>
 #include <sys/stat.h>
 
@@ -16,14 +15,14 @@
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
 #define COM_LEN 16
-#define MAX_LEN_FILENAME 20
 #define MAX_LEN_USR 20
+#define MAX_LEN_FILENAME 20
 #define COMM_NUMB 8
-#define SERVER_PORT 9425
 #define CHUNK_SIZE 512
+#define SERVER_PORT 9425
 #define LOCALHOST "127.0.0.1"
-#define MAIN_FOLDER_SERVER "/home/marc/Documents/database" // When you test the software on your pc change this variable
-#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download" // When you test the software on your pc change this variable
+#define MAIN_FOLDER_SERVER "/home/marc/Documents/database"  // When you test the software on your pc change this variable
+#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download"  // When you test the software on your pc change this variable
 
 #define LOGIN "login"
 #define LOGOUT "logout"
@@ -33,11 +32,12 @@
 #define LIST "list"
 #define SHARE "share"
 #define DELETE "delete"
+#define HELP "help"
 
 #define LOGIN_REQUEST "logi_req"
 #define LOGOUT_REQUEST "logo_req"
-#define LIST_REQUEST "list_req"
-#define LIST_RESPONSE "list_res"
+#define LIST_REQ "list_req"
+#define LIST_RESP "list_res"
 #define RENAME_REQUEST "renm_req"
 #define RENAME_ACCEPTED "renm_acc"
 #define RENAME_DENIED "renm_den"
@@ -55,4 +55,9 @@
 #define UPLOAD_CHUNK "upld_cnk"
 #define UPLOAD_FINISHED "upld_fin"
 #define SHARE_REQUEST "shre_req"
+#define SHARE_ACCEPTED "shre_acc"
+#define SHARE_PERMISSION "shre_per"
 
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define RESET "\x1B[0m"

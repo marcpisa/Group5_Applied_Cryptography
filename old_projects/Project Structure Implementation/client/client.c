@@ -278,10 +278,32 @@ int main(int argc, char* argv[])
                 }
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
-                    // Here are stuff concerning the "share" function. We have to manage
-                    // the request to share files (second Client part)
-                    close (i);
-                    FD_CLR(i, &master);
+                    memset(buffer, 0, strlen(buffer));
+                    ret = recv(i, buffer, strlen(buffer));
+                    if (ret == -1)
+                    {
+                        printf("Error during recieve function!\n\n");
+                        exit(1);
+                    }
+                    pid = fork();
+                    if (pid < 0)
+                    {
+                        perror("Error during fork execution: ");
+                        exit(-1);
+                    }
+                    if (pid == 0)
+                    {
+                        //We are in the son part of code
+                        close(listenerTCP);
+                        ret = shareReceivedClient(i, buffer);
+                        if (ret == -1)
+                        {
+                            printf("Error during received share request!\n\n");
+                            exit(1);
+                        }
+                        close(i);
+                        exit(0);
+                    }
                 }
             }
         }

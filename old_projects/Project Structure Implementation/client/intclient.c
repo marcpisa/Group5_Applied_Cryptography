@@ -285,6 +285,8 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     int i, sock, nchunk, ret;
     FILE* fd;
 
+    sock = createSocket();
+
     // SANIFICATION FILENAME
     if (chdir(MAIN_FOLDER_CLIENT) == -1)
     {
@@ -389,7 +391,93 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int shareClient()
+int shareClient(char* username, char* filename, char* peername, struct sockaddr_in srv_addr)
 {
-    
+    char buffer[BUF_LEN];
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    int sock, ret;
+
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
+
+    sprintf(buffer, "%s %s %s %s", SHARE_REQUEST, username, peername, filename);
+
+    // ENCRYPT THE BUFFER
+
+    ret = send(sock, buffer, strlen(buffer), 0);
+    if (ret == -1)
+    {
+        printf("Error during send operation!\n\n");
+        return -1;
+    }
+
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    ret = recv(sock, buffer, strlen(buffer));
+    if (ret == -1)
+    {
+        printf("Error during receive operation!\n\n");
+        return -1;
+    }
+
+    // DECRYPT THE BUFFER
+
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    if (strcmp(bufferSupp1, SHARE_ACCEPTED) == 0)
+    {
+        printf("Share operation accepted by the server!\n\n");
+        return 1;
+    }
+    else printf("Share operation denied by the server!\n\n");
+    return -1;
+}
+
+
+int shareReceivedClient(int sd, char* rec_mex)
+{
+    int ret, i;
+    char buffer[BUF_LEN];
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    char filename[MAX_LEN_FILENAME];
+    char username[MAX_LEN_USR];
+
+    //DECRYPT REC_MEX, SANITIZE THE INPUT
+
+    sscanf(rec_mex, "%s %s %s", bufferSupp1, username, filename);
+    if (strcmp(bufferSupp1, SHARE_PERMISSION) != 0)
+    {
+        printf("The mex type is incorrect!\n\n");
+        return -1;
+    }
+    printf("We received a share request: the filename is %s from peer %s. Do you accept the share operation? [Y/N]\n\n", filename, username);
+    sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
+
+    // MANAGE THE INPUT GIVEN BY THE USER
+
+     if (strcmp(buffer, "Y") == 0)
+     {
+        memset (buffer, 0, strlen(buffer));
+
+        // SEND RESPONSE TO SERVER ACCEPTING THE SHARE OPERATION
+        return 1;
+     }
+     else
+     {
+        // SEND RESPONSE TO SERVER DENYING THE SHARE OPERATION
+        return 1;
+     }
 }
