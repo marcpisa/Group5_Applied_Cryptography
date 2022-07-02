@@ -251,7 +251,32 @@ int downloadServer(int sd, char* rec_mex)
 
 int uploadServer()
 {
+    int sock, ret, nchunk, i;
+    char buffer[BUF_LEN];
+    FILE* f1;
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    sock = createSocket();
 
+    if (chdir(MAIN_FOLDER_CLIENT) == -1)
+	{
+		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+	}
+    f1 = fopen(filename, "r");
+    if (f1 == NULL) printf("Starting the download...\n\n");
+    else
+    {
+        fclose(f1);
+        printf("Filename already exists. Download request over...\n\n");
+        return -1;
+    }
+
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
 }
 
 int shareServer()
