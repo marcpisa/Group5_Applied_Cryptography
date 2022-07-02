@@ -49,6 +49,8 @@
 #define DOWNLOAD_CHUNK "down_cnk"
 #define DOWNLOAD_FINISHED "down_fin"
 #define UPLOAD_REQUEST "upld_req"
+#define UPLOAD_ACCEPTED "upld_acc"
+#define UPLOAD_DENIED "upld_den"
 #define SHARE_REQUEST "shre_req"
 
 #define RED   "\x1B[31m"

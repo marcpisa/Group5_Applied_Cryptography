@@ -165,6 +165,9 @@ int deleteServer(int sd, char* rec_mex)
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(bufferSupp1, "%s", DELETE_ACCEPTED); //Format of the message sent is: type_mex
+
+    // ENCRYPT THE MESSAGE SENT
+
     ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
     if (ret == -1)
     {
@@ -192,6 +195,9 @@ int downloadServer(int sd, char* rec_mex)
 
     sscanf(rec_mex, "%s %s %s", bufferSupp1, username, filename); // bufferSupp2 = username, bufferSupp3 = filename
     chdir(MAIN_FOLDER_SERVER);
+
+    // SANITIZATION OF THE USERNAME AND THE FILENAME
+
     ret = chdir(username);
     if (ret == -1)
     {
@@ -228,6 +234,9 @@ int downloadServer(int sd, char* rec_mex)
             return -1;
         }
         sprintf(bufferSupp1, "%s %d %s", DOWNLOAD_CHUNK, nchunk, payload); //Format of the message sent is: type_mex n_chunk
+        
+        //ENCRYPT THE MESSAGE SENT
+
         ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
         if (ret == -1)
         {
@@ -238,6 +247,9 @@ int downloadServer(int sd, char* rec_mex)
     }
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     ret = read(sd, buffer, strlen(buffer));
+
+    // DECRYPT THE BUFFER
+
     sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
     if (!(strcmp(bufferSupp1, DOWNLOAD_FINISHED)==0) || !(strcmp(bufferSupp2, username)==0) || !(strcmp(bufferSupp3, filename)==0))
     {
@@ -249,33 +261,68 @@ int downloadServer(int sd, char* rec_mex)
 }
 
 
-int uploadServer()
+int uploadServer(int sd, char* rec_mex)
 {
-    int sock, ret, nchunk, i;
+    int ret, nchunk, i;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
-    sock = createSocket();
+    char filename[MAX_LEN_FILENAME];
+    char username[MAX_LEN_USR];
 
-    if (chdir(MAIN_FOLDER_CLIENT) == -1)
+    sscanf(rec_mex, "%s %s %s %i", bufferSupp1, username, filename, bufferSupp2);
+    nchunk = atoi(bufferSupp2);
+
+    // SANITIZATION OF THE USERNAME AND THE FILENAME
+
+    if (chdir(MAIN_FOLDER_SERVER) == -1)
 	{
 		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
     f1 = fopen(filename, "r");
-    if (f1 == NULL) printf("Starting the download...\n\n");
+    if (f1 == NULL) 
+    {
+        printf("Starting the upload...\n\n");
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        sprintf(buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            print("Some problem with send operation...\n\n");
+            return -1;
+        }
+    }
     else
     {
+        printf("File with this name already exists: refusing upload operation...\n\n");
         fclose(f1);
         printf("Filename already exists. Download request over...\n\n");
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        sprintf(buffer, "%s %s %s", UPLOAD_DENIED, username, filename);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret = -1) printf("Had some problem with the send operation...\n\n");
         return -1;
     }
 
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    for (i = 0; i < nchunk; i++)
     {
-        printf("\nConnection Failed \n");
-        exit(1);
+        memset(buffer, 0, strlen(buffer));
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        ret = recv(sd, buffer, strlen(buffer));
+        if (ret == -1)
+        {
+            printf("We had some problem with the recv function...\n\n");
+            return -1;
+        }
+        
     }
 }
 
