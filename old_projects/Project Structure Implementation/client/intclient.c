@@ -244,7 +244,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     {
         memset(buffer, 0, strlen(buffer));
         // I'm receveing a message with this format: download_chunk n_chunk payload
-        ret = read(sock, buffer, BUF_LEN);
+        ret = recv(sock, buffer, BUF_LEN);
         if (ret == -1)
         {
             printf("Read operation gone bad\n");
