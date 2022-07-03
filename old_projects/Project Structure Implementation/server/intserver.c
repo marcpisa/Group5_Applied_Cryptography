@@ -28,7 +28,6 @@ int listServer(int sd, char* rec_mex)
     struct dirent *files;
     int ret;
     printf("I received a message from a client saying: %s\n\n", rec_mex);
-    printf("adnoiand\n");
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
