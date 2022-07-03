@@ -229,7 +229,7 @@ int downloadServer(int sd, char* rec_mex)
     {
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(payload, 0, strlen(payload));
-        ret = fread(payload, CHUNK_SIZE, 1, fp);
+        ret = fread(payload, CHUNK_SIZE, 1, fd);
         if (ret == -1)
         {
             printf("Problem during the reading of the file to downlaod... \n\n");
