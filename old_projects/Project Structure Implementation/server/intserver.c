@@ -231,6 +231,8 @@ int downloadServer(int sd, char* rec_mex)
     printf("I'm starting to send chunks\n");
     for (i = 0; i < nchunk; i++)
     {
+
+        printf("test it goes inside for loop\n");
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(payload, 0, strlen(payload));
         ret = fread(payload, CHUNK_SIZE, 1, fd);
@@ -254,7 +256,7 @@ int downloadServer(int sd, char* rec_mex)
         }
     }
     memset(bufferSupp1, 0, strlen(bufferSupp1));
-    ret = recv(sd, buffer, strlen(buffer), 0);
+    ret = recv(sd, buffer, strlen(buffer),0);
     if (ret == -1)
     {
         printf("Send operation gone bad!\n\n");
