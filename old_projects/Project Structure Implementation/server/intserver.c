@@ -56,7 +56,7 @@ int listServer(int sd, char* rec_mex)
     {
         while((files = readdir(d)) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
         {
-           // strcat(bufferSupp1, files->d_name);
+            strcat(bufferSupp1, files->d_name);
             strcat(bufferSupp1, "/");
         }
     }
