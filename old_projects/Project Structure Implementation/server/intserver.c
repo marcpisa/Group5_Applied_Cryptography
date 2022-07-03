@@ -213,15 +213,15 @@ int downloadServer(int sd, char* rec_mex)
         return -1;
     }
     stat(filename, &st);
-    printf("The size of the file is %ld", st.st_size);
-    nchunk = ceil(st.st_size/CHUNK_SIZE);
-    printf("The number of chunk is %i\n", nchunk);    
+    printf("The size of the file is %ld\n\n", st.st_size);
+    nchunk = (st.st_size/CHUNK_SIZE)+1;
+    printf("The number of chunk is %i\n\n", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
-    printf("I'm sending %s", bufferSupp1);
+    printf("I'm sending %s\n\n\n", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
     
     ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
