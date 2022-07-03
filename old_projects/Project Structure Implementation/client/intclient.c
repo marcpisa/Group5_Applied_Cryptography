@@ -215,6 +215,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     // SET DOWNLOAD REQUEST BUFFER
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s %s %s", DOWNLOAD_REQUEST, username, filename);
+    printf("I'm sending %s\n\n", buffer);
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
 
@@ -229,7 +230,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
     // I'm going to receive a messsage with this format: download_accepted username number_of_chunk
 
-    ret = recv(sock, buffer, BUF_LEN,0);
+    ret = recv(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
         printf("Receive operation gone bad\n");
@@ -238,6 +239,11 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     }
     sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
     nchunk = atoi(bufferSupp3);
+    if (nchunk == 0)
+    {
+        printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
+        return 1;
+    }
 
     f1 = fopen(filename, "w");
     for (i; i < nchunk; i++)

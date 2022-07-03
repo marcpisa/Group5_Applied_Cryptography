@@ -123,8 +123,9 @@ int main(int argc, char* argv[])
 
                     // We check the first keyword to understand what the Client wants us to do
                     memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem
-                    //Remember to sanitize the buffers
-                    sscanf(buffer, "%s", bufferSupp1);
+                    memset(bufferSupp2, 0, strlen(bufferSupp2)); //we clean the mem
+                    memset(bufferSupp3, 0, strlen(bufferSupp3)); //we clean the mem
+                    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
                     
                     
                     // ************ LOGIN REQUEST MANAGER ***********
@@ -302,7 +303,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA download request has came up...\n\n");
+                            printf("\nA download request has came up from %s and the filename is %s...\n\n", bufferSupp2, bufferSupp3);
 
                             // DOWNLOAD MANAGER: SERVER SIDE
                             
