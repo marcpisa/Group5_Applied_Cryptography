@@ -221,7 +221,7 @@ int downloadServer(int sd, char* rec_mex)
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
-    printf("I'm sending %s\n\n\n", bufferSupp1);
+    printf("I'm sending %s\n\n", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
     
     ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
