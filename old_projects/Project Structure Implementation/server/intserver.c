@@ -28,6 +28,7 @@ int listServer(int sd, char* rec_mex)
     struct dirent *files;
     int ret;
     printf("I received a message from a client saying: %s\n\n", rec_mex);
+    printf("adnoiand\n");
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
@@ -211,8 +212,7 @@ int downloadServer(int sd, char* rec_mex)
     stat(filename, &st);
     printf("The size of the file is %d", st.st_size);
     nchunk = ceil(st.st_size/CHUNK_SIZE);
-    printf("The number of chunks is %i", nchunk);
-    
+    printf("The number of chunks is %i", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
