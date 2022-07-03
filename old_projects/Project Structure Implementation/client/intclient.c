@@ -279,8 +279,6 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char payload[CHUNK_SIZE+1];
-    //char username[MAX_LEN_USR];
-    //char filename[MAX_LEN_FILENAME];
     struct stat st;
     int i, sock, nchunk, ret;
     FILE* fd;
@@ -390,6 +388,8 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     printf("We have completed successfully the upload operation!\n\n");
     return 1;
 }
+
+
 
 int shareClient(char* username, char* filename, char* peername, struct sockaddr_in srv_addr)
 {

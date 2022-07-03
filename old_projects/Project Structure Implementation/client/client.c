@@ -206,7 +206,7 @@ int main(int argc, char* argv[])
                                 break;
                             }*/
                             ret = deleteClient(username,command2, srv_addr);
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
 
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
                             ret = uploadClient(username, command2, srv_addr);
                             if (ret == -1)
                             {
-                                printf("Error during the rename operation request!\n\n");
+                                printf("Error during the upload operation request!\n\n");
                                 exit(1);
                             }
 
