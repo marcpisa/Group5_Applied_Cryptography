@@ -356,7 +356,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             printf("Problem during the reading of the file to upload... \n\n");
             return -1;
         }
-        sprintf(buffer, "%s %i %s", UPLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex n_chunk
+        sprintf(buffer, "%s %s %s", UPLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex n_chunk
         
         // ENCRYPT BUFFER
 
@@ -464,7 +464,7 @@ int shareReceivedClient(int sd, char* rec_mex)
         return -1;
     }
     printf("We received a share request: the filename is %s from peer %s. Do you accept the share operation? [Y/N]\n\n", filename, username);
-    sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
+    //sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
 
     // MANAGE THE INPUT GIVEN BY THE USER
 
