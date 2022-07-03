@@ -209,13 +209,16 @@ int downloadServer(int sd, char* rec_mex)
         return -1;
     }
     stat(filename, &st);
+    printf("The size of the file is %d", st.st_size);
     nchunk = ceil(st.st_size/CHUNK_SIZE);
+    printf("The number of chunks is %i", nchunk);
+    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
-    
+    printf("I'm sending %s", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
     
     ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
@@ -225,6 +228,8 @@ int downloadServer(int sd, char* rec_mex)
         // Change this later to manage properly the session
         exit(1);
     }
+
+    printf("I'm starting to send chunks\n");
     for (i = 0; i < nchunk; i++)
     {
         memset(bufferSupp1, 0, strlen(bufferSupp1));
@@ -250,7 +255,7 @@ int downloadServer(int sd, char* rec_mex)
         }
     }
     memset(bufferSupp1, 0, strlen(bufferSupp1));
-    ret = recv(sd, buffer, strlen(buffer));
+    ret = recv(sd, buffer, strlen(buffer), 0);
     if (ret == -1)
     {
         printf("Send operation gone bad!\n\n");
