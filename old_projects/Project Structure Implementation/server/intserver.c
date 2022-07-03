@@ -209,9 +209,9 @@ int downloadServer(int sd, char* rec_mex)
         return -1;
     }
     stat(filename, &st);
-    //printf("The size of the file is %d", st.st_size);
+    printf("The size of the file is %d", st.st_size);
     nchunk = ceil(st.st_size/CHUNK_SIZE);
-    printf("The number of chunk is %i", nchunk);    
+    printf("The number of chunk is %i\n", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
