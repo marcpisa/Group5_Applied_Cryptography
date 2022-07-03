@@ -245,9 +245,9 @@ int downloadServer(int sd, char* rec_mex)
             printf("Problem during the reading of the file to downlaod... \n\n");
             return -1;
         }
-        printf("The payload for the %i chunk is %s\n", i, payload);
+        printf("The payload for the %i chunk is %s\n\n\n", i, payload);
         sprintf(bufferSupp1, "%s %s %s", DOWNLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex filename payload
-        printf("We are sending %s\n", bufferSupp1);
+        printf("We are sending %s\n\n", bufferSupp1);
 
         //ENCRYPT THE MESSAGE SENT
 
