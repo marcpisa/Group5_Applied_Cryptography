@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <inttypes.h>
 #include <sys/stat.h>
+#include <math.h>
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
