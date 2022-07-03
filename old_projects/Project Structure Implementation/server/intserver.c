@@ -1,5 +1,5 @@
 #include "intserver.h"
-
+#include "dirent.h"
 int createSocket()
 {
     int sock;
@@ -56,7 +56,7 @@ int listServer(int sd, char* rec_mex)
     {
         while((files = readdir(d)) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
         {
-            strcat(bufferSupp1, files->d_name);
+           // strcat(bufferSupp1, files->d_name);
             strcat(bufferSupp1, "/");
         }
     }
@@ -209,7 +209,7 @@ int downloadServer(int sd, char* rec_mex)
         return -1;
     }
     stat(filename, &st);
-    printf("The size of the file is %d", st.st_size);
+    //printf("The size of the file is %d", st.st_size);
     nchunk = ceil(st.st_size/CHUNK_SIZE);
     printf("The number of chunk is %i", nchunk);    
 
@@ -313,7 +313,7 @@ int uploadServer(int sd, char* rec_mex)
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
-            print("Some problem with send operation...\n\n");
+          //  print("Some problem with send operation...\n\n");
             return -1;
         }
     }
@@ -337,7 +337,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
-        ret = recv(sd, buffer, strlen(buffer));
+        ret = recv(sd, buffer, strlen(buffer),0);
         if (ret == -1)
         {
             printf("We had some problem with the recv function...\n\n");

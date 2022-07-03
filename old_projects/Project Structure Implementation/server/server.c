@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA list request has came up...\n\n");
+                            printf("\nA list request hasasdjhadasjkdhjaskdjkasdhs came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
                             ret = listServer(i, buffer);

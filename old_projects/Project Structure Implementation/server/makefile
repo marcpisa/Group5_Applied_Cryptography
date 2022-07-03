@@ -4,4 +4,4 @@ serverPr: server.o intserver.o
 	gcc -Wall -o serverPr server.o intserver.o
 
 server.o: intserver.h
-intserver.o: intserver.h util.h
+intserver.o: intserver.h ../util.h
