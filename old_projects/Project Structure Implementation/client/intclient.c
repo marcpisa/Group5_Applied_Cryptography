@@ -37,7 +37,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     
     // SET LIST REQUEST BUFFER
     memset(buffer, 0, BUF_LEN);
-    sprintf(buffer, "%s %s", LIST_REQ, username);
+    sprintf(buffer, "%s %s", LIST_REQUEST, username);
     buffer[BUF_LEN-1] = '\0';
 
     // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
@@ -51,7 +51,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     }
     memset(buffer, 0, strlen(buffer));
     printf("List request message sent\n");
-    ret = recv(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Receive operation gone bad\n");
@@ -103,7 +103,7 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
     }
     memset(buffer, 0, strlen(buffer));
     printf("Rename request message sent\n");
-    ret = recv(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Receive operation gone bad\n");
@@ -165,7 +165,7 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
     }
     printf("Delete request message sent\n");
     memset(buffer, 0, strlen(buffer));
-    ret = recv(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Receive operation gone bad\n");
@@ -229,7 +229,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
     // I'm going to receive a messsage with this format: download_accepted username number_of_chunk
 
-    ret = recv(sock, buffer, BUF_LEN);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Receive operation gone bad\n");
@@ -244,7 +244,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     {
         memset(buffer, 0, strlen(buffer));
         // I'm receveing a message with this format: download_chunk n_chunk payload
-        ret = recv(sock, buffer, BUF_LEN);
+        ret = recv(sock, buffer, BUF_LEN,0);
         if (ret == -1)
         {
             printf("Receive operation gone bad\n");
@@ -279,8 +279,8 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char payload[CHUNK_SIZE+1];
-    char username[MAX_LEN_USR];
-    char filename[MAX_LEN_FILENAME];
+    //char username[MAX_LEN_USR];
+    //char filename[MAX_LEN_FILENAME];
     struct stat st;
     int i, sock, nchunk, ret;
     FILE* fd;
@@ -293,7 +293,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         printf("Main folder of the client unaccessible...\n\n");
         return -1;
     }
-    if ((f1 = fopen(filename)) == NULL)
+    if ((fd = fopen(filename, "r")) == NULL)
     {
         printf("The file doesn't exist\n\n");
         return -1;
@@ -327,7 +327,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp2, 0, strlen(bufferSupp3));
-        ret = recv(sock, buffer, strlen(buffer));
+        ret = recv(sock, buffer, strlen(buffer),0);
         if (ret == -1)
         {
             printf("Receive operation gone bad!\n\n");
@@ -343,7 +343,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             return -1;
         }
     }
-    f1 = fopen(filename, "r");
+    fd = fopen(filename, "r");
     for (i = 0; i < nchunk; i++)
     {
         memset(buffer, 0, strlen(buffer));
@@ -352,7 +352,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         memset(bufferSupp3, 0, strlen(bufferSupp3));
         memset(payload, 0, strlen(payload));
 
-        ret = fread(payload, CHUNK_SIZE, 1, fp);
+        ret = fread(payload, CHUNK_SIZE, 1, fd);
         if (ret == -1)
         {
             printf("Problem during the reading of the file to upload... \n\n");
@@ -374,7 +374,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
 
-    ret = recv(sock, buffer, strlen(buffer));
+    ret = recv(sock, buffer, strlen(buffer),0);
     if (ret == -1)
     {
         printf("Problem during the send operation... \n\n");
@@ -425,7 +425,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    ret = recv(sock, buffer, strlen(buffer));
+    ret = recv(sock, buffer, strlen(buffer),0);
     if (ret == -1)
     {
         printf("Error during receive operation!\n\n");

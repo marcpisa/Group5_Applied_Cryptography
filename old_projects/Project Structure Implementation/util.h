@@ -36,8 +36,8 @@
 
 #define LOGIN_REQUEST "logi_req"
 #define LOGOUT_REQUEST "logo_req"
-#define LIST_REQ "list_req"
-#define LIST_RESP "list_res"
+#define LIST_REQUEST "list_req"
+#define LIST_RESPONSE "list_res"
 #define RENAME_REQUEST "renm_req"
 #define RENAME_ACCEPTED "renm_acc"
 #define RENAME_DENIED "renm_den"

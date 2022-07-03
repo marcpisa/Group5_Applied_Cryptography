@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
                     memset(buffer, 0, strlen(buffer));
-                    ret = recv(i, buffer, strlen(buffer));
+                    ret = recv(i, buffer, strlen(buffer), 0);
                     if (ret == -1)
                     {
                         printf("Error during recieve function!\n\n");
