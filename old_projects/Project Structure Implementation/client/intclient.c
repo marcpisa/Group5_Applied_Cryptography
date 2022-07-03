@@ -248,9 +248,10 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     f1 = fopen(filename, "w");
     for (i; i < nchunk; i++)
     {
+        printf("We are receiving the chunk number %i...\n\n", i);
         memset(buffer, 0, strlen(buffer));
         // I'm receveing a message with this format: download_chunk n_chunk payload
-        ret = recv(sock, buffer, BUF_LEN,0);
+        ret = recv(sock, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
             printf("Receive operation gone bad\n");
@@ -259,11 +260,13 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
         sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
+        printf("Now we append %s to the file...\n\n", bufferSupp3);
         fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
     }
+    fclose(f1);
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
     ret = send(sock, buffer, BUF_LEN, 0);
