@@ -237,8 +237,9 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         // Change this later to manage properly the session
         exit(1);
     }
-    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
-    nchunk = atoi(bufferSupp3);
+    printf("I'm receiving %s", buffer);
+    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2); // bufferSupp3 = number_of_chunk
+    nchunk = atoi(bufferSupp2);
     if (nchunk == 0)
     {
         printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
