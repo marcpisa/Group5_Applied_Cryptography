@@ -20,7 +20,7 @@
 #define MAX_LEN_FILENAME 20
 #define COMM_NUMB 8
 #define CHUNK_SIZE 512
-#define SERVER_PORT 9425
+#define SERVER_PORT 9420
 #define LOCALHOST "127.0.0.1"
 #define MAIN_FOLDER_SERVER "/home/marc/Documents/database"  // When you test the software on your pc change this variable
 #define MAIN_FOLDER_CLIENT "/home/marc/Documents/download"  // When you test the software on your pc change this variable
