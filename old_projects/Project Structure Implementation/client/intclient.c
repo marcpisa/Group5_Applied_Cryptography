@@ -523,6 +523,6 @@ int shareReceivedClient(int sd, char* rec_mex)
             return 1;
         }
         else printf("Given a bad input. Retry!\n\n");
-        flush(din);
+        fflush(stdin);
     }
 }
