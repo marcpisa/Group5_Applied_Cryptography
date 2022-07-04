@@ -58,6 +58,7 @@
 #define SHARE_REQUEST "shre_req"
 #define SHARE_ACCEPTED "shre_acc"
 #define SHARE_PERMISSION "shre_per"
+#define SHARE_DENIED "shre_den"
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"

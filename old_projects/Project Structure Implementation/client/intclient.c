@@ -479,28 +479,50 @@ int shareReceivedClient(int sd, char* rec_mex)
         printf("The mex type is incorrect!\n\n");
         return -1;
     }
-    printf("We received a share request: the filename is %s from peer %s. Do you accept the share operation? [Y/N]\n\n", filename, username);
+    printf("We received a share request: the filename is %s from peer %s.\n Do you accept the share operation? [Y/N]\n\n", filename, username);
     //sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
-    if (fgets(buffer, BUF_LEN, stdin) == NULL)
+    while((strcmp(buffer, "Y")!=0) && (strcmp(buffer, "N")!=0))
     {
-        printf("Some problem during the get function...\n\n");
-        return -1;
+        if (fgets(buffer, BUF_LEN, stdin) == NULL)
+        {
+            printf("Some problem during the get function...\n\n");
+            return -1;
+        }
+        p = strchr(buffer, '\n');
+        if(p) {*p = '\0';}
+
+        printf("Given in input %s", buffer);
+        if(strcmp(buffer, "Y") == 0)
+        {
+            memset(buffer, 0, strlen(buffer));
+            memset(bufferSupp1, 0, strlen(bufferSupp1));
+            memset(bufferSupp2, 0, strlen(bufferSupp2));
+            memset(bufferSupp2, 0, strlen(bufferSupp3));
+            sprintf(buffer, "%s %s %s", SHARE_ACCEPTED, filename, username);
+            ret = send(sd, buffer, strlen(buffer), 0);
+            if (ret == -1)
+            {
+                printf("Send operation gone bad.\n\n");
+                return -1;
+            }
+            return 1;
+        }
+        else if (strcmp(buffer, "N") == 0)
+        {
+            memset(buffer, 0, strlen(buffer));
+            memset(bufferSupp1, 0, strlen(bufferSupp1));
+            memset(bufferSupp2, 0, strlen(bufferSupp2));
+            memset(bufferSupp2, 0, strlen(bufferSupp3));
+            sprintf(buffer, "%s %s %s", SHARE_DENIED, filename, username);
+            ret = send(sd, buffer, strlen(buffer), 0);
+            if (ret == -1)
+            {
+                printf("Send operation gone bad.\n\n");
+                return -1;
+            }
+            return 1;
+        }
+        else printf("Given a bad input. Retry!\n\n");
+        flush(din);
     }
-    p = strchr(buffer, '\n');
-    if(p) {*p = '\0';}
-
-    // MANAGE THE INPUT GIVEN BY THE USER
-
-     if (strcmp(buffer, "Y") == 0)
-     {
-        memset (buffer, 0, strlen(buffer));
-
-        // SEND RESPONSE TO SERVER ACCEPTING THE SHARE OPERATION
-        return 1;
-     }
-     else
-     {
-        // SEND RESPONSE TO SERVER DENYING THE SHARE OPERATION
-        return 1;
-     }
 }
