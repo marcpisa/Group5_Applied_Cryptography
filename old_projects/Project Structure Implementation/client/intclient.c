@@ -482,8 +482,8 @@ int shareReceivedClient(int sd, char* rec_mex)
         printf("Some problem during the get function...\n\n");
         return -1;
     }
-    p = strchr(buf, '\n');
-    if(p) {*p = '\0'};
+    p = strchr(buffer, '\n');
+    if(p) {*p = '\0';}
 
     // MANAGE THE INPUT GIVEN BY THE USER
 
