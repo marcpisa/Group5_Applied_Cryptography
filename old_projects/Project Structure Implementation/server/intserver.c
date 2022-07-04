@@ -259,13 +259,14 @@ int downloadServer(int sd, char* rec_mex)
             exit(1);
         }
     }
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    ret = recv(sd, buffer, strlen(buffer),0);
+    memset(buffer, 0, strlen(buffer));
+    ret = recv(sd, buffer, strlen(buffer), 0);
     if (ret == -1)
     {
         printf("Send operation gone bad!\n\n");
         exit(1);
     }
+    printf("I'm receiving %s", buffer);
 
     // DECRYPT THE BUFFER
 
