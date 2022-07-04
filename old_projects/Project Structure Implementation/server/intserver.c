@@ -432,9 +432,9 @@ int shareServer(int sd, char* rec_mex)
 	}
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s.txt", receivername);
-    if (!(f1 = open(buffer, "r")))
+    if (!(f1 = fopen(buffer, "r")))
     {
-        printf("The receiver %s is not online... Try it later\n\n");
+        printf("The receiver %s is not online... Try it later\n\n", receivername);
         memset(buffer, 0, strlen(buffer));
         sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
         ret = send(sd, buffer, strlen(buffer), 0);
