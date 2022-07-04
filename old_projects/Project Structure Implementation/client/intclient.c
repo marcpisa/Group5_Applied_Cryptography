@@ -324,7 +324,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         sprintf(buffer, "%s %s %s %i", UPLOAD_REQUEST, username, filename, nchunk);
 
         // ENCRYPT THE BUFFER
-
+        printf("I'm sending %s\n\n", buffer);
         ret = send(sock, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
