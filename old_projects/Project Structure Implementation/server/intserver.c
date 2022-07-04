@@ -144,7 +144,7 @@ int deleteServer(int sd, char* rec_mex)
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3
-    chdir("/home/marc/Documents/database");
+    chdir("/home/marc/Documents/database");;
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
@@ -377,7 +377,101 @@ int uploadServer(int sd, char* rec_mex)
     return 1;
 }
 
-int shareServer()
+int shareServer(int sd, char* rec_mex)
 {
+    int sock, ret, i, receiverport;
+    char buffer[BUF_LEN];
+    FILE* f1;
+    struct sockaddr_in rec_addr;
+    socklen_t addrlen;
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    char filename[MAX_LEN_FILENAME];
+    char sharername[MAX_LEN_USR];
+    char receivername[MAX_LEN_USR];
 
+    printf("I received %s\n\n", rec_mex);
+    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, sharername, filename, receivername);
+    
+    // SANITIZATION OF FILENAME, USERNAMES
+    
+    if (chdir(MAIN_FOLDER_SERVER) == -1)
+	{
+		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+        return -1;
+	}
+    if (chdir(sharername) == -1)
+    {
+        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+        return -1;
+    }
+    f1 = fopen(filename, "r");
+    if (f1 == NULL)
+    {
+        printf("The sharer doesn't have any file called %s\n\n", filename);
+        memset(buffer, 0, strlen(buffer));
+        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Something bad happened with the send function...\n\n");
+            return -1;
+        }
+        return 1;
+    }
+    fclose(f1);
+
+    // We should ask to the receiver whether it wants to allow the share operation
+    // Create a folder where you store all the information about the listeners of the users logged
+
+    if (chdir(INFO_FOLDER_SERVER) == -1)
+    {
+		printf("I'm having some problem with the change directory to the info folder of the software...\n\n");
+        return -1;
+	}
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s.txt", receivername);
+    if (!(f1 = open(buffer, "r")))
+    {
+        printf("The receiver %s is not online... Try it later\n\n");
+        memset(buffer, 0, strlen(buffer));
+        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Something bad happened with the send function...\n\n");
+            return -1;
+        }
+        return 1;
+    }
+    memset(buffer, 0, strlen(buffer));
+    ret = fread(buffer, PORT_SIZE, 1, f1);
+    if (ret == -1)
+    {
+        printf("Problem during the reading of the file to downlaod... \n\n");
+        return -1;
+    }
+    receiverport = atoi(buffer);
+
+    memset(&rec_addr, 0, sizeof(rec_addr));
+	rec_addr.sin_family = AF_INET;
+	rec_addr.sin_port = htons(receiverport);
+	inet_pton(AF_INET, LOCALHOST, &rec_addr.sin_addr);
+
+    sock = createSocket();
+    if (connect(sock, (struct sockaddr*)&rec_addr, sizeof(rec_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
+
+
+
+
+
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
 }

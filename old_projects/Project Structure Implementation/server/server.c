@@ -375,7 +375,13 @@ int main(int argc, char* argv[])
                             printf("\nA share request has came up...\n\n");
                             // SHARE MANAGER: SERVER SIDE
                             
-                            // Do stuff
+                            ret = shareServer(i, buffer);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client share request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a share request and all was good!\n\n");
 
                             printf("End of share request management!\n\n");
                             close(i);

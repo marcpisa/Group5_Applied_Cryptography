@@ -414,6 +414,8 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
     char bufferSupp3[BUF_LEN];
     int sock, ret;
 
+    sock = createSocket();
+
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));

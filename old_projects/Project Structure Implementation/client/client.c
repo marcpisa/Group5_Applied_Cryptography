@@ -241,12 +241,18 @@ int main(int argc, char* argv[])
                             break;
 
                         case 8: //********** SHARE ************
-                            if (connected == 0)
+                            /*if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            //Stuff to do
+                            */
+                            ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            if (ret == -1)
+                            {
+                                printf("Error during the upload operation request!\n\n");
+                                exit(1);
+                            }
 
                             break;
 
