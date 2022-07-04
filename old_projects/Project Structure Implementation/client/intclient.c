@@ -270,6 +270,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     fclose(f1);
     memset(buffer, 0, strlen(buffer));
     sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
+    printf("I'm sending %s\n\n", buffer);
     ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
