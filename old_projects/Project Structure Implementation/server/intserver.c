@@ -292,9 +292,10 @@ int uploadServer(int sd, char* rec_mex)
     char filename[MAX_LEN_FILENAME];
     char username[MAX_LEN_USR];
 
-    printf("I received %s", rec_mex);
+    printf("I received %s\n\n", rec_mex);
     sscanf(rec_mex, "%s %s %s %s", bufferSupp1, username, filename, bufferSupp2);
     nchunk = atoi(bufferSupp2);
+    printf("The number of chunk of the file is %i", nchunk);
 
     // SANITIZATION OF THE USERNAME AND THE FILENAME
 
@@ -316,7 +317,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         sprintf(buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
-        printf("I'm sending %s", buffer);
+        printf("I'm sending %s\n\n", buffer);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
@@ -352,6 +353,7 @@ int uploadServer(int sd, char* rec_mex)
             printf("We had some problem with the recv function...\n\n");
             return -1;
         }
+        printf("I'm receiving %s\n\n", buffer);
 
         // DECRYPT THE MESSAGE
 
