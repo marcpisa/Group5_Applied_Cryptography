@@ -381,7 +381,8 @@ int shareServer(int sd, char* rec_mex)
     int sock, ret, i, receiverport;
     char buffer[BUF_LEN];
     char ch;
-    FILE* f1, f2;
+    FILE* f1;
+    FILE* f2;
     struct sockaddr_in rec_addr;
     socklen_t addrlen;
     char bufferSupp1[BUF_LEN];
@@ -531,7 +532,7 @@ int shareServer(int sd, char* rec_mex)
         ch = fgetc(f1);
         while(ch != EOF)
         {
-            fput(ch, f2);
+            fputc(ch, f2);
             ch = fgetc(f1);
         }
         printf("File copied properly\n\n");
