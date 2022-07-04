@@ -335,13 +335,14 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         memset(buffer, 0, strlen(buffer));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp2, 0, strlen(bufferSupp3));
-        ret = recv(sock, buffer, strlen(buffer),0);
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        ret = recv(sock, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
             printf("Receive operation gone bad!\n\n");
             exit(1);
         }
+        printf("I received %s from the server\n\n", buffer);
 
         // DECRYPT THE BUFFER
 
@@ -386,7 +387,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
 
-    ret = recv(sock, buffer, strlen(buffer),0);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Problem during the send operation... \n\n");
@@ -439,7 +440,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    ret = recv(sock, buffer, strlen(buffer),0);
+    ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
         printf("Error during receive operation!\n\n");
