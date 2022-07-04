@@ -315,7 +315,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
 
         stat(filename, &st);
-        nchunk = ceil(st.st_size/CHUNK_SIZE);
+        nchunk = (st.st_size/CHUNK_SIZE)+1;
 
         memset(buffer, 0, strlen(buffer));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
@@ -352,6 +352,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
     }
     fd = fopen(filename, "r");
+    // We should add another check about the fact that the file exists or not
     for (i = 0; i < nchunk; i++)
     {
         memset(buffer, 0, strlen(buffer));
@@ -458,6 +459,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
 int shareReceivedClient(int sd, char* rec_mex)
 {
     int ret, i;
+    char* p;
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
@@ -475,6 +477,13 @@ int shareReceivedClient(int sd, char* rec_mex)
     }
     printf("We received a share request: the filename is %s from peer %s. Do you accept the share operation? [Y/N]\n\n", filename, username);
     //sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
+    if (fgets(buffer, BUF_LEN, stdin) == NULL)
+    {
+        printf("Some problem during the get function...\n\n");
+        return -1;
+    }
+    p = strchr(buf, '\n');
+    if(p) {*p = '\0'};
 
     // MANAGE THE INPUT GIVEN BY THE USER
 
