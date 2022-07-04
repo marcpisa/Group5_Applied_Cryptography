@@ -347,7 +347,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
-        ret = recv(sd, buffer, strlen(buffer),0);
+        ret = recv(sd, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
             printf("We had some problem with the recv function...\n\n");
