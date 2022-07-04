@@ -353,6 +353,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         }
     }
     fd = fopen(filename, "r");
+    printf("I'm starting the upload operation...\n\n");
     // We should add another check about the fact that the file exists or not
     for (i = 0; i < nchunk; i++)
     {
@@ -369,7 +370,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             return -1;
         }
         sprintf(buffer, "%s %s %s", UPLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex n_chunk
-        
+        printf("I'm sending %s\n\n", buffer);
         // ENCRYPT BUFFER
 
         ret = send(sock, buffer, strlen(buffer), 0);
@@ -379,6 +380,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             return -1;
         }
     }
+    printf("Upload operation over... Waiting end communication from the server... \n\n");
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
