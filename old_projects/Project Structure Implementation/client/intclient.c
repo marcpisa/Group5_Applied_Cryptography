@@ -471,11 +471,11 @@ int shareReceivedClient(int sd, char* rec_mex)
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char filename[MAX_LEN_FILENAME];
-    char username[MAX_LEN_USR];
+    char sharername[MAX_LEN_USR];
 
     //DECRYPT REC_MEX, SANITIZE THE INPUT
 
-    sscanf(rec_mex, "%s %s %s", bufferSupp1, username, filename);
+    sscanf(rec_mex, "%s %s %s", bufferSupp1, sharername, filename);
     if (strcmp(bufferSupp1, SHARE_PERMISSION) != 0)
     {
         printf("The mex type is incorrect!\n\n");
@@ -500,7 +500,7 @@ int shareReceivedClient(int sd, char* rec_mex)
             memset(bufferSupp1, 0, strlen(bufferSupp1));
             memset(bufferSupp2, 0, strlen(bufferSupp2));
             memset(bufferSupp2, 0, strlen(bufferSupp3));
-            sprintf(buffer, "%s %s %s", SHARE_ACCEPTED, filename, username);
+            sprintf(buffer, "%s %s %s", SHARE_ACCEPTED, sharername, filename);
             ret = send(sd, buffer, strlen(buffer), 0);
             if (ret == -1)
             {
@@ -515,7 +515,7 @@ int shareReceivedClient(int sd, char* rec_mex)
             memset(bufferSupp1, 0, strlen(bufferSupp1));
             memset(bufferSupp2, 0, strlen(bufferSupp2));
             memset(bufferSupp2, 0, strlen(bufferSupp3));
-            sprintf(buffer, "%s %s %s", SHARE_DENIED, filename, username);
+            sprintf(buffer, "%s %s %s", SHARE_DENIED, sharername, filename);
             ret = send(sd, buffer, strlen(buffer), 0);
             if (ret == -1)
             {

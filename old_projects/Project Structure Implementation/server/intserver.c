@@ -1,5 +1,4 @@
 #include "intserver.h"
-#include "dirent.h"
 int createSocket()
 {
     int sock;
@@ -381,7 +380,8 @@ int shareServer(int sd, char* rec_mex)
 {
     int sock, ret, i, receiverport;
     char buffer[BUF_LEN];
-    FILE* f1;
+    char ch;
+    FILE* f1, f2;
     struct sockaddr_in rec_addr;
     socklen_t addrlen;
     char bufferSupp1[BUF_LEN];
@@ -466,12 +466,101 @@ int shareServer(int sd, char* rec_mex)
         exit(1);
     }
 
-
-
-
-
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s %s", SHARE_PERMISSION, sharername, filename);
+    ret = send(sock, buffer, strlen(buffer), 0);
+    if (ret == -1)
+    {
+        printf("Something bad happened with the send function...\n\n");
+        return -1;
+    }
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
+    ret = recv(sock, buffer, BUF_LEN, 0);
+    if (ret == -1)
+    {
+        printf("Something bad happened with the receive function...\n\n");
+        return -1;
+    }
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    if (strcmp(bufferSupp1, SHARE_ACCEPTED)==0)
+    {
+        // COPY THE FILE IN THE FOLDER OF THE REICEIVER
+        printf("The receiver is allowing the share operation...\n\n");
+
+        // Now we do the copy function
+        // Opening the file for the sharer
+        if (chdir(MAIN_FOLDER_SERVER) == -1)
+	    {
+		    printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+            return -1;
+	    }
+        if (chdir(sharername) == -1)
+        {
+            printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+            return -1;
+        }
+        f1 = fopen(filename, "r");
+        if (f1 == NULL)
+        {
+            printf("Error in open file\n\n");
+            return -1;
+        }
+
+        // Opening the file for the receiver
+        if (chdir(MAIN_FOLDER_SERVER) == -1)
+	    {
+		    printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+            return -1;
+	    }
+        if (chdir(receivername) == -1)
+        {
+            printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+            return -1;
+        }
+        f2 = fopen(filename, "w");
+        if (f1 == NULL)
+        {
+            printf("Error in open file\n\n");
+            return -1;
+        }
+
+        // Copying operation
+        ch = fgetc(f1);
+        while(ch != EOF)
+        {
+            fput(ch, f2);
+            ch = fgetc(f1);
+        }
+        printf("File copied properly\n\n");
+        fclose(f1);
+        fclose(f2);
+
+
+        memset(buffer, 0, strlen(buffer));
+        sprintf(buffer, "%s %s %s %s", SHARE_ACCEPTED, sharername, filename, receivername);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Something bad happened with the send function...\n\n");
+            return -1;
+        }
+        return 1;
+    }
+    if (strcmp(bufferSupp1, SHARE_DENIED)==0)
+    {
+        // THE SHARE OPERATION IS NOT ALLOWED, SEND A MESSAGE TO THE SHARER LETTING HIM KNOW IT
+        printf("The receiver is denying the share operation...\n\n");
+        memset(buffer, 0, strlen(buffer));
+        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
+        ret = send(sd, buffer, strlen(buffer), 0);
+        if (ret == -1)
+        {
+            printf("Something bad happened with the send function...\n\n");
+            return -1;
+        }
+        return 1;
+    }
 }
