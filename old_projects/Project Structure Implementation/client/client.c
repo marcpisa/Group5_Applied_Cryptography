@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
     int new_sd, listenerTCP, nbytes, ret, fdmax, pid, port, s;
-    struct sockaddr_in my_addr, srv_addr;
+    struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
 
     //Buffers
@@ -112,8 +112,8 @@ int main(int argc, char* argv[])
                     // so i store the information about the server address and
                     // call the accept function. The accept function send
                     // a response to the server.
-                    addrlen = sizeof(srv_addr);
-                    new_sd = accept(listenerTCP, (struct sockaddr*)&srv_addr, &addrlen);
+                    addrlen = sizeof(srv_addr2);
+                    new_sd = accept(listenerTCP, (struct sockaddr*)&srv_addr2, &addrlen);
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
                 }
