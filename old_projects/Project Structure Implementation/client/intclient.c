@@ -495,6 +495,7 @@ int shareReceivedClient(int sd, char* rec_mex)
         if(p) {*p = '\0';}
 
         printf("Given in input %s", buffer);
+        printf("\n"); 
         if(strcmp(buffer, "Y") == 0)
         {
             memset(buffer, 0, strlen(buffer));
