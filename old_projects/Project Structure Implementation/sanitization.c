@@ -1,8 +1,13 @@
-//IS THE SANIFICATION PROCESS DONE AT CLIENT LEVEL OR AT SERVER LEVEL???
-
 #include "server/utilserver.h"
 
+/* These can be put in the server file
+
 static char *commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE};
+static cahr *client_list[] = {mark_hoffman, andrea_giuliani43, tpacini, fr75_rubino}
+
+#define MAX_LENG_USERNAME
+
+*/
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-./"};
 
 
@@ -11,16 +16,16 @@ RETURN:
     0 -> command invalid or input 
     i+1 -> command valid returning id of command
 */
-int input_sanitization_commands(const char* input[]) {
+int input_sanitization_commands(const char* input[], const char* commands[]) {
 
     int i;
     for (i = 0; i < COMM_NUMB; i++) {
-        if (strncmp(commands[i], input, COM_LEN) == 0) return i + 1;
+        if (strncmp(commands[i], strlwr(input), COM_LEN) == 0) return i + 1;
     }
     return 0;
 }
 
-/*Sanitization of file_name inserted by the client.
+/*Sanitization of file_name sent by the client.
 RETURN:
     0 -> file_name with denied characters or error during canonization
     -1 -> unathorized path for file_name
@@ -37,4 +42,11 @@ int file_name_sanitization(const char* file_name[], const char* root_dir[], char
     return 1;
 }
 
-int username_sanitization()
+// Only search inside the list of clients at the server side
+int username_sanitization(const char* input[], const char* client_list[]) {
+    int i;
+    for (i = 0; i < COMM_NUMB; i++) {
+        if (strncmp(commands[i], input, MAX_LENG_USERNAME) == 0) return i + 1;
+    }
+    return 0;
+}
