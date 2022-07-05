@@ -113,14 +113,15 @@ int main(int argc, char* argv[])
                 else //Manager for the accepted communications
                 {
                     memset(buffer, 0, strlen(buffer));
-                    nbytes = BUF_LEN;
-                    ret = recv(i, buffer, nbytes, 0);
+                    printf("Now the buffer contains %s\n\n", buffer);
+                    ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret < 0)
                     {
-                        perror("Errore in fase di ricezione: ");
+                        perror("Errore during recv operation: ");
                         close(listenerTCP);
                         exit(-1);
                     }
+                    printf("I received %s\n\n", buffer);
 
                     // We check the first keyword to understand what the Client wants us to do
                     memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem
