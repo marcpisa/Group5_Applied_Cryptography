@@ -250,7 +250,7 @@ int main(int argc, char* argv[])
                             ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
-                                printf("Error during the upload operation request!\n\n");
+                                printf("Error during the share operation request!\n\n");
                                 exit(1);
                             }
 
