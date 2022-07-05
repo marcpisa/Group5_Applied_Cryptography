@@ -247,6 +247,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
                             */
+                            printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
                             ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {

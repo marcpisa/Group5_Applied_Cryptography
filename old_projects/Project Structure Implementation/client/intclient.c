@@ -428,6 +428,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
     }
 
     sprintf(buffer, "%s %s %s %s", SHARE_REQUEST, username, peername, filename);
+    printf("I'm sending %s to the server\n\n", buffer);
 
     // ENCRYPT THE BUFFER
 
