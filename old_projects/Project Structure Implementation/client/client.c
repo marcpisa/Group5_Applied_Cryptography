@@ -294,6 +294,12 @@ int main(int argc, char* argv[])
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
+                    ret = recv(i, buffer, BUF_LEN, 0);
+                    if (ret == -1)
+                    {
+                        printf("Error during recieve function!\n\n");
+                        exit(1);
+                    }
 
                     pid = fork();
                     if (pid < 0)
@@ -303,8 +309,8 @@ int main(int argc, char* argv[])
                     }
                     if (pid == 0)
                     {
-                        //We are in the son part of code
                         close(listenerTCP);
+                        //We are in the son part of code
                         ret = shareReceivedClient(i, buffer);
                         if (ret == -1)
                         {
@@ -314,6 +320,8 @@ int main(int argc, char* argv[])
                         close(i);
                         exit(0);
                     }
+                    close(i);
+					FD_CLR(i, &master);
                 }
             }
         }
