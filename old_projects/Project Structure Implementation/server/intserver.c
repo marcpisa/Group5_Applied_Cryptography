@@ -407,6 +407,7 @@ int shareServer(int sd, char* rec_mex)
         printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
         return -1;
     }
+    printf("The filename is %s\n\n", filename);
     f1 = fopen(filename, "r");
     if (f1 == NULL)
     {
