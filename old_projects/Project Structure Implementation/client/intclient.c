@@ -479,7 +479,7 @@ int shareReceivedClient(int sd, char* rec_mex)
     sscanf(rec_mex, "%s %s %s", bufferSupp1, sharername, filename);
     if (strcmp(bufferSupp1, SHARE_PERMISSION) != 0)
     {
-        printf("The mex type is incorrect!\n\n");
+        //printf("The mex type is incorrect!\n\n");
         return -1;
     }
     printf("We received a share request: the filename is %s from peer %s.\n Do you accept the share operation? [Y/N]\n\n", filename, sharername);

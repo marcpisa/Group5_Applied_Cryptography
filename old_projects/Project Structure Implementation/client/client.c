@@ -308,7 +308,7 @@ int main(int argc, char* argv[])
                         ret = shareReceivedClient(i, buffer);
                         if (ret == -1)
                         {
-                            printf("Error during received share request!\n\n");
+                            //printf("Error during received share request!\n\n");
                             exit(1);
                         }
                         close(i);
