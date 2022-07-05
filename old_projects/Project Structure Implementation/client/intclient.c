@@ -189,6 +189,9 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
+
+    int position;
+
     sock = createSocket();
 
     if (chdir(MAIN_FOLDER_CLIENT) == -1)
@@ -259,7 +262,18 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             // Change this later to manage properly the session
             exit(1);
         }
-        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
+        //sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2);
+        position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
+        for (j = 0; j < CHUNK_SIZE; j++)
+        {
+            bufferSupp3[j] = buffer[position+j];
+        }
+        bufferSupp3[j] = ´\0´;
+        
+        
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
         printf("Now we append %s to the file...\n\n", bufferSupp3);
         fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
