@@ -271,7 +271,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         {
             bufferSupp3[j] = buffer[position+j];
         }
-        bufferSupp3[j] = ´\0´;
+        bufferSupp3[j] = '\0';
         
         
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
