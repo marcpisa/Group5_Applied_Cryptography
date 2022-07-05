@@ -393,7 +393,7 @@ int shareServer(int sd, char* rec_mex)
     char receivername[MAX_LEN_USR];
 
     printf("I received %s\n\n", rec_mex);
-    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, sharername, filename, receivername);
+    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, sharername, receivername, filename);
     
     // SANITIZATION OF FILENAME, USERNAMES
     
