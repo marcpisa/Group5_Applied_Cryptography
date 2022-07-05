@@ -86,6 +86,8 @@ int main(int argc, char* argv[])
     }
     printf("Bind phase correctly executed: port %i used!\n\n", port);
     printf(RED "Write 'help' to see the manual.\n" RESET ); 
+    
+    printf("Please, write a command..\n\n");
 
     // CONFIGURATION SET FOR THE SELECT FUNCTION
     FD_ZERO(&master);
@@ -98,7 +100,7 @@ int main(int argc, char* argv[])
     while(1)
     {
         read_fds = master;
-        printf("Please, write a command..\n\n");
+        
         select(fdmax+1, &read_fds, NULL, NULL, 0);
         for (int i = 0; i <= fdmax; i++)
         {
@@ -286,12 +288,13 @@ int main(int argc, char* argv[])
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
                     memset(buffer, 0, strlen(buffer));
-                    ret = recv(i, buffer, strlen(buffer), 0);
+                    ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret == -1)
                     {
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
+
                     pid = fork();
                     if (pid < 0)
                     {
