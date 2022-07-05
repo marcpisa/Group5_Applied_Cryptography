@@ -294,12 +294,6 @@ int main(int argc, char* argv[])
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
-                    ret = recv(i, buffer, BUF_LEN, 0);
-                    if (ret == -1)
-                    {
-                        printf("Error during recieve function!\n\n");
-                        exit(1);
-                    }
 
                     pid = fork();
                     if (pid < 0)
