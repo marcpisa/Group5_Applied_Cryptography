@@ -495,9 +495,26 @@ int shareServer(int sd, char* rec_mex)
         // COPY THE FILE IN THE FOLDER OF THE REICEIVER
         printf("The receiver is allowing the share operation...\n\n");
 
+        memset(buffer, 0, strlen(buffer));
+        strcat(buffer, "cp "); 
+        strcat(buffer, MAIN_FOLDER_SERVER); 
+        strcat(buffer, "/"); 
+        strcat(buffer, sharername); 
+        strcat(buffer, "/"); 
+        strcat(buffer, filename); 
+        strcat(buffer, " "); 
+        strcat(buffer, MAIN_FOLDER_SERVER); 
+        strcat(buffer, "/"); 
+        strcat(buffer, receivername); 
+        system(buffer); 
+
+
+
+
+
         // Now we do the copy function
         // Opening the file for the sharer
-        if (chdir(MAIN_FOLDER_SERVER) == -1)
+      /*  if (chdir(MAIN_FOLDER_SERVER) == -1)
 	    {
 		    printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
             return -1;
@@ -542,7 +559,7 @@ int shareServer(int sd, char* rec_mex)
         printf("File copied properly\n\n");
         fclose(f1);
         fclose(f2);
-
+*/
 
         memset(buffer, 0, strlen(buffer));
         sprintf(buffer, "%s %s %s %s", SHARE_ACCEPTED, sharername, filename, receivername);
@@ -554,6 +571,8 @@ int shareServer(int sd, char* rec_mex)
         }
         return 1;
     }
+
+
     if (strcmp(bufferSupp1, SHARE_DENIED)==0)
     {
         // THE SHARE OPERATION IS NOT ALLOWED, SEND A MESSAGE TO THE SHARER LETTING HIM KNOW IT
