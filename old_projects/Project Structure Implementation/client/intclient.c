@@ -183,7 +183,7 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
 int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
-    int sock, ret, nchunk, i;
+    int sock, ret, nchunk, i, j;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
