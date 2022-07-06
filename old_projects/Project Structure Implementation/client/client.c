@@ -99,6 +99,8 @@ int main(int argc, char* argv[])
 
     while(1)
     {
+
+   
         read_fds = master;
         
         select(fdmax+1, &read_fds, NULL, NULL, 0);

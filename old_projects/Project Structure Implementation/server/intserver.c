@@ -508,59 +508,6 @@ int shareServer(int sd, char* rec_mex)
         strcat(buffer, receivername); 
         system(buffer); 
 
-
-
-
-
-        // Now we do the copy function
-        // Opening the file for the sharer
-      /*  if (chdir(MAIN_FOLDER_SERVER) == -1)
-	    {
-		    printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-            return -1;
-	    }
-        if (chdir(sharername) == -1)
-        {
-            printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-            return -1;
-        }
-        f1 = fopen(filename, "r");
-        if (f1 == NULL)
-        {
-            printf("Error in open file\n\n");
-            return -1;
-        }
-
-        // Opening the file for the receiver
-        if (chdir(MAIN_FOLDER_SERVER) == -1)
-	    {
-		    printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-            return -1;
-	    }
-        if (chdir(receivername) == -1)
-        {
-            printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-            return -1;
-        }
-        f2 = fopen(filename, "w");
-        if (f1 == NULL)
-        {
-            printf("Error in open file\n\n");
-            return -1;
-        }
-
-        // Copying operation
-        ch = fgetc(f1);
-        while(ch != EOF)
-        {
-            fputc(ch, f2);
-            ch = fgetc(f1);
-        }
-        printf("File copied properly\n\n");
-        fclose(f1);
-        fclose(f2);
-*/
-
         memset(buffer, 0, strlen(buffer));
         sprintf(buffer, "%s %s %s %s", SHARE_ACCEPTED, sharername, filename, receivername);
         ret = send(sd, buffer, strlen(buffer), 0);
