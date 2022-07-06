@@ -278,7 +278,8 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
         printf("Now we append %s to the file...\n\n", bufferSupp3);
-        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
+        fprintf(f1, "%s", bufferSupp3);
+        //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
