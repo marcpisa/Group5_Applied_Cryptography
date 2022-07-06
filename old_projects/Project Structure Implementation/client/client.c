@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
     FILE* fd1;
 
     //********* END VARIABLES *********
-
+    printf("We're testing something\n\n");
     if (argc != 3)
     {
         printf("Error at the boot phase of the Client. The number of arguments is wrong...\n");
