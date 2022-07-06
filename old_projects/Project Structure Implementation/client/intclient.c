@@ -265,6 +265,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         //sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
         sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2);
         position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
         for (j = 0; j < CHUNK_SIZE; j++)
