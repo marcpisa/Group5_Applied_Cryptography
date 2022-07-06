@@ -529,6 +529,7 @@ int shareReceivedClient(int sd, char* rec_mex)
         }
         else if (strcmp(buffer, "N") == 0)
         {
+            //test comment remove later not important just to test if git works for francesco
             memset(buffer, 0, strlen(buffer));
             memset(bufferSupp1, 0, strlen(bufferSupp1));
             memset(bufferSupp2, 0, strlen(bufferSupp2));
