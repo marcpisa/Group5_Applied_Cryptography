@@ -5,3 +5,7 @@ clientPr: client.o intclient.o
 
 client.o: intclient.h
 intpeer.o: intclient.h ../util.h
+
+clean:
+		rm  *.o clientPr
+
