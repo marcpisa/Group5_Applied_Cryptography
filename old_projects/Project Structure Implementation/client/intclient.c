@@ -24,7 +24,7 @@ int LogoutClient()
 int listClient(char* username, struct sockaddr_in srv_addr)
 {
     
-    int sock, ret;
+    int sock, ret, i;
     char buffer[BUF_LEN];
     sock = createSocket();
 
@@ -62,8 +62,22 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     // HERE USE DECRYPTION TO UNDERSTAND WHAT YOU RECEIVE
 
     // END COMMUNICATION
+    char* point = NULL;
+    char* token;
+    i = 0;
+    token = strtok_r(buffer, " ", &point);
+    
+    printf("REQUEST %s FROM SERVER:\n", token);
 
-    printf("%s\n", buffer);
+    while(token = strtok_r(NULL, " ", &point)) {
+        if(strncmp(token, ".", 1) == 0 || strncmp(token, "..", 2) == 0) {
+            printf("Directory %d: %s\n", i, token);
+        }
+        else {
+            printf("File      %d: %s\n", i, token);
+        }
+        i++;
+    }
     return 1;
 }
 
