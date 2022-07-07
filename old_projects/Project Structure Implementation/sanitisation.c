@@ -1,11 +1,4 @@
 #include "util.h"
-
-/* These can be put in the server file
-
-static char *commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE};
-static cahr *client_list[] = {mark_hoffman, andrea_giuliani43, tpacini, fr75_rubino} BETTER IN A FILE
-
-*/
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-./"};
 
 
@@ -41,7 +34,6 @@ int file_name_sanitisation(const char* file_name[], const char* root_dir[], char
 }
 
 // Only search inside the list of clients at the server side
-//IDEA: The client list is taken by a file in wich there are all username of clients.
 int username_sanitisation(const char* input[], const char* client_list[]) {
     int i;
     for (i = 0; i < COMM_NUMB; i++) {
