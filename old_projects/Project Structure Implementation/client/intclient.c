@@ -183,12 +183,15 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
 int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
-    int sock, ret, nchunk, i;
+    int sock, ret, nchunk, i, j;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
+
+    int position;
+
     sock = createSocket();
 
     if (chdir(MAIN_FOLDER_CLIENT) == -1)
@@ -259,10 +262,25 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             // Change this later to manage properly the session
             exit(1);
         }
-        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
+        //sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2);
+        position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
+        for (j = 0; j < CHUNK_SIZE; j++)
+        {
+            bufferSupp3[j] = buffer[position+j];
+        }
+        bufferSupp3[j] = '\0';
+
+        printf("The payload received is %s\n\n", bufferSupp3);
+        
+        
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
         printf("Now we append %s to the file...\n\n", bufferSupp3);
-        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
+        fprintf(f1, "%s", bufferSupp3);
+        //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
@@ -428,6 +446,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
     }
 
     sprintf(buffer, "%s %s %s %s", SHARE_REQUEST, username, peername, filename);
+    printf("I'm sending %s to the server\n\n", buffer);
 
     // ENCRYPT THE BUFFER
 
@@ -478,7 +497,7 @@ int shareReceivedClient(int sd, char* rec_mex)
     sscanf(rec_mex, "%s %s %s", bufferSupp1, sharername, filename);
     if (strcmp(bufferSupp1, SHARE_PERMISSION) != 0)
     {
-        printf("The mex type is incorrect!\n\n");
+        //printf("The mex type is incorrect!\n\n");
         return -1;
     }
     printf("We received a share request: the filename is %s from peer %s.\n Do you accept the share operation? [Y/N]\n\n", filename, sharername);
@@ -494,6 +513,7 @@ int shareReceivedClient(int sd, char* rec_mex)
         if(p) {*p = '\0';}
 
         printf("Given in input %s", buffer);
+        printf("\n"); 
         if(strcmp(buffer, "Y") == 0)
         {
             memset(buffer, 0, strlen(buffer));
@@ -511,6 +531,7 @@ int shareReceivedClient(int sd, char* rec_mex)
         }
         else if (strcmp(buffer, "N") == 0)
         {
+            //test comment remove later not important just to test if git works for francesco
             memset(buffer, 0, strlen(buffer));
             memset(bufferSupp1, 0, strlen(bufferSupp1));
             memset(bufferSupp2, 0, strlen(bufferSupp2));

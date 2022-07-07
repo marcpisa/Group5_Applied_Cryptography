@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
     int new_sd, listenerTCP, nbytes, ret, fdmax, pid, port, s;
-    struct sockaddr_in my_addr, srv_addr;
+    struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
 
     //Buffers
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
     FILE* fd1;
 
     //********* END VARIABLES *********
-
+    printf("We're testing something\n\n");
     if (argc != 3)
     {
         printf("Error at the boot phase of the Client. The number of arguments is wrong...\n");
@@ -86,6 +86,8 @@ int main(int argc, char* argv[])
     }
     printf("Bind phase correctly executed: port %i used!\n\n", port);
     printf(RED "Write 'help' to see the manual.\n" RESET ); 
+    
+    printf("Please, write a command..\n\n");
 
     // CONFIGURATION SET FOR THE SELECT FUNCTION
     FD_ZERO(&master);
@@ -97,8 +99,10 @@ int main(int argc, char* argv[])
 
     while(1)
     {
+
+   
         read_fds = master;
-        printf("Please, write a command..\n\n");
+        
         select(fdmax+1, &read_fds, NULL, NULL, 0);
         for (int i = 0; i <= fdmax; i++)
         {
@@ -110,8 +114,8 @@ int main(int argc, char* argv[])
                     // so i store the information about the server address and
                     // call the accept function. The accept function send
                     // a response to the server.
-                    addrlen = sizeof(srv_addr);
-                    new_sd = accept(listenerTCP, (struct sockaddr*)&srv_addr, &addrlen);
+                    addrlen = sizeof(srv_addr2);
+                    new_sd = accept(listenerTCP, (struct sockaddr*)&srv_addr2, &addrlen);
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
                 }
@@ -247,10 +251,11 @@ int main(int argc, char* argv[])
                                 break;
                             }
                             */
+                            printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
                             ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
-                                printf("Error during the upload operation request!\n\n");
+                                printf("Error during the share operation request!\n\n");
                                 exit(1);
                             }
 
@@ -268,7 +273,7 @@ int main(int argc, char* argv[])
                                     printf("Delete file: 'delete filename'\n"); 
                                     printf("Download file: 'download filename'\n"); 
                                     printf("Upload file: 'upload file_location'\n"); 
-                                    printf("Share file with other user: 'share username filename'\n"); 
+                                    printf("Share file with other user: 'share filename username'\n"); 
                                     printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
                                     break; 
                                } 
@@ -285,12 +290,13 @@ int main(int argc, char* argv[])
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
                     memset(buffer, 0, strlen(buffer));
-                    ret = recv(i, buffer, strlen(buffer), 0);
+                    ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret == -1)
                     {
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
+
                     pid = fork();
                     if (pid < 0)
                     {
@@ -299,17 +305,19 @@ int main(int argc, char* argv[])
                     }
                     if (pid == 0)
                     {
-                        //We are in the son part of code
                         close(listenerTCP);
+                        //We are in the son part of code
                         ret = shareReceivedClient(i, buffer);
                         if (ret == -1)
                         {
-                            printf("Error during received share request!\n\n");
+                            //printf("Error during received share request!\n\n");
                             exit(1);
                         }
                         close(i);
                         exit(0);
                     }
+                    close(i);
+					FD_CLR(i, &master);
                 }
             }
         }
