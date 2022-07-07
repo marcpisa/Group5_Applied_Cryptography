@@ -1,4 +1,5 @@
 #include "intclient.h"
+#include <openssl/evp.h>
 
 int createSocket()
 {
@@ -11,9 +12,63 @@ int createSocket()
     return sock;
 }
 
-int LoginClient()
+int LoginClient(char* session_key1, char* session_key2)
 {
+    EVP_MD_CTX* ctx;
+    unsigned char* digest;
+    char key[1028]; // TO check if the size is 1028 byte, not sure, but it is fixed
+    int digestlen;
+    
 
+    // Generate a
+
+    // Send username, requestLogin, g^a
+
+    // Calculate K = g^a^b mod p
+    // Decrypt the server's message
+    // Verify the signature of the server
+    // Check that all the contents are correct like the fresh quantities and the username received back
+    
+    // Send username, g^a concatenated with g^b signed with the private key of cliend and encrypted with K
+
+
+    /* After establishing the session key, there is the
+     * generation of the two session keys (for symm. encr. and MAC) 
+     */
+    digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256())); // check malloc return value
+    ctx = EVP_MD_CTX_new();
+
+
+    /* Hashing */
+    EVP_DigestInit(ctx, EVP_sha256());
+    
+    // We need more than one update....
+    EVP_DigestUpdate(ctx, (unsigned char*)key, sizeof(key));
+    EVP_DigestFinal(ctx, digest, &digestlen);
+
+    EVP_MD_CTX_free(ctx);
+
+    // Split the digest in half to obtain the two keys
+    if(len(session_key1) != (16+1) || len(session_key2) != (16+1)) { //16byte=128bits + null final char
+        print("Invalid length of session keys");
+        return -1;
+    }
+    if(digestlen != 256) {
+        print("Invalid length of digest");
+        return -1;
+    }
+
+    for(int i = 0; i < 16; i++) {
+        session_key1[i] = digest[i];
+    }
+    session_key1[16] = '\0';
+
+    for(int i = 0; i < 16; i++) {
+        session_key2[i] = digest[15+i];
+    }
+    session_key2[16] = '\0';
+
+    //return
 }
 
 int LogoutClient()
