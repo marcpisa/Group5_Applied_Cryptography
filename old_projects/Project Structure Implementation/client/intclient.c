@@ -12,24 +12,180 @@ int createSocket()
     return sock;
 }
 
-int LoginClient(char* session_key1, char* session_key2)
+int LoginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr)
 {
     EVP_MD_CTX* ctx;
     unsigned char* digest;
     char key[1028]; // TO check if the size is 1028 byte, not sure, but it is fixed
     int digestlen;
     
+    // Diffie-Hellman variables
+    EVP_PKEY* dh_params;
+    EVP_PKEY_CTX* ctx;
+    EVP_PKEY* my_prvkey = NULL;
+    EVP_PKEY* peer_pubkey;
+    unsigned char* K;
+    EVP_PKEY_CTX* ctx_drv;
+    size_t secretlen;
+    FILE* file_pubkey_pem;
+    EVP_PKEY* dh_pubkey;
 
-    // Generate a
+    int sock, ret;
+    char buffer[BUF_LEN];
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    sock = createSocket();
 
-    // Send username, requestLogin, g^a
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
+    {
+        printf("\nConnection Failed \n");
+        exit(1);
+    }
+
+
+    /* Generate a (private key of the client) and the 
+       related public key, and saves the public key */
+    dh_params = EVP_PKEY_new();
+    EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+
+    ctx = EVP_PKEY_CTX_new(dh_params, NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_keygen(ctx, &my_prvkey);
+
+    file_pubkey_pem = fopen('../dh_pubkey.pem', 'w'); // to fix path
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error writing to PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+    else 
+    {
+        ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
+        fclose(file_pubkey_pem);
+        if (ret != 1) {
+            printf("Error on saving DH pubkey.\n");
+            // Change this later to manage properly the session
+            exit(1);
+        }
+    }
+    
+    free(ctx);
+
+
+    /* Send login request message to server */
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s %s", username, LOGIN_REQUEST, g^a); // or %d?
+    printf("I'm sending to the server the mex %s\n\n", buffer);
+
+    ret = send(sock, buffer, strlen(buffer), 0); // in clear
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    memset(buffer, 0, strlen(buffer));
+    printf("Login request message sent\n");
+    ret = recv(sock, buffer, BUF_LEN,0);
+    if (ret == -1)
+    {
+        printf("Receive operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
 
     // Calculate K = g^a^b mod p
     // Decrypt the server's message
     // Verify the signature of the server
     // Check that all the contents are correct like the fresh quantities and the username received back
+    ...
+
+
+
+    file_pubkey_pem = fopen('../dh_pubkey.pem', 'r'); // to fix path
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error reading PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+    else 
+    {
+        dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
+        fclose(file_pubkey_pem);
+        if (dh_pubkey == NULL) {
+            printf("Error on reading DH pubkey from file.\n");
+            // Change this later to manage properly the session
+            exit(1);
+        }
+    }
+
+
+
+    // ... store the peer pubkey in peer_pubkey
+
+    ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
+    EVP_PKEY_derive_init(ctx_drv);
+    EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
     
-    // Send username, g^a concatenated with g^b signed with the private key of cliend and encrypted with K
+    /* Retrieving shared secret’s length */
+    EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
+
+    /* Deriving shared secret */
+    K = (unsigned char*)malloc(secretlen);
+    EVP_PKEY_derive(ctx_drv, K, &secretlen);
+
+
+
+
+    // If everything good
+
+    // Concatenate g^a (dh_pubkey) and g^b, signed it with the private key and encrypt it with K
+    // result=....
+    
+    
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s", username, result); // or %d?
+    printf("I'm sending to the server the mex %s\n\n", buffer);
+
+    ret = send(sock, buffer, strlen(buffer), 0); // in clear
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    memset(buffer, 0, strlen(buffer));
+    printf("Login last message sent\n");
+    ret = recv(sock, buffer, BUF_LEN,0);
+    if (ret == -1)
+    {
+        printf("Receive operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2); // The two values are the message type and eventually the reason why the request went bad
+    
+    // SANITIZE THE BUFFER
+
+    if (strcmp(bufferSupp1, LOGIN_DENIED) == 0)
+    {
+        printf("The login request has been denied: %s\n\n", bufferSupp2);
+        return -1;
+    }
+    else if (strcmp(bufferSupp1, LOGIN_ACCEPTED) == 0)
+    {
+        printf("The login request has been accepted!\n\n");
+    }
+    else
+    {
+        printf("We don't know what the server said...\n\n");
+        return -1;
+    }
 
 
     /* After establishing the session key, there is the
@@ -67,6 +223,8 @@ int LoginClient(char* session_key1, char* session_key2)
         session_key2[i] = digest[15+i];
     }
     session_key2[16] = '\0';
+
+    //DH_free(dh_client);
 
     //return
 }
