@@ -34,6 +34,8 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    char bufferSupp4[BUF_LEN];
     sock = createSocket();
 
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
@@ -71,38 +73,8 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     }
     
     free(ctx);
-
-
-    /* Send login request message to server */
-    memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s %s", username, LOGIN_REQUEST, g^a); // or %d?
-    printf("I'm sending to the server the mex %s\n\n", buffer);
-
-    ret = send(sock, buffer, strlen(buffer), 0); // in clear
-    if (ret == -1)
-    {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
-
-    memset(buffer, 0, strlen(buffer));
-    printf("Login request message sent\n");
-    ret = recv(sock, buffer, BUF_LEN,0);
-    if (ret == -1)
-    {
-        printf("Receive operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
-
-    // Calculate K = g^a^b mod p
-    // Decrypt the server's message
-    // Verify the signature of the server
-    // Check that all the contents are correct like the fresh quantities and the username received back
-    ...
-
-
+    free(dh_params);
+    // free ...
 
     file_pubkey_pem = fopen('../dh_pubkey.pem', 'r'); // to fix path
     if (file_pubkey_pem == NULL) 
@@ -123,8 +95,47 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     }
 
 
+    /* Send login request message to server */
+    memset(buffer, 0, strlen(buffer));
+    sprintf(buffer, "%s %s %s", username, LOGIN_REQUEST, dh_pubkey); // or %d?
+    printf("I'm sending to the server the mex %s\n\n", buffer);
 
-    // ... store the peer pubkey in peer_pubkey
+    ret = send(sock, buffer, strlen(buffer), 0); // in clear
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    memset(buffer, 0, strlen(buffer));
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    memset(bufferSupp4, 0, strlen(bufferSupp4));
+    printf("Login request message sent\n");
+    ret = recv(sock, buffer, BUF_LEN,0);
+    if (ret == -1)
+    {
+        printf("Receive operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    /* Parse the server response, calculate K and do the checks*/
+    sscanf(buffer, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4);
+
+    // SANITIZATION
+
+    if (strcmp(username, bufferSupp1) != 0) 
+    {
+        printf("Wrong username\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    // Calculate K = g^a^b mod p 
+    peer_pubkey = bufferSupp2;
 
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
     EVP_PKEY_derive_init(ctx_drv);
@@ -138,6 +149,16 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
 
+    // Decrypt the server's message (bufferSupp3)
+    
+    
+    // Verify the signature of the server
+    // DO SOMETHING WITH CERTIFICATE (bufferSupp4)
+    
+    
+    
+    // Check that all the contents are correct like the fresh quantities and the username received back
+    
 
 
     // If everything good
