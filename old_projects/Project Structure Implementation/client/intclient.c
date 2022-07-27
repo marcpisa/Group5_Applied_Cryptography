@@ -1,5 +1,6 @@
 #include "intclient.h"
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 
 int createSocket()
 {
@@ -12,16 +13,16 @@ int createSocket()
     return sock;
 }
 
-int LoginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr)
+int loginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr)
 {
-    EVP_MD_CTX* ctx;
+    EVP_MD_CTX* ctx_digest;
     unsigned char* digest;
     char key[1028]; // TO check if the size is 1028 byte, not sure, but it is fixed
     int digestlen;
     
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
-    EVP_PKEY_CTX* ctx;
+    EVP_PKEY_CTX* ctx_dh;
     EVP_PKEY* my_prvkey = NULL;
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
@@ -50,54 +51,52 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     dh_params = EVP_PKEY_new();
     EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
 
-    ctx = EVP_PKEY_CTX_new(dh_params, NULL);
-    EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_keygen(ctx, &my_prvkey);
+    ctx_dh = EVP_PKEY_CTX_new(dh_params, NULL);
+    EVP_PKEY_keygen_init(ctx_dh);
+    EVP_PKEY_keygen(ctx_dh, &my_prvkey);
 
-    file_pubkey_pem = fopen('../dh_pubkey.pem', 'w'); // to fix path
+    // Save public key
+    file_pubkey_pem = fopen("../dh_client1_pubkey.pem", "w"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error writing to PEM file.\n");
         // Change this later to manage properly the session
         exit(1);
     } 
-    else 
-    {
-        ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
-        fclose(file_pubkey_pem);
-        if (ret != 1) {
-            printf("Error on saving DH pubkey.\n");
-            // Change this later to manage properly the session
-            exit(1);
-        }
+    
+    ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
+    fclose(file_pubkey_pem);
+    if (ret != 1) {
+        printf("Error on saving DH pubkey.\n");
+        // Change this later to manage properly the session
+        exit(1);
     }
     
-    free(ctx);
+    free(ctx_dh);
     free(dh_params);
     // free ...
 
-    file_pubkey_pem = fopen('../dh_pubkey.pem', 'r'); // to fix path
+    // Retrieve the saved public key
+    file_pubkey_pem = fopen("../dh_client1_pubkey.pem", "r"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error reading PEM file.\n");
         // Change this later to manage properly the session
         exit(1);
     } 
-    else 
-    {
-        dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
-        fclose(file_pubkey_pem);
-        if (dh_pubkey == NULL) {
-            printf("Error on reading DH pubkey from file.\n");
-            // Change this later to manage properly the session
-            exit(1);
-        }
+    
+    dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
+    fclose(file_pubkey_pem);
+    if (dh_pubkey == NULL) {
+        printf("Error on reading DH pubkey from file.\n");
+        // Change this later to manage properly the session
+        exit(1);
     }
+    
 
-
-    /* Send login request message to server */
+    /* Send FIRST MESSAGE to server: login request message */
     memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s %s", username, LOGIN_REQUEST, dh_pubkey); // or %d?
+    sprintf(buffer, "%s %s %s", LOGIN_REQUEST, username, dh_pubkey); // or %d?
     printf("I'm sending to the server the mex %s\n\n", buffer);
 
     ret = send(sock, buffer, strlen(buffer), 0); // in clear
@@ -123,6 +122,7 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     }
 
     /* Parse the server response, calculate K and do the checks*/
+    // username, g^b, encrypted dig.sign., cert. server
     sscanf(buffer, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4);
 
     // SANITIZATION
@@ -150,8 +150,11 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
 
 
     // Decrypt the server's message (bufferSupp3)
-    
-    
+    printf("%lu\n", secretlen);
+    exit(1);
+
+
+    /*
     // Verify the signature of the server
     // DO SOMETHING WITH CERTIFICATE (bufferSupp4)
     
@@ -209,21 +212,20 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     }
 
 
-    /* After establishing the session key, there is the
-     * generation of the two session keys (for symm. encr. and MAC) 
-     */
+    // After establishing the session key, there is the
+    // generation of the two session keys (for symm. encr. and MAC) 
     digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256())); // check malloc return value
-    ctx = EVP_MD_CTX_new();
+    ctx_digest = EVP_MD_CTX_new();
 
 
-    /* Hashing */
-    EVP_DigestInit(ctx, EVP_sha256());
+    // Hashing
+    EVP_DigestInit(ctx_digest, EVP_sha256());
     
     // We need more than one update....
-    EVP_DigestUpdate(ctx, (unsigned char*)key, sizeof(key));
-    EVP_DigestFinal(ctx, digest, &digestlen);
+    EVP_DigestUpdate(ctx_digest, (unsigned char*)key, sizeof(key));
+    EVP_DigestFinal(ctx_digest, digest, &digestlen);
 
-    EVP_MD_CTX_free(ctx);
+    EVP_MD_CTX_free(ctx_digest);
 
     // Split the digest in half to obtain the two keys
     if(len(session_key1) != (16+1) || len(session_key2) != (16+1)) { //16byte=128bits + null final char
@@ -248,9 +250,10 @@ int LoginClient(char* session_key1, char* session_key2, char* username, struct s
     //DH_free(dh_client);
 
     //return
+    */
 }
 
-int LogoutClient()
+int logoutClient()
 {
 
 }

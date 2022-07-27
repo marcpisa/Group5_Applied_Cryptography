@@ -148,8 +148,16 @@ int main(int argc, char* argv[])
                             close(listenerTCP);
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
-                            
-                            // Do stuff
+
+                            ret = loginServer(i, buffer);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client list request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a login request and all was good!\n\n");
+
+                            //END COMMUNICATION
 
                             printf("End of login request management!\n\n");
                             close(i);

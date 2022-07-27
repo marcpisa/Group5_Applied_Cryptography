@@ -1,4 +1,6 @@
 #include "intserver.h"
+#include <openssl/evp.h>
+
 int createSocket()
 {
     int sock;
@@ -9,9 +11,168 @@ int createSocket()
     return sock;
 }
 
-int LoginServer()
+int LoginServer(int sd, char* rec_mex)
 {
+    char bufferSupp1[BUF_LEN];
+    char bufferSupp2[BUF_LEN];
+    char bufferSupp3[BUF_LEN];
+    char bufferSupp4[BUF_LEN];
+    int ret;
 
+    // Diffie-Hellman variables
+    EVP_PKEY* dh_params;
+    EVP_PKEY_CTX* ctx;
+    EVP_PKEY* my_prvkey = NULL;
+    EVP_PKEY* peer_pubkey;
+    unsigned char* K;
+    EVP_PKEY_CTX* ctx_drv;
+    size_t secretlen;
+    FILE* file_pubkey_pem;
+    EVP_PKEY* dh_pubkey;
+
+    // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
+
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    //printf("We received the message %s", rec_mex);
+    sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+
+    //SANITIZE AND CHECK THE CORRECTNESS OF BUFFERS' CONTENTS
+
+    // Check username
+    chdir(MAIN_FOLDER_SERVER);
+    ret = chdir(bufferSupp2);
+    if (ret == -1)
+    {
+        printf("Error: username doesn't exists...\n");
+        exit(1);
+    }
+
+    /* Generate a (private key of the server) and the 
+       related public key, and saves the public key */
+    dh_params = EVP_PKEY_new();
+    EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+
+    ctx = EVP_PKEY_CTX_new(dh_params, NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_keygen(ctx, &my_prvkey);
+
+    // Save public key
+    file_pubkey_pem = fopen('../dh_server_pubkey.pem', 'w'); // to fix path
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error writing to PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+    
+    ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
+    fclose(file_pubkey_pem);
+    if (ret != 1) {
+        printf("Error on saving DH pubkey.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    
+    free(ctx);
+    free(dh_params);
+    // free ...
+
+    // Retrieve the saved public key
+    file_pubkey_pem = fopen('../dh_server_pubkey.pem', 'r'); // to fix path
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error reading PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+    
+    dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
+    fclose(file_pubkey_pem);
+    if (dh_pubkey == NULL) {
+        printf("Error on reading DH pubkey from file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    // Calculate K = g^a^b mod p 
+    peer_pubkey = bufferSupp3;
+
+    ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
+    EVP_PKEY_derive_init(ctx_drv);
+    EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
+    
+    /* Retrieving shared secret’s length */
+    EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
+
+    /* Deriving shared secret */
+    K = (unsigned char*)malloc(secretlen);
+    EVP_PKEY_derive(ctx_drv, K, &secretlen);
+
+    printf("%d\n", secretlen);
+    return -1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // CHECK IF THE FILE EXISTS, otherwise send a message of error to the client
+
+    ret = rename(bufferSupp3, bufferSupp4);
+    if (ret == -1) 
+    {
+        printf("Something bad happened during the rename operation\n\n");
+        exit(1);
+    }
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    memset(bufferSupp4, 0, strlen(bufferSupp4));
+    sprintf(bufferSupp1, "%s", RENAME_ACCEPTED); //Format of the message sent is: type_mex
+    ret = send(sd, bufferSupp1, strlen(bufferSupp1), 0);
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+    return 1;
 }
 
 int LogoutServer()

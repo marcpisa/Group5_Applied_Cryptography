@@ -25,6 +25,17 @@ int main(int argc, char* argv[])
     // Variables for file management
     FILE* fd1;
 
+    // Variables for cryptographic operation
+    char* session_key1;
+    char* session_key2;
+    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
+    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
+    if(session_key1 == NULL || session_key2 == NULL)
+    {
+        printf("Unable to allocate session keys...\n\n");
+        return -1;
+    }
+
     //********* END VARIABLES *********
     printf("We're testing something\n\n");
     if (argc != 3)
@@ -160,7 +171,15 @@ int main(int argc, char* argv[])
                         case 1: //*********** LOGIN **************
 
                         // Stuff to do
+                            if (connected == 1)
+                            {
+                                printf("Connection already established. Login impossible operation!\n\n");
+                                break;
+                            }
 
+                            ret = loginClient(session_key1, session_key2, username, srv_addr);
+                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                        
                             break;
 
                         case 2: //*********** LOGOUT ************
