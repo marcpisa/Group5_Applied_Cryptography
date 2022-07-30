@@ -1,5 +1,7 @@
 #include "intserver.h"
 #include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <sys/sendfile.h>
 
 int createSocket()
 {
@@ -11,13 +13,18 @@ int createSocket()
     return sock;
 }
 
-int LoginServer(int sd, char* rec_mex)
+int loginServer(int sd, char* rec_mex)
 {
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char bufferSupp4[BUF_LEN];
     int ret;
+    int file_sz;
+    FILE *received_file;
+    int remain_data = 0;
+    char* path_pubkey = "../dh_server_pubkey.pem";
+    char* path_peer_pubkey = "../dh_peer1_pubkey.pem";
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -34,9 +41,8 @@ int LoginServer(int sd, char* rec_mex)
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
     //printf("We received the message %s", rec_mex);
-    sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+    sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2);
 
     //SANITIZE AND CHECK THE CORRECTNESS OF BUFFERS' CONTENTS
 
@@ -59,7 +65,7 @@ int LoginServer(int sd, char* rec_mex)
     EVP_PKEY_keygen(ctx, &my_prvkey);
 
     // Save public key
-    file_pubkey_pem = fopen('../dh_server_pubkey.pem', 'w'); // to fix path
+    file_pubkey_pem = fopen(path_pubkey, "w"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error writing to PEM file.\n");
@@ -80,7 +86,7 @@ int LoginServer(int sd, char* rec_mex)
     // free ...
 
     // Retrieve the saved public key
-    file_pubkey_pem = fopen('../dh_server_pubkey.pem', 'r'); // to fix path
+    file_pubkey_pem = fopen(path_pubkey, "r"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error reading PEM file.\n");
@@ -96,9 +102,57 @@ int LoginServer(int sd, char* rec_mex)
         exit(1);
     }
 
-    // Calculate K = g^a^b mod p 
-    peer_pubkey = bufferSupp3;
+    /* Receive pubkey of the peer and the size of the file
+        (to derive K) */
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    ret = recv(sd, bufferSupp3, BUF_LEN, 0);
+    if (ret == -1)
+    {
+        printf("Receive operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
 
+    file_sz = atoi(bufferSupp3);
+    //fprintf(stdout, "\nFile size : %d\n", file_size);
+
+    received_file = fopen(path_peer_pubkey, "w");
+    if (received_file == NULL)
+    {
+        printf("Open gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    remain_data = file_sz;
+    while ((remain_data > 0) && ((ret = recv(sd, bufferSupp3, BUF_LEN, 0)) > 0))
+    {
+        fwrite(bufferSupp3, sizeof(char), ret, received_file);
+        remain_data -= ret;
+        fprintf(stdout, "Receive %d bytes and we hope :- %d bytes\n", ret, remain_data);
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+    }
+    
+    fclose(received_file);
+
+    received_file = fopen(path_peer_pubkey, "r"); // to fix path
+    if (received_file == NULL) 
+    { 
+        printf("Error reading PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+    
+    peer_pubkey = PEM_read_PUBKEY(received_file, NULL, NULL, NULL);
+    fclose(received_file);
+    if (peer_pubkey == NULL) {
+        printf("Error on reading DH pubkey from file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+     
+    // Calculate K = g^a^b mod p 
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
     EVP_PKEY_derive_init(ctx_drv);
     EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
@@ -110,7 +164,7 @@ int LoginServer(int sd, char* rec_mex)
     K = (unsigned char*)malloc(secretlen);
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
-    printf("%d\n", secretlen);
+    printf("%lu\n", secretlen);
     return -1;
 
 
@@ -151,7 +205,7 @@ int LoginServer(int sd, char* rec_mex)
 
 
 
-
+    /*
     // CHECK IF THE FILE EXISTS, otherwise send a message of error to the client
 
     ret = rename(bufferSupp3, bufferSupp4);
@@ -173,6 +227,7 @@ int LoginServer(int sd, char* rec_mex)
         exit(1);
     }
     return 1;
+    */
 }
 
 int LogoutServer()

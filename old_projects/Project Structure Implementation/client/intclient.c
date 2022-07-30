@@ -19,7 +19,12 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     unsigned char* digest;
     char key[1028]; // TO check if the size is 1028 byte, not sure, but it is fixed
     int digestlen;
-    
+    char* path_pubkey = "../dh_client1_pubkey.pem";
+    int file_sz;
+    int sent_bytes = 0;
+    int offset;
+    int remain_data;
+
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
     EVP_PKEY_CTX* ctx_dh;
@@ -56,7 +61,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     EVP_PKEY_keygen(ctx_dh, &my_prvkey);
 
     // Save public key
-    file_pubkey_pem = fopen("../dh_client1_pubkey.pem", "w"); // to fix path
+    file_pubkey_pem = fopen(path_pubkey, "w"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error writing to PEM file.\n");
@@ -77,7 +82,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     // free ...
 
     // Retrieve the saved public key
-    file_pubkey_pem = fopen("../dh_client1_pubkey.pem", "r"); // to fix path
+    file_pubkey_pem = fopen(path_pubkey, "r"); // to fix path
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error reading PEM file.\n");
@@ -85,6 +90,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
         exit(1);
     } 
     
+    fseek(file_pubkey_pem, 0L, SEEK_END);
+    file_sz = ftell(file_pubkey_pem);
+
     dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
     fclose(file_pubkey_pem);
     if (dh_pubkey == NULL) {
@@ -93,10 +101,10 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
         exit(1);
     }
     
-
+    
     /* Send FIRST MESSAGE to server: login request message */
     memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s %s", LOGIN_REQUEST, username, dh_pubkey); // or %d?
+    sprintf(buffer, "%s %s", LOGIN_REQUEST, username);
     printf("I'm sending to the server the mex %s\n\n", buffer);
 
     ret = send(sock, buffer, strlen(buffer), 0); // in clear
@@ -106,6 +114,34 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
         // Change this later to manage properly the session
         exit(1);
     }
+
+    /* Send file size + pubkey file (after the login request) */
+    ret = send(sock, file_sz, sizeof(file_sz), 0);
+    if (ret < 0)
+    {
+        printf("Send file size gone bad\n");
+        exit(1);
+        //exit(EXIT_FAILURE);
+    }
+
+    file_pubkey_pem = fopen(path_pubkey, "r"); // to fix path
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error reading PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+
+    offset = 0;
+    remain_data = file_sz;
+    /* Sending file data */
+    while (((sent_bytes = sendfile(sock, file_pubkey_pem, &offset, BUF_LEN)) > 0) && (remain_data > 0))
+    {
+            fprintf(stdout, "1. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+            remain_data -= sent_bytes;
+            fprintf(stdout, "2. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+    }
+   
 
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
@@ -151,7 +187,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     // Decrypt the server's message (bufferSupp3)
     printf("%lu\n", secretlen);
-    exit(1);
+    return -1;
 
 
     /*
