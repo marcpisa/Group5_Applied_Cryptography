@@ -1,11 +1,16 @@
 #include "intclient.h"
-//#include "../sanitization.c"
+#include <openssl/evp.h>
+#include "../sanitization.c"
 
 int main(int argc, char* argv[])
 {
     //********** VARIABLES ************
+    // SSL
+    BIO* bio;
+    SSL_CTX* ssl_ctx;
+    SSL* ssl;
 
-    // Variables for socket management
+    // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
     int new_sd, listenerTCP, nbytes, ret, fdmax, pid, port, s;
@@ -22,10 +27,10 @@ int main(int argc, char* argv[])
     // Timeout Variables
     struct timeval tv;
 
-    // Variables for file management
+    // File management
     FILE* fd1;
 
-    // Variables for cryptographic operation
+    // Cryptographic operation
     char* session_key1;
     char* session_key2;
     session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
@@ -35,24 +40,28 @@ int main(int argc, char* argv[])
         printf("Unable to allocate session keys...\n\n");
         return -1;
     }
-
     //********* END VARIABLES *********
-    printf("We're testing something\n\n");
-    if (argc != 3)
-    {
-        printf("Error at the boot phase of the Client. The number of arguments is wrong...\n");
+
+    if (argc != 3) { 
+        printf("Error, the number of arguments is wrong...\n");
         exit(-1);
     }
+    
     printf("\n+++++++++++ FILE CLOUD MANAGER +++++++++++\n");
-    printf("File Cloud Manager booted correctly...\n");
-
-    // CHECKING USERNAME LENGTH
+    
+    // Checking username length and sanitize it
     if (strlen(argv[1]) > MAX_LEN_USR)
     {
         printf("Username too long... max length %i\n", MAX_LEN_USR);
-        exit(1);
+        exit(-1);
     }
+    if (!username_sanitization(username))
+    {
+        printf("Username contain invalid chars (a-z | _ | -)\n");
+        exit(-1);
+    } 
     strcpy(username, argv[1]);
+
 
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
@@ -60,9 +69,9 @@ int main(int argc, char* argv[])
 
     // CONFIGURATION OF THE SERVER INFO
     memset(&srv_addr, 0, sizeof(srv_addr));
-	srv_addr.sin_family = AF_INET;
+	srv_addr.sin_family = AF_INET; // IPv4
 	port = SERVER_PORT;
-	srv_addr.sin_port = htons(port);
+	srv_addr.sin_port = htons(port); // port to connect to
 	inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
 
     // SOCKET TCP DECLARATION
@@ -74,8 +83,8 @@ int main(int argc, char* argv[])
     }
     printf("\nSocket TCP correctly allocated!\n");
 
-    //SOCKET CONFIGURATION
-    port = atoi(argv[2]);
+    // SOCKET CONFIGURATION
+    port = atoi(argv[2]); 
     memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family = AF_INET;
     my_addr.sin_port = htons(port);
@@ -110,8 +119,6 @@ int main(int argc, char* argv[])
 
     while(1)
     {
-
-   
         read_fds = master;
         
         select(fdmax+1, &read_fds, NULL, NULL, 0);
@@ -170,7 +177,7 @@ int main(int argc, char* argv[])
                     {
                         case 1: //*********** LOGIN **************
 
-                        // Stuff to do
+                            // Stuff to do
                             if (connected == 1)
                             {
                                 printf("Connection already established. Login impossible operation!\n\n");
@@ -178,7 +185,10 @@ int main(int argc, char* argv[])
                             }
 
                             ret = loginClient(session_key1, session_key2, username, srv_addr);
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            if (ret == -1) {
+                                printf("Login failed.\n\n"); 
+                                exit(-1);
+                            }
                         
                             break;
 
@@ -202,8 +212,8 @@ int main(int argc, char* argv[])
                                 break;
                             }*/
 
-                            ret = listClient(username, srv_addr);
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            //ret = listClient(username, srv_addr);
+                            //if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
                         
@@ -214,12 +224,12 @@ int main(int argc, char* argv[])
                                 break;
                             }*/
                             //printf("Command3 is %s\n", command3);
-                            ret = renameClient(username, command2, command3, srv_addr);
-                            if (ret == -1)
-                            {
-                                printf("Error during the rename operation request!\n\n");
-                                exit(1);
-                            }
+                            //ret = renameClient(username, command2, command3, srv_addr);
+                            //if (ret == -1)
+                            //{
+                            //    printf("Error during the rename operation request!\n\n");
+                            //    exit(1);
+                            //}
                             break;
 
                         case 5: //*********** DELETE **********
@@ -228,8 +238,8 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            ret = deleteClient(username,command2, srv_addr);
-                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
+                            //ret = deleteClient(username,command2, srv_addr);
+                            //if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
 
@@ -239,12 +249,12 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
-                            if (ret == -1)
-                            {
-                                printf("Error during the download operation request!\n\n");
-                                exit(1);
-                            }
+                            //ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
+                            //if (ret == -1)
+                            //{
+                            //    printf("Error during the download operation request!\n\n");
+                            //    exit(1);
+                            //}
 
                             break;
 
@@ -254,12 +264,12 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            ret = uploadClient(username, command2, srv_addr);
+                            /*ret = uploadClient(username, command2, srv_addr);
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
                                 exit(1);
-                            }
+                            }*/
 
                             break;
 
@@ -271,12 +281,12 @@ int main(int argc, char* argv[])
                             }
                             */
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            /*ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");
                                 exit(1);
-                            }
+                            }*/
 
                             break;
 
@@ -285,8 +295,8 @@ int main(int argc, char* argv[])
                                if (connected == 0 || connected == 1) 
                                { 
                                     printf(GRN "This is the manual with the following commands:\n\n"); 
-                                    printf("Login: ' ' \n"); 
-                                    printf("Logout: ' ' \n"); 
+                                    printf("Login: 'login' \n"); 
+                                    printf("Logout: 'logout' \n"); 
                                     printf("List all files: 'list'\n");
                                     printf("Rename files: 'rename old_filename new_filename'\n"); 
                                     printf("Delete file: 'delete filename'\n"); 
@@ -326,12 +336,12 @@ int main(int argc, char* argv[])
                     {
                         close(listenerTCP);
                         //We are in the son part of code
-                        ret = shareReceivedClient(i, buffer);
+                        /*ret = shareReceivedClient(i, buffer);
                         if (ret == -1)
                         {
                             //printf("Error during received share request!\n\n");
                             exit(1);
-                        }
+                        }*/
                         close(i);
                         exit(0);
                     }

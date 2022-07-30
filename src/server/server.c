@@ -2,7 +2,7 @@
 
 int main(int argc, char* argv[])
 {
-    // *********** VARIABLES ************
+    //*********** VARIABLES ************
     
     // Socket management variables
     int ret, pid, listenerTCP, len, i, nbytes, fdmax, new_sd, s;
@@ -19,7 +19,6 @@ int main(int argc, char* argv[])
     char bufferSupp3[BUF_LEN];
     char command1[BUF_LEN];
 
-
     // Timeout varible for the select function
     struct timeval tv;
 
@@ -32,7 +31,6 @@ int main(int argc, char* argv[])
     }
 
     printf("\n+++++++++++ FILE CLOUD SERVER +++++++++++\n");
-    printf("File Cloud Server booted correctly...\n");
 
     // SOCKET DECLARATION
     listenerTCP = socket(AF_INET, SOCK_STREAM, 0);
@@ -122,6 +120,9 @@ int main(int argc, char* argv[])
                         exit(-1);
                     }
                     printf("I received %s\n\n", buffer);
+
+
+                    // TO DO: CHANGE FORMAT
 
                     // We check the first keyword to understand what the Client wants us to do
                     memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem

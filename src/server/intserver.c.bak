@@ -2,6 +2,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <sys/sendfile.h>
+#include <openssl/x509.h>
 
 int createSocket()
 {
@@ -25,6 +26,8 @@ int loginServer(int sd, char* rec_mex)
     int remain_data = 0;
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_peer_pubkey = "../dh_peer1_pubkey.pem";
+    char* path_cert_rsa = "../cert.pem";
+    char* path_rsa_key = "../key.pem";
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -39,6 +42,7 @@ int loginServer(int sd, char* rec_mex)
 
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
+    /* ---- Parse the first message ---- */
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     //printf("We received the message %s", rec_mex);
@@ -55,8 +59,7 @@ int loginServer(int sd, char* rec_mex)
         exit(1);
     }
 
-    /* Generate a (private key of the server) and the 
-       related public key, and saves the public key */
+    /* ---- Generate a DH asymmetric key(s) ---- */
     dh_params = EVP_PKEY_new();
     EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
 
@@ -65,7 +68,7 @@ int loginServer(int sd, char* rec_mex)
     EVP_PKEY_keygen(ctx, &my_prvkey);
 
     // Save public key
-    file_pubkey_pem = fopen(path_pubkey, "w"); // to fix path
+    file_pubkey_pem = fopen(path_pubkey, "w");
     if (file_pubkey_pem == NULL) 
     { 
         printf("Error writing to PEM file.\n");
@@ -136,7 +139,8 @@ int loginServer(int sd, char* rec_mex)
     
     fclose(received_file);
 
-    received_file = fopen(path_peer_pubkey, "r"); // to fix path
+    // Read the received peer pubkey
+    received_file = fopen(path_peer_pubkey, "r");
     if (received_file == NULL) 
     { 
         printf("Error reading PEM file.\n");
@@ -152,27 +156,58 @@ int loginServer(int sd, char* rec_mex)
         exit(1);
     }
      
-    // Calculate K = g^a^b mod p 
+    /* ---- Calculate K = g^a^b mod p ---- */ 
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
     EVP_PKEY_derive_init(ctx_drv);
     EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
     
-    /* Retrieving shared secret’s length */
+    // Retrieving shared secret’s length
     EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
 
-    /* Deriving shared secret */
+    // Deriving shared secret
     K = (unsigned char*)malloc(secretlen);
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
     printf("%lu\n", secretlen);
-    return -1;
+
+    /* Send response (username, dig.sign and DH pubkey+cert) */
 
 
 
+    // Calculating digital signature
+
+    /**/
 
 
 
+    /* Sending certificate ....
+    // Send pubkey file size
+    ret = send(sock, file_sz, sizeof(file_sz), 0);
+    if (ret < 0)
+    {
+        printf("Send file size gone bad\n");
+        exit(1);
+    }
 
+    file_pubkey_pem = fopen(path_pubkey, "r");
+    if (file_pubkey_pem == NULL) 
+    { 
+        printf("Error reading PEM file.\n");
+        // Change this later to manage properly the session
+        exit(1);
+    } 
+
+    // Sending file data
+    offset = 0;
+    remain_data = file_sz;
+    while (((sent_bytes = sendfile(sock, file_pubkey_pem, &offset, BUF_LEN)) > 0) && (remain_data > 0))
+    {
+            fprintf(stdout, "1. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+            remain_data -= sent_bytes;
+            fprintf(stdout, "2. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+    }
+
+*/
 
 
 
