@@ -2,11 +2,6 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509_vfy.h>
-#include <sys/sendfile.h>
-
-#define MAX_SIZE_USERNAME 25
-#define MAX_SIZE_REQUEST 15
-#define MAX_SIZE_PUBKEY 1024
 
 /*********************************************
  *          AUXILIARY FUNCTIONS 
@@ -44,7 +39,6 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
 
 }
 
-
 /*********************************************
  *                 INTERFACES
  ********************************************/
@@ -62,10 +56,8 @@ int createSocket()
 int loginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr) {
     EVP_MD_CTX* ctx_digest;
     unsigned char* digest;
-    char key[1028]; // TO check if the size is 1028 byte, not sure, but it is fixed
     int digestlen;
     char* path_pubkey = "../dh_client1_pubkey.pem";
-    int pubkey_len = 0;
     int msg_len;
 
     // Diffie-Hellman variables
@@ -74,6 +66,8 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     EVP_PKEY* my_prvkey = NULL;
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
+    unsigned char* pubkey_byte;
+    int pubkey_len = 0;
     EVP_PKEY_CTX* ctx_drv;
     size_t secretlen;
     FILE* file_pubkey_pem;
@@ -144,8 +138,8 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     
     
     /* ---- Send login request message + DH pubkey ---- */
-    unsigned char* pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
-    if (pubkey_len > MAX_SIZE_PUBKEY) 
+    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    if (pubkey_len > MAX_SIZE_PUBKEY) // TO CHANGE
     {
         printf("Pubkey too long.\n");
         exit(-1);
@@ -170,17 +164,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     free(buffer);
     free(pubkey_byte);
-    exit(1);
-
-
-
-
-
-
-
-
 
     /* ---- Obtain response server (DH pubkey, signature and cert.) ----*/
+    /*
     memset(buffer, 0, strlen(buffer));
     printf("Login request message sent\n");
     ret = recv(sock, buffer, BUF_LEN,0);
@@ -224,11 +210,11 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
     EVP_PKEY_derive_init(ctx_drv);
     EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
-    
-    /* Retrieving shared secret’s length */
+
+    // Retrieving shared secret’s length
     EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
 
-    /* Deriving shared secret */
+    // Deriving shared secret
     K = (unsigned char*)malloc(secretlen);
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
@@ -236,7 +222,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     // Decrypt the server's message (bufferSupp3)
     printf("%lu\n", secretlen);
     return -1;
-
+    */
 
     /*
     // Verify the signature of the server
@@ -335,5 +321,4 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     //return
     */
-    BIO_free(bio);
 }

@@ -4,10 +4,6 @@
 #include <sys/sendfile.h>
 #include <openssl/x509.h>
 
-#define MAX_SIZE_USERNAME 25
-#define MAX_SIZE_REQUEST 15
-#define MAX_SIZE_PUBKEY 1024
-
 /*********************************************
  *          AUXILIARY FUNCTIONS 
  ********************************************/
@@ -44,8 +40,6 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
 
 }
 
-
-
 /*********************************************
  *                 INTERFACES
  ********************************************/
@@ -60,19 +54,19 @@ int createSocket()
 }
 
 int loginServer(int sd, char* rec_mex)
-{
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char bufferSupp4[BUF_LEN];
+{   
+    unsigned char* buffer;
+    unsigned char* msg_to_sign;
+    unsigned char bufferSupp1[BUF_LEN];
+    unsigned char bufferSupp2[BUF_LEN];
+    unsigned char bufferSupp3[BUF_LEN];
+    unsigned char bufferSupp4[BUF_LEN];
     int ret;
-    int file_sz;
-    FILE *received_file;
-    int remain_data = 0;
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_peer_pubkey = "../dh_peer1_pubkey.pem";
     char* path_cert_rsa = "../cert.pem";
     char* path_rsa_key = "../key.pem";
+    int msg_len;
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -80,6 +74,10 @@ int loginServer(int sd, char* rec_mex)
     EVP_PKEY* my_prvkey = NULL;
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
+    unsigned char* pubkey_byte;
+    int pubkey_len = 0;
+    unsigned char* peer_pubkey_byte;
+    int peer_pubkey_len = 0;
     EVP_PKEY_CTX* ctx_drv;
     size_t secretlen;
     FILE* file_pubkey_pem;
@@ -97,7 +95,8 @@ int loginServer(int sd, char* rec_mex)
     memcpy(bufferSupp1, rec_mex, MAX_SIZE_REQUEST);
     memcpy(bufferSupp2, &*(rec_mex+MAX_SIZE_REQUEST+strlen(" ")), MAX_SIZE_USERNAME);
     memcpy(bufferSupp3, &*(rec_mex+MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ")), MAX_SIZE_PUBKEY);
-    //printf("We received the message %s", rec_mex);
+    //printf("%s\n%s\n%s\n", bufferSupp1, bufferSupp2, bufferSupp3);
+    
     
     //SANITIZE AND CHECK THE CORRECTNESS OF BUFFERS' CONTENTS
 
@@ -165,14 +164,49 @@ int loginServer(int sd, char* rec_mex)
     EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
 
     // Deriving shared secret
-    K = (unsigned char*)malloc(secretlen);
+    K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
-    printf("Length of %lu\n", secretlen);
 
-    exit(1);
+
     /* --- Send response (username, dig.sign and DH pubkey+cert) --- */
+    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    if (pubkey_len > MAX_SIZE_PUBKEY) //TO CHANGE
+    {
+        printf("Pubkey too long.\n");
+        exit(-1);
+    }
 
+    // Prepare the digital signature
+    msg_len = MAX_SIZE_PUBKEY+strlen(" ")+pubkey_len;
+    msg_to_sign = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    memcpy(msg_to_sign, bufferSupp3, MAX_SIZE_PUBKEY); // peer pubkey is still inside bufferSupp3
+    memcpy(&*(buffer+MAX_SIZE_PUBKEY), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_SIZE_PUBKEY+strlen(" ")), pubkey_byte, pubkey_len);
+    
+    // sign and encrypt
+
+    
+    // Serialize the certificate
+
+
+    msg_len = MAX_SIZE_USERNAME+strlen(" ")+...+strlen(" ")+pubkey_len
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+
+
+    printf("%s\n", buffer);
+    printf("I'm sending to the client the mex %s\n\n", buffer);
+    ret = send(sd, buffer, msg_len, 0); 
+    if (ret == -1)
+    {
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
+    }
+
+    free(buffer);
+    free(pubkey_byte);
+    free(msg_to_sign);
 
 
     // Calculating digital signature

@@ -121,14 +121,9 @@ int main(int argc, char* argv[])
                     }
                     printf("I received %s\n\n", buffer);
 
-
-                    // TO DO: CHANGE FORMAT
-
                     // We check the first keyword to understand what the Client wants us to do
                     memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem
-                    memset(bufferSupp2, 0, strlen(bufferSupp2)); //we clean the mem
-                    memset(bufferSupp3, 0, strlen(bufferSupp3)); //we clean the mem
-                    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
+                    memcpy(bufferSupp1, buffer, MAX_SIZE_REQUEST);
                     
                     
                     // ************ LOGIN REQUEST MANAGER ***********
@@ -166,7 +161,7 @@ int main(int argc, char* argv[])
                         }
                     }
 
-
+                    /*
                     //************ LOGOUT REQUEST MANAGER ************
                     else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
                     {
@@ -399,7 +394,7 @@ int main(int argc, char* argv[])
                             exit(0);
                         }
                     }
-
+                    */
 
                     else printf("Unknown type of request by the Client...");
                     // Here we can also send a message to the client saying that we didn't understand what it wants

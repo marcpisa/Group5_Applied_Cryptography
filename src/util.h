@@ -25,9 +25,9 @@
 #define CHUNK_SIZE 512
 #define SERVER_PORT 9420
 #define LOCALHOST "127.0.0.1"
-#define MAIN_FOLDER_SERVER "/home/marc/Documents/Group5_Applied_Cryptography/database"  // When you test the software on your pc change this variable
-#define MAIN_FOLDER_CLIENT "/home/marc/Documents/Group5_Applied_Cryptography/download"  // When you test the software on your pc change this variable
-#define INFO_FOLDER_SERVER "/home/marc/Documents/Group5_Applied_Cryptography/database/info" // When you test the software on your pc change this variable
+#define MAIN_FOLDER_SERVER "../../database"  // When you test the software on your pc change this variable
+#define MAIN_FOLDER_CLIENT "../../download"  // When you test the software on your pc change this variable
+#define INFO_FOLDER_SERVER "../../database/info" // When you test the software on your pc change this variable
 
 #define LOGIN "login"
 #define LOGOUT "logout"
@@ -67,3 +67,7 @@
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
 #define RESET "\x1B[0m"
+
+#define MAX_SIZE_USERNAME 25
+#define MAX_SIZE_REQUEST 20
+#define MAX_SIZE_PUBKEY 1024

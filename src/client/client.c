@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     //********* END VARIABLES *********
 
     if (argc != 3) { 
-        printf("Error, the number of arguments is wrong...\n");
+        printf("Error, the number of arguments is wrong... (./clientPr username port_num)\n");
         exit(-1);
     }
     
@@ -55,12 +55,17 @@ int main(int argc, char* argv[])
         printf("Username too long... max length %i\n", MAX_LEN_USR);
         exit(-1);
     }
-    if (!username_sanitization(username))
+    if (!username_sanitization(argv[1]))
     {
-        printf("Username contain invalid chars (a-z | _ | -)\n");
+        printf("Username contains invalid chars (a-z | _ | -)\n");
         exit(-1);
     } 
     strcpy(username, argv[1]);
+    if(strspn(argv[2], "0123456789") < strlen(argv[2])) 
+    {
+        printf("Port contains invalid chars (0-9)\n");
+        exit(-1);
+    }
 
 
     // Set the value of the max interval that the select function wait for an action to do
