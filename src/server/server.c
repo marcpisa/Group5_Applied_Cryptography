@@ -22,6 +22,17 @@ int main(int argc, char* argv[])
     // Timeout varible for the select function
     struct timeval tv;
 
+    // Cryptographic operation
+    char* session_key1;
+    char* session_key2;
+    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
+    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
+    if(session_key1 == NULL || session_key2 == NULL)
+    {
+        printf("Unable to allocate session keys...\n\n");
+        return -1;
+    }
+
     // ********** END VARIABLES *********
 
     if (argc != 1)
@@ -145,7 +156,7 @@ int main(int argc, char* argv[])
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, buffer);
+                            ret = loginServer(i, buffer, &session_key1, &session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");

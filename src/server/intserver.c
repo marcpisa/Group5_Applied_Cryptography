@@ -28,6 +28,26 @@ unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len)
     return key;
 }
 
+unsigned char* cert_to_byte(X509* cert, int* cert_len)
+{
+    BIO *bio = NULL;
+    unsigned char *c = NULL;
+    int c_len = 0;
+
+    bio = BIO_new(BIO_s_mem());
+    PEM_write_bio_X509(bio, cert);
+
+    c_len = BIO_pending(bio);
+    *cert_len = c_len;
+
+    c = (unsigned char *) malloc(sizeof(unsigned char) * c_len);
+
+    BIO_read(bio, c, c_len);
+    BIO_free(bio);
+
+    return c;
+}
+
 EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
     BIO* mbio = BIO_new(BIO_s_mem());
     BIO_write(mbio, public_key, len);
@@ -37,7 +57,6 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
     BIO_free(mbio);
 
     return pk;
-
 }
 
 /*********************************************
@@ -53,7 +72,7 @@ int createSocket()
     return sock;
 }
 
-int loginServer(int sd, char* rec_mex)
+int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 {   
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -61,12 +80,38 @@ int loginServer(int sd, char* rec_mex)
     unsigned char bufferSupp2[BUF_LEN];
     unsigned char bufferSupp3[BUF_LEN];
     unsigned char bufferSupp4[BUF_LEN];
-    int ret;
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_peer_pubkey = "../dh_peer1_pubkey.pem";
     char* path_cert_rsa = "../cert.pem";
     char* path_rsa_key = "../key.pem";
+    int ret;
     int msg_len;
+    char username [MAX_SIZE_USERNAME];
+
+    // Certificate
+    X509* cert_rsa;
+    FILE* file_cert_rsa;
+    unsigned char* cert_byte;
+    int cert_len = 0;
+
+    // Symmetric encryption
+    unsigned char* ciphertext;
+    EVP_CIPHER_CTX* ctx_symmencr;
+    int cipherlen;
+    int outlen;
+
+    // Hashing
+    unsigned char* digest;
+    int digestlen;
+    EVP_MD_CTX* ctx_digest;
+
+    // Digital Signature variables
+    unsigned char* signature;
+    int signature_len;
+    EVP_MD_CTX* ctx_digsig;
+    EVP_PKEY* rsa_prvkey;
+    FILE* file_prvkey_pem;
+    char* password = "password";
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -82,11 +127,8 @@ int loginServer(int sd, char* rec_mex)
     size_t secretlen;
     FILE* file_pubkey_pem;
     EVP_PKEY* dh_pubkey;
-    BIO* bio;
 
     // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
-
-    bio = BIO_new_socket(sd, BIO_NOCLOSE);
 
     /* ---- Parse the first message ---- */
     memset(bufferSupp1, 0, BUF_LEN);
@@ -108,6 +150,8 @@ int loginServer(int sd, char* rec_mex)
         printf("Error: username doesn't exists...\n");
         exit(1);
     }
+    memset(username, 0, MAX_SIZE_USERNAME);
+    memcpy(username, bufferSupp2, BUF_LEN);
 
     peer_pubkey = pubkey_to_PKEY(bufferSupp3, MAX_SIZE_PUBKEY);
 
@@ -167,7 +211,19 @@ int loginServer(int sd, char* rec_mex)
     K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
+    // Obtain the two session keys
+    digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
+    ctx_digest = EVP_MD_CTX_new();
+    EVP_DigestInit(ctx_digest, EVP_sha256());
+    EVP_DigestUpdate(ctx, K, sizeof(K));
+    EVP_DigestFinal(ctx, digest, &digestlen);
+    EVP_MD_CTX_free(ctx);
 
+    memcpy(session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(session_key2, &*(digest+16), 16);
+    printf("Digest:%s\nS1:%s\nS2:%s\n", digest, session_key1, session_key2);
+    free(K);
+    free(digest);
 
     /* --- Send response (username, dig.sign and DH pubkey+cert) --- */
     pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
@@ -184,14 +240,51 @@ int loginServer(int sd, char* rec_mex)
     memcpy(&*(buffer+MAX_SIZE_PUBKEY), " ", strlen(" "));
     memcpy(&*(buffer+MAX_SIZE_PUBKEY+strlen(" ")), pubkey_byte, pubkey_len);
     
-    // sign and encrypt
+    // Signature generation
+    file_prvkey_pem = fopen(path_rsa_key, 'r');
+    if(file_prvkey_pem == NULL) 
+    {
+        printf("Impossible to open prvkey file\n\n");
+        exit(-1);
+    }
+    rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
+    fclose(file_prvkey_pem);
+    if (rsa_prvkey == NULL) {
+        printf("Error on reading RSA prvkey from file.\n");
+        // Change this later to manage properly the session
+        exit(-1);
+    }
+    ctx_digsig = EVP_MD_CTX_new();
+    signature = malloc(EVP_PKEY_size(rsa_prvkey));
+    EVP_SignInit(ctx_digsig, EVP_sha256());
+    EVP_SignUpdate(ctx_digsig, msg_to_sign, sizeof(msg_to_sign));
+    EVP_SignFinal(ctx_digsig, signature, &signature_len, rsa_prvkey);
+    EVP_MD_CTX_free(ctx_digsig);
 
-    
+    // Encrypt the signature (with first session key)
+    ciphertext = (unsigned char*)malloc(sizeof(signature) + 16);
+    ctx_symmencr = EVP_CIPHER_CTX_new();
+    EVP_EncryptInit(ctx_symmencr, EVP_aes_128_ecb(), session_key1, NULL);
+    EVP_EncryptUpdate(ctx_symmencr, ciphertext, &outlen, signature, sizeof(signature));
+    cipherlen = outlen;
+    EVP_EncryptFinal(ctx_symmencr, ciphertext + cipherlen, &outlen);
+    cipherlen += outlen;
+    EVP_CIPHER_CTX_free(ctx_symmencr);
+
     // Serialize the certificate
+    file_cert_rsa = fopen(path_cert_rsa, 'r');
+    if (file_cert_rsa == NULL)
+    {
+        printf("Impossible read certificate\n");
+        exit(-1);
+    }
+    cert_rsa = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
+    cert_byte = cert_to_byte(cert_rsa, &cert_len);
 
-
-    msg_len = MAX_SIZE_USERNAME+strlen(" ")+...+strlen(" ")+pubkey_len
+    msg_len = MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+pubkey_len+strlen(" ")+cert_len;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    /*TODO:COMPOSE THE MESSAGE: username, ciphertext, pubkey_byte, cert_byte*/
+
 
 
     printf("%s\n", buffer);
@@ -206,7 +299,9 @@ int loginServer(int sd, char* rec_mex)
 
     free(buffer);
     free(pubkey_byte);
+    free(cert_byte);
     free(msg_to_sign);
+    free(ciphertext);
 
 
     // Calculating digital signature
@@ -298,4 +393,6 @@ int loginServer(int sd, char* rec_mex)
     }
     return 1;
     */
+
+   //free(); ... search for mallocs
 }
