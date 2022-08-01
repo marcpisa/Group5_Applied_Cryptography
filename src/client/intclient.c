@@ -39,6 +39,27 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
 
 }
 
+size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
+{
+    size_t count     = 0;
+    unsigned char* tmp = a_str;
+    
+    // Count how many elements there are before delim
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            break;
+        }
+        tmp++;
+    }
+
+    return count;
+}
+
+
+
 /*********************************************
  *                 INTERFACES
  ********************************************/
@@ -54,11 +75,16 @@ int createSocket()
 }
 
 int loginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr) {
+    char* path_pubkey = "../dh_client1_pubkey.pem";
+    int msg_len;
+    size_t offset;
+    size_t old_offset;
+    const unsigned char delim = ' ';
+
+    // Hashing
     EVP_MD_CTX* ctx_digest;
     unsigned char* digest;
     int digestlen;
-    char* path_pubkey = "../dh_client1_pubkey.pem";
-    int msg_len;
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -166,7 +192,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     free(pubkey_byte);
 
     /* ---- Obtain response server (DH pubkey, signature and cert.) ----*/
-    /*
+    
     memset(buffer, 0, strlen(buffer));
     printf("Login request message sent\n");
     ret = recv(sock, buffer, BUF_LEN,0);
@@ -178,15 +204,30 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     }
 
     // Parse the server response
-    // username, g^b, encrypted dig.sign., cert. server
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     memset(bufferSupp4, 0, strlen(bufferSupp4));
-    sscanf(buffer, "%s %s %s %s", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4);
+
+    offset = str_ssplit(buffer, delim);
+    memcpy(bufferSupp1, buffer, offset); // username
+    old_offset = offset;
+
+    offset = str_ssplit(&*(buffer+offset), delim);
+    memcpy(bufferSupp2, &*(buffer+old_offset), offset); // dig.sig.
+    old_offset = offset;
+
+    offset = str_ssplit(&*(buffer+offset), delim);
+    memcpy(bufferSupp3, &*(buffer+old_offset), offset); // g^b
+    old_offset = offset;
+
+    offset = str_ssplit(&*(buffer+offset), delim);
+    memcpy(bufferSupp4, &*(buffer+old_offset), offset); // cert
+    //old_offset = offset;
 
     // SANITIZATION
 
+    // Check username validity
     if (strcmp(username, bufferSupp1) != 0) 
     {
         printf("Wrong username\n");
@@ -194,8 +235,32 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
         exit(1);
     }
 
+    // Obtain the public key, derive the established key
+    peer_pubkey = pubkey_to_PKEY(bufferSupp3, MAX_SIZE_PUBKEY);
+    
 
-    peer_pubkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+    // Issue the session keys 
+
+
+    // Decrypt the message
+
+    // Obtain the RSA public key (?)
+    // Verify with the certificate
+
+    // Generate the digital signature and compare with the received one
+    
+
+
+
+
+
+
+
+
+
+
+
+
 
     //cert_fp = fopen(cert, r);
 

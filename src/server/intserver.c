@@ -281,11 +281,22 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     cert_rsa = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
     cert_byte = cert_to_byte(cert_rsa, &cert_len);
 
+    if (cipherlen > 1023 || pubkey_len > 1023 || cert_len > 1023)
+    {
+        printf("Too long\n");
+        exit(-1);
+    }
     msg_len = MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+pubkey_len+strlen(" ")+cert_len;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    /*TODO:COMPOSE THE MESSAGE: username, ciphertext, pubkey_byte, cert_byte*/
-
-
+ 
+    // Compose the message
+    memcpy(buffer, username, MAX_SIZE_USERNAME);
+    memcpy(&*(buffer+MAX_SIZE_USERNAME), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")), ciphertext, cipherlen);
+    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")), pubkey_byte, MAX_SIZE_PUBKEY);
+    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+MAX_SIZE_PUBKEY), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+MAX_SIZE_PUBKEY+strlen(" ")), cert_byte, cert_len);
 
     printf("%s\n", buffer);
     printf("I'm sending to the client the mex %s\n\n", buffer);
@@ -303,68 +314,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     free(msg_to_sign);
     free(ciphertext);
 
-
-    // Calculating digital signature
-
-    /**/
-
-
-
-    /* Sending certificate ....
-    // Send pubkey file size
-    ret = send(sock, file_sz, sizeof(file_sz), 0);
-    if (ret < 0)
-    {
-        printf("Send file size gone bad\n");
-        exit(1);
-    }
-
-    file_pubkey_pem = fopen(path_pubkey, "r");
-    if (file_pubkey_pem == NULL) 
-    { 
-        printf("Error reading PEM file.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    } 
-
-    // Sending file data
-    offset = 0;
-    remain_data = file_sz;
-    while (((sent_bytes = sendfile(sock, file_pubkey_pem, &offset, BUF_LEN)) > 0) && (remain_data > 0))
-    {
-            fprintf(stdout, "1. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
-            remain_data -= sent_bytes;
-            fprintf(stdout, "2. Client sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
-    }
-
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    exit(1);
 
 
 
