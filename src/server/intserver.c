@@ -215,9 +215,9 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
     ctx_digest = EVP_MD_CTX_new();
     EVP_DigestInit(ctx_digest, EVP_sha256());
-    EVP_DigestUpdate(ctx, K, sizeof(K));
-    EVP_DigestFinal(ctx, digest, &digestlen);
-    EVP_MD_CTX_free(ctx);
+    EVP_DigestUpdate(ctx_digest, K, sizeof(K));
+    EVP_DigestFinal(ctx_digest, digest, &digestlen);
+    EVP_MD_CTX_free(ctx_digest);
 
     memcpy(session_key1, digest, 16); // 16 byte = 128 bit
     memcpy(session_key2, &*(digest+16), 16);
@@ -262,6 +262,9 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     EVP_MD_CTX_free(ctx_digsig);
 
     // Encrypt the signature (with first session key)
+
+    // TODO: cbc
+
     ciphertext = (unsigned char*)malloc(sizeof(signature) + 16);
     ctx_symmencr = EVP_CIPHER_CTX_new();
     EVP_EncryptInit(ctx_symmencr, EVP_aes_128_ecb(), session_key1, NULL);

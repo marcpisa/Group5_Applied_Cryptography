@@ -5,11 +5,6 @@
 int main(int argc, char* argv[])
 {
     //********** VARIABLES ************
-    // SSL
-    BIO* bio;
-    SSL_CTX* ssl_ctx;
-    SSL* ssl;
-
     // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
@@ -24,11 +19,13 @@ int main(int argc, char* argv[])
     char command3[MAX_LEN_CMD];
     char username[MAX_LEN_USR];
 
-    // Timeout Variables
+    // Others
     struct timeval tv;
-
-    // File management
     FILE* fd1;
+    X509_STORE* ca_store;
+    X509* cert_serv;
+    FILE* file_cert_serv;
+    char* path_cert_serv = "../cert.pem";
 
     // Cryptographic operation
     char* session_key1;
@@ -66,6 +63,26 @@ int main(int argc, char* argv[])
         printf("Port contains invalid chars (0-9)\n");
         exit(-1);
     }
+
+    // CA store configuration
+    ca_store = X509_STORE_new();
+    file_cert_serv = fopen(path_cert_serv, 'r');
+    if (file_cert_serv == NULL)
+    {
+        printf("Impossible to open the certificate file\n");
+        // TO STANDARDIZE
+        exit(-1);   
+    }
+    cert_serv = PEM_read_X509(file_cert_serv, NULL, NULL, NULL);
+    ret = X509_STORE_add_cert(ca_store, cert_serv);
+    if (ret != 1) 
+    {
+        printf("Impossible to allocate certificate store\n");
+        // TO STANDARDIZE
+        exit(-1);
+    }
+
+    // WE NEED TO SET ALSO THE CRL?????????????
 
 
     // Set the value of the max interval that the select function wait for an action to do
@@ -189,7 +206,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = loginClient(session_key1, session_key2, username, srv_addr);
+                            ret = loginClient(session_key1, session_key2, username, srv_addr, ca_store);
                             if (ret == -1) {
                                 printf("Login failed.\n\n"); 
                                 exit(-1);
@@ -357,5 +374,6 @@ int main(int argc, char* argv[])
         }
     }
     close(listenerTCP);
+    X509_STORE_free(ca_store);
     return 0;
 }

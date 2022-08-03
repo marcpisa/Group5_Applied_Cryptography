@@ -39,6 +39,19 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
 
 }
 
+X509* cert_to_X509(unsigned char* cert, int cert_len)
+{
+    BIO* mbio = BIO_new(BIO_s_mem());
+    BIO_write(mbio, cert, cert_len);
+
+    X509* crt = NULL;
+    crt =  PEM_read_bio_X509(mbio, NULL, NULL, NULL);
+    BIO_free(mbio);
+
+    return crt;
+}
+
+
 size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
 {
     size_t count     = 0;
@@ -59,7 +72,6 @@ size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
 }
 
 
-
 /*********************************************
  *                 INTERFACES
  ********************************************/
@@ -74,17 +86,25 @@ int createSocket()
     return sock;
 }
 
-int loginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr) {
+int loginClient(char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) {
     char* path_pubkey = "../dh_client1_pubkey.pem";
     int msg_len;
     size_t offset;
     size_t old_offset;
     const unsigned char delim = ' ';
 
+    // Symmetric Encryption
+    EVP_CIPHER_CTX* ctx_symmencr;
+    unsigned char* msg_to_ver;
+    int outlen;
+
     // Hashing
     EVP_MD_CTX* ctx_digest;
     unsigned char* digest;
     int digestlen;
+    EVP_MD_CTX* ctx_digsig_ver;
+    unsigned char* exp_digsig;
+    int expected_len;
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -100,8 +120,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     EVP_PKEY* dh_pubkey;
 
     // Certificate
-    X509* server_cert;
-    FILE* cert_fp;
+    X509* serv_cert;
+    EVP_PKEY* pub_rsa_key;
+    X509_STORE_CTX* ctx_cert;
 
     int sock, ret;
     unsigned char* buffer;
@@ -189,10 +210,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     }
 
     free(buffer);
-    free(pubkey_byte);
+    //free(pubkey_byte);
 
-    /* ---- Obtain response server (DH pubkey, signature and cert.) ----*/
-    
+    /* ---- Obtain and parse response server (DH pubkey, signature and cert.) ----*/
     memset(buffer, 0, strlen(buffer));
     printf("Login request message sent\n");
     ret = recv(sock, buffer, BUF_LEN,0);
@@ -226,6 +246,8 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     //old_offset = offset;
 
     // SANITIZATION
+    // Check that all the contents are correct like the fresh quantities and the username received back
+  
 
     // Check username validity
     if (strcmp(username, bufferSupp1) != 0) 
@@ -240,65 +262,111 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     
 
     // Issue the session keys 
-
-
-    // Decrypt the message
-
-    // Obtain the RSA public key (?)
-    // Verify with the certificate
-
-    // Generate the digital signature and compare with the received one
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    //cert_fp = fopen(cert, r);
-
-    //server_cert = PEM_read_X509(cert_fp, NULL, NULL, NULL);
-
-
-
-
-    // Calculate K = g^a^b mod p 
-    //peer_pubkey = bufferSupp2;
-
+    // -- Calculate K = g^a^b mod p
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
     EVP_PKEY_derive_init(ctx_drv);
     EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
-
+    
     // Retrieving shared secret’s length
     EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
 
     // Deriving shared secret
-    K = (unsigned char*)malloc(secretlen);
+    K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
     EVP_PKEY_derive(ctx_drv, K, &secretlen);
 
+    // -- Obtain the two session keys
+    digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
+    ctx_digest = EVP_MD_CTX_new();
+    EVP_DigestInit(ctx_digest, EVP_sha256());
+    EVP_DigestUpdate(ctx_digest, K, sizeof(K));
+    EVP_DigestFinal(ctx_digest, digest, &digestlen);
+    EVP_MD_CTX_free(ctx_digest);
 
-    // Decrypt the server's message (bufferSupp3)
-    printf("%lu\n", secretlen);
-    return -1;
-    */
+    memcpy(session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(session_key2, &*(digest+16), 16);
+    printf("Digest:%s\nS1:%s\nS2:%s\n", digest, session_key1, session_key2);
+    free(K);
+    free(digest);
+
+    // Decrypt the message (bufferSupp2)
+
+    // TODO: cbc
+    msg_to_ver = (unsigned char*) malloc(sizeof(unsigned char) * BUF_LEN);
+    ctx_symmencr = EVP_CIPHER_CTX_new();
+    EVP_DecryptInit(ctx_symmencr, EVP_aes_128_ecb(), session_key1, NULL);
+    EVP_DecryptUpdate(ctx_symmencr, msg_to_ver, &outlen, bufferSupp2, sizeof(bufferSupp2));
+    
+    msg_len = outlen;
+    EVP_DecryptFinal(ctx_symmencr, msg_to_ver + msg_len, &outlen);
+    msg_len += outlen;
+    EVP_CIPHER_CTX_free(ctx_symmencr);
+
+    // Obtain the RSA public key and verify the certificate
+    serv_cert = cert_to_X509(bufferSupp4, sizeof(bufferSupp4));
+    pub_rsa_key = X509_get_pubkey(serv_cert);
+
+    ctx_cert = X509_STORE_CTX_new();
+    ret = X509_STORE_CTX_init(ctx_cert, ca_store, serv_cert, NULL);
+    if (ret != 1) 
+    {
+        printf("Initialization certificate verification context failed.\n\n");
+        exit(-1);
+    }
+    ret = X509_verify_cert(ctx_cert);
+    if (ret != 1) 
+    {
+        printf("Certificate verification failed.\n\n");
+        exit(-1);
+    }
+
+    X509_STORE_CTX_free(ctx_cert);
+
+    // Generate the digital signature expected
+    expected_len = MAX_SIZE_PUBKEY+strlen(" ")+pubkey_len;
+    exp_digsig = (unsigned char*) malloc(sizeof(unsigned char)*expected_len);
+    
+    memcpy(exp_digsig, pubkey_byte, pubkey_len);
+    memcpy(&*(exp_digsig+MAX_SIZE_PUBKEY), " ", strlen(" "));
+    memcpy(&*(exp_digsig+MAX_SIZE_PUBKEY+strlen(" ")), bufferSupp3, MAX_SIZE_PUBKEY); // peer pubkey is still inside bufferSupp3
+    
+    // Verify the digital signature received
+    ctx_digsig_ver = EVP_MD_CTX_new();
+    EVP_VerifyInit(ctx_digsig_ver, EVP_sha256());
+    EVP_VerifyUpdate(ctx_digsig_ver, exp_digsig, expected_len);
+    ret = EVP_VerifyFinal(ctx_digsig_ver, msg_to_ver, msg_len, pub_rsa_key);
+    if (ret != 1) 
+    {
+        printf("Digital signature verification failed.\n");
+        exit(-1);
+    }
+
+    EVP_MD_CTX_free(ctx_digsig_ver);
+    //free(exp_digsig);
+    free(pubkey_byte);
+    free(msg_to_ver);
+
+
+
+    /* Generate message for the server (username + digital signature) */
+    
+    msg_len = MAX_SIZE_USERNAME + .. ;
+    if (msg_len > 1023) 
+    {
+        printf("Message too long.\n");
+        exit(-1);
+    } 
+    
+    // Sign exp_digsig with private key of client
+    // Encrypt the signature with K
+
+
+
+
+
+
+    free(exp_digsig);
 
     /*
-    // Verify the signature of the server
-    // DO SOMETHING WITH CERTIFICATE (bufferSupp4)
-    
-    
-    
-    // Check that all the contents are correct like the fresh quantities and the username received back
-    
-
-
     // If everything good
 
     // Concatenate g^a (dh_pubkey) and g^b, signed it with the private key and encrypt it with K
@@ -353,37 +421,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     ctx_digest = EVP_MD_CTX_new();
 
 
-    // Hashing
-    EVP_DigestInit(ctx_digest, EVP_sha256());
-    
-    // We need more than one update....
-    EVP_DigestUpdate(ctx_digest, (unsigned char*)key, sizeof(key));
-    EVP_DigestFinal(ctx_digest, digest, &digestlen);
-
-    EVP_MD_CTX_free(ctx_digest);
-
-    // Split the digest in half to obtain the two keys
-    if(len(session_key1) != (16+1) || len(session_key2) != (16+1)) { //16byte=128bits + null final char
-        print("Invalid length of session keys");
-        return -1;
-    }
-    if(digestlen != 256) {
-        print("Invalid length of digest");
-        return -1;
-    }
-
-    for(int i = 0; i < 16; i++) {
-        session_key1[i] = digest[i];
-    }
-    session_key1[16] = '\0';
-
-    for(int i = 0; i < 16; i++) {
-        session_key2[i] = digest[15+i];
-    }
-    session_key2[16] = '\0';
-
-    //DH_free(dh_client);
-
-    //return
+    return 1;
     */
+
+
+   // Check all the return values of cryptographic functions (client and server)
 }
