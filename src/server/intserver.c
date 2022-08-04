@@ -316,6 +316,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     free(cert_byte);
     free(msg_to_sign);
     free(ciphertext);
+    free(signature);
 
     exit(1);
 

@@ -70,4 +70,9 @@
 
 #define MAX_SIZE_USERNAME 25
 #define MAX_SIZE_REQUEST 20
-#define MAX_SIZE_PUBKEY 1024
+
+#define DH_PUBKEY_SIZE 20    // 160 bit
+#define DH_PRIVKEY_SIZE 128  // 1024 bit
+#define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
+#define HASH_LEN EVP_MD_size(EVP_sha256())
+#define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
