@@ -2,11 +2,11 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509_vfy.h>
+#include <openssl/rand.h>
 
 /*********************************************
  *          AUXILIARY FUNCTIONS 
- ********************************************/
-
+ *********************************************/
 unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len) 
 {
     BIO *bio = NULL;
@@ -27,16 +27,16 @@ unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len)
     return key;
 }
 
-EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
+EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len)
+{
     BIO* mbio = BIO_new(BIO_s_mem());
     BIO_write(mbio, public_key, len);
 
     EVP_PKEY* pk = NULL;
-    pk =  PEM_read_bio_PUBKEY(mbio, NULL, NULL, NULL);
+    pk = PEM_read_bio_PUBKEY(mbio, NULL, NULL, NULL);
     BIO_free(mbio);
 
     return pk;
-
 }
 
 X509* cert_to_X509(unsigned char* cert, int cert_len)
@@ -54,7 +54,7 @@ X509* cert_to_X509(unsigned char* cert, int cert_len)
 
 size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
 {
-    size_t count     = 0;
+    size_t count = 0;
     unsigned char* tmp = a_str;
     
     // Count how many elements there are before delim
@@ -74,92 +74,81 @@ size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     FILE* file_pubkey_pem = fopen(path_pubkey, "w");
-    if (file_pubkey_pem == NULL) 
-    { 
-        printf("Error writing to PEM file.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    } 
-    
+    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed: ", 1);
     int ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
     fclose(file_pubkey_pem);
-    if (ret != 1) {
-        printf("Error on saving DH pubkey.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
+    if (ret != 1) exit_with_failure("PEM_write_PUBKEY failed: ", 1);
     
     // Retrieve the saved public key
     file_pubkey_pem = fopen(path_pubkey, "r");
-    if (file_pubkey_pem == NULL) 
-    { 
-        printf("Error reading PEM file.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    } 
-
+    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed: ", 1);
     EVP_PKEY* dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
     fclose(file_pubkey_pem);
-    if (dh_pubkey == NULL) {
-        printf("Error on reading DH pubkey from file.\n");
-        // Change this later to manage properly the session
-        exit(-1);
-    }
+    if (dh_pubkey == NULL) exit_with_failure("PEM_read_PUBKEY failed: ", 1);
 
     return dh_pubkey;
 }
 
 void exit_with_failure(char* err, int perror_enable) {
-    if (perror_enable) perror(err);
-    else printf(err);
+    if (perror_enable) 
+    {
+        perror(err);
+    }
+    else 
+    {
+        printf("%s\n", err);
+    }
     exit(EXIT_FAILURE);
 }
-
-void decrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
-{
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed: ", 1);
-    int ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
-    if(ret != 1) exit_with_failure("DecryptInit failed: ", 1);
-
-    int update_len = 0; // bytes decrypted at each chunk
-    int total_len = 0; // total decrypted bytes
-   
-    // more than one call???
-    ret = EVP_DecryptUpdate(ctx, out, &update_len, in, sizeof(in));
-    if(ret != 1) exit_with_failure("DecryptUpdate failed: ", 1);
-    total_len += update_len;
-   
-    ret = EVP_DecryptFinal(ctx, out + total_len, &update_len);
-    if(ret != 1) exit_with_failure("DecryptFinal failed: ", 1);
-    total_len += update_len;
-    out_len = total_len;
-
-    EVP_CIPHER_CTX_free(ctx);   
-}
-
 void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
 {
+    int ret;
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed: ", 1);
-    int ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
+
+    ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if(ret != 1) exit_with_failure("EncryptInit failed: ", 1);
     
     int update_len = 0; // bytes encrypted at each chunk
     int total_len = 0; // total encrypted bytes
 
-    // more than one call???
-    ret = EVP_EncryptUpdate(ctx, out, &update_len, in, sizeof(in));
+    ret = EVP_EncryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    printf("%d\n", update_len);
     if(ret != 1) exit_with_failure("EncryptUpdate failed: ", 1);
     total_len += update_len;
 
     ret = EVP_EncryptFinal(ctx, out + total_len, &update_len);
     if(ret != 1) exit_with_failure("EncryptFinal failed: ", 1);
     total_len += update_len;
-    out_len = total_len;
-    
+    *out_len = total_len;
+
     EVP_CIPHER_CTX_free(ctx);  
+}
+
+void decrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
+{
+    int ret;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed: ", 1);
+    
+    ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
+    if(ret != 1) exit_with_failure("DecryptInit failed: ", 1);
+
+    int update_len = 0; // bytes decrypted at each chunk
+    int total_len = 0; // total decrypted bytes
+   
+    ret = EVP_DecryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    if(ret != 1) exit_with_failure("DecryptUpdate failed: ", 1);
+    total_len += update_len;
+
+    ret = EVP_DecryptFinal(ctx, out + total_len, &update_len);
+    if(ret != 1) exit_with_failure("DecryptFinal failed: ", 1);
+    total_len += update_len;
+    *out_len = total_len;
+
+    EVP_CIPHER_CTX_free(ctx);   
 }
 
 unsigned char* hash_SHA256(char* msg)
@@ -174,9 +163,9 @@ unsigned char* hash_SHA256(char* msg)
     /* Context allocation */
     ctx = EVP_MD_CTX_new();
 
-    /* Hashing (initialization + single update + finalization */
+    /* Hashing */
     EVP_DigestInit(ctx, EVP_sha256());
-    EVP_DigestUpdate(ctx, (unsigned char*)msg, sizeof(msg));
+    EVP_DigestUpdate(ctx, (unsigned char*)msg, strlen(msg));
     EVP_DigestFinal(ctx, digest, &digestlen);
 
 
@@ -198,7 +187,7 @@ unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_si
     EVP_MD_CTX* ctx_digsig = EVP_MD_CTX_new();
     unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
     EVP_SignInit(ctx_digsig, EVP_sha256());
-    EVP_SignUpdate(ctx_digsig, msg_to_sign, sizeof(msg_to_sign));
+    EVP_SignUpdate(ctx_digsig, msg_to_sign, strlen((char*)msg_to_sign));
     EVP_SignFinal(ctx_digsig, signature, &signature_len, rsa_prvkey);
     EVP_MD_CTX_free(ctx_digsig);
 
@@ -209,8 +198,8 @@ int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_P
 {
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
     EVP_VerifyInit(ctx, EVP_sha256());
-    EVP_VerifyUpdate(ctx, exp_digsig, strlen(exp_digsig));
-    int ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen(msg_to_ver), pub_rsa_key);
+    EVP_VerifyUpdate(ctx, exp_digsig, strlen((char*)exp_digsig));
+    int ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen((char*)msg_to_ver), pub_rsa_key);
     if (ret != 1) return 0;
 
     EVP_MD_CTX_free(ctx);
@@ -248,30 +237,22 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     FILE* file_prvkey_pem;
     EVP_PKEY* priv_rsa_key_client;
 
-    // Encryption (AES-128-CBC)
+    // Encryption/Decryption (AES-128-CBC)
     unsigned char* iv;
-
-    // Encryption
-    EVP_CIPHER_CTX* ctx_symmencr;
-    unsigned char* msg_to_ver;
-    int outlen;
     unsigned char* ciphertext;
+    unsigned char* msg_to_ver;
     int cipherlen;
 
     // Hashing and digital signature
     unsigned char* digest;
-
-
+    unsigned char* exp_digsig;
+    unsigned char* signature;
     EVP_MD_CTX* ctx_digest;
     int digestlen;
-    EVP_MD_CTX* ctx_digsig_ver;
-    unsigned char* exp_digsig;
     int expected_len;
-    EVP_MD_CTX* ctx_digsig;
-    unsigned char* signature;
     int signature_len;
 
-    // Diffie-Hellman variables
+    // Diffie-Hellman
     EVP_PKEY* dh_params;
     EVP_PKEY_CTX* ctx_dh;
     EVP_PKEY* my_prvkey = NULL;
@@ -300,8 +281,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
      * END VARIABLES
      ********************/
 
+    // HERE
 
-   // Check all the return values of cryptographic functions (client and server)
+    // Check all the return values of cryptographic functions (client and server)
 
 
     // Creation of socket
