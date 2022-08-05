@@ -198,8 +198,6 @@ int main(int argc, char* argv[])
                     switch(s)
                     {
                         case 1: //*********** LOGIN **************
-
-                            // Stuff to do
                             if (connected == 1)
                             {
                                 printf("Connection already established. Login impossible operation!\n\n");
@@ -207,9 +205,15 @@ int main(int argc, char* argv[])
                             }
 
                             ret = loginClient(session_key1, session_key2, username, srv_addr, ca_store);
-                            if (ret == -1) {
+                            // TO ADD the return -1 cases
+                            if (ret == -1) 
+                            {
                                 printf("Login failed.\n\n"); 
                                 exit(-1);
+                            }
+                            else 
+                            {
+                                printf("Login succedded.\n");
                             }
                         
                             break;

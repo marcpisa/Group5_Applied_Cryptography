@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
                 }
                 else //Manager for the accepted communications
                 {
-                    memset(buffer, 0, strlen(buffer));
+                    memset(buffer, 0, 4*strlen(buffer)); // ???
                     printf("Now the buffer contains %s\n\n", buffer);
                     ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret < 0)

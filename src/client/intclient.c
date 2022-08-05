@@ -186,6 +186,37 @@ unsigned char* hash_SHA256(char* msg)
     return digest;
 }
 
+unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, int* signature_len)
+{
+    FILE* file_prvkey_pem = fopen(path_key, 'r');
+    if(file_prvkey_pem == NULL) exit_with_failure("Open failed: ", 1);
+
+    EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
+    fclose(file_prvkey_pem);
+    if (rsa_prvkey == NULL) exit_with_failure("PEM_read_PrivateKey failed: ", 1);
+
+    EVP_MD_CTX* ctx_digsig = EVP_MD_CTX_new();
+    unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
+    EVP_SignInit(ctx_digsig, EVP_sha256());
+    EVP_SignUpdate(ctx_digsig, msg_to_sign, sizeof(msg_to_sign));
+    EVP_SignFinal(ctx_digsig, signature, &signature_len, rsa_prvkey);
+    EVP_MD_CTX_free(ctx_digsig);
+
+    return signature;
+}
+
+int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key)
+{
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_VerifyInit(ctx, EVP_sha256());
+    EVP_VerifyUpdate(ctx, exp_digsig, strlen(exp_digsig));
+    int ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen(msg_to_ver), pub_rsa_key);
+    if (ret != 1) return 0;
+
+    EVP_MD_CTX_free(ctx);
+    return 1;
+}
+
 
 
 /*********************************************
@@ -270,6 +301,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
      ********************/
 
 
+   // Check all the return values of cryptographic functions (client and server)
+
+
     // Creation of socket
     sock = createSocket();
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed:", 1);
@@ -288,31 +322,22 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
  
     free(ctx_dh);
     free(dh_params);
-    
-    // Retrieve RSA client private key
-    file_prvkey_pem = fopen(path_rsa_key, 'r');
-    if(file_prvkey_pem == NULL) exit_with_failure("Prvkey file open failed:", 1);
-
-    priv_rsa_key_client = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
-    fclose(file_prvkey_pem);
-    if (priv_rsa_key_client == NULL) exit_with_failure("Read RSA prvkey failed: ", 1);
-    
-    
 
 
-    /* ---- 1st message: login request message + username + DH pubkey + IV + H(IV) ---- */
-    msg_len = MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ")+DH_PUBKEY_SIZE+ \
-    strlen(" ")+IV_LEN+HASH_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-
+    /* ---- 1st message: login request message + username + DH pubkey + IV + dig.sig.(IV) ---- */
     // Generate the IV and the related hash
     iv = (unsigned char*)malloc(IV_LEN);
     RAND_poll(); // Seed OpenSSL PRNG
     ret = RAND_bytes((unsigned char*)&iv[0],IV_LEN);
     if(ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    digest = hash_SHA256(iv);
+    signature = sign_msg(path_rsa_key, password, iv, &signature_len);
+    if(signature_len > 1023) exit_with_failure("Signature too long\n", 0);
 
+    msg_len = MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ")+DH_PUBKEY_SIZE+ \
+    strlen(" ")+IV_LEN+signature_len;
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    
     // Compose the message and send it to the server
     memcpy(buffer, LOGIN_REQUEST, MAX_SIZE_REQUEST);
     memcpy(&*(buffer+MAX_SIZE_REQUEST), " ", strlen(" "));
@@ -327,7 +352,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(&*(buffer+MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ")+DH_PUBKEY_SIZE+ \
     strlen(" ")+IV_LEN), " ", strlen(" "));
     memcpy(&*(buffer+MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ")+DH_PUBKEY_SIZE+ \
-    strlen(" ")+IV_LEN+strlen(" ")), digest HASH_LEN);
+    strlen(" ")+IV_LEN+strlen(" ")), signature, signature_len);
 
     //printf("%s\n", buffer);
     printf("I'm sending to the server the mex %s\n\n", buffer);
@@ -335,15 +360,15 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     if (ret == -1) exit_with_failure("Send failed:", 1);
 
     free(buffer);
-    free(digest);
+    free(signature);
     //free(pubkey_byte);
 
 
 
 
     /* ---- Obtain and parse response server (username, DH pubkey, signature and cert.) ----*/
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*2*BUF_LEN); // max size msg.??
-    ret = recv(sock, buffer, 2*BUF_LEN, 0);
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*4*BUF_LEN); // max size msg.??
+    ret = recv(sock, buffer, 4*BUF_LEN, 0);
     if (ret == -1) exit_with_failure("Receive failed:", 1);
     
     // Parse the server response
@@ -407,7 +432,6 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(K_trunc, K, EVP_CIPHER_key_length(EVP_aes_128_cbc()));
     
     free(K);
-    free(digest);
 
     // Decrypt the message (bufferSupp2)
     msg_to_ver = (unsigned char*) malloc(sizeof(unsigned char) * BUF_LEN);
@@ -437,40 +461,21 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(&*(exp_digsig+DH_PUBKEY_SIZE+strlen(" ")), bufferSupp3, DH_PUBKEY_SIZE); // peer pubkey is still inside bufferSupp3
     
     // Verify the digital signature received
-    ctx_digsig_ver = EVP_MD_CTX_new();
-    EVP_VerifyInit(ctx_digsig_ver, EVP_sha256());
-    EVP_VerifyUpdate(ctx_digsig_ver, exp_digsig, expected_len);
-    ret = EVP_VerifyFinal(ctx_digsig_ver, msg_to_ver, msg_len, pub_rsa_key_serv);
-    if (ret != 1) exit_with_failure("EVP_VerifyFinal failed: ", 1);
+    ret = verify_signature(exp_digsig, msg_to_ver, pub_rsa_key_serv);
+    if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
-    EVP_MD_CTX_free(ctx_digsig_ver);
-    //free(exp_digsig);
     free(pubkey_byte);
     free(msg_to_ver);
 
 
 
 
-    /* Generate message for the server (username + digital signature) */
-    // Sign exp_digsig with private key of client
-    ctx_digsig = EVP_MD_CTX_new();
-    signature = malloc(EVP_PKEY_size(priv_rsa_key_client));
-    EVP_SignInit(ctx_digsig, EVP_sha256());
-    EVP_SignUpdate(ctx_digsig, exp_digsig, sizeof(exp_digsig));
-    EVP_SignFinal(ctx_digsig, signature, &signature_len, priv_rsa_key_client);
-    EVP_MD_CTX_free(ctx_digsig);
-
-    // Encrypt the signature with K
+    /* Generate last message for the server (username + digital signature) */
+    // Sign exp_digsig with private key of client and encrypt the signature with K
+    signature = sign_msg(path_rsa_key, password, exp_digsig, &signature_len);
     ciphertext = (unsigned char*)malloc(sizeof(signature) + BLOCK_SIZE);
-    
     encrypt_AES_128_CBC(&ciphertext, &cipherlen, signature, iv, K_trunc);
-    
-    //???
-    if (cipherlen > 1023) 
-    {
-        printf("Message too long.\n");
-        exit(-1);
-    } 
+    if (cipherlen > 1023) exit_with_failure("Ciphertext too long", 0);
 
     msg_len = MAX_SIZE_USERNAME + strlen(" ") + cipherlen;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
@@ -479,80 +484,16 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(&*(buffer+MAX_SIZE_USERNAME), " ", strlen(" "));
     memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")), ciphertext, cipherlen);
     
-    printf("%s\n", buffer);
+    //printf("%s\n", buffer);
     printf("I'm sending to the server the mex %s\n\n", buffer);
     ret = send(sock, buffer, msg_len, 0); 
-    if (ret == -1)
-    {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
+    if (ret == -1) exit_with_failure("Send failed: ", 1);
 
     free(buffer);
     free(ciphertext);
     free(signature);
     free(exp_digsig);
     free(iv);
-
-    /*
-    // If everything good
-
-    // Concatenate g^a (dh_pubkey) and g^b, signed it with the private key and encrypt it with K
-    // result=....
     
-    
-    memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s", username, result); // or %d?
-    printf("I'm sending to the server the mex %s\n\n", buffer);
-
-    ret = send(sock, buffer, strlen(buffer), 0); // in clear
-    if (ret == -1)
-    {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
-
-    memset(buffer, 0, strlen(buffer));
-    printf("Login last message sent\n");
-    ret = recv(sock, buffer, BUF_LEN,0);
-    if (ret == -1)
-    {
-        printf("Receive operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
-
-    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2); // The two values are the message type and eventually the reason why the request went bad
-    
-    // SANITIZE THE BUFFER
-
-    if (strcmp(bufferSupp1, LOGIN_DENIED) == 0)
-    {
-        printf("The login request has been denied: %s\n\n", bufferSupp2);
-        return -1;
-    }
-    else if (strcmp(bufferSupp1, LOGIN_ACCEPTED) == 0)
-    {
-        printf("The login request has been accepted!\n\n");
-    }
-    else
-    {
-        printf("We don't know what the server said...\n\n");
-        return -1;
-    }
-
-
-    // After establishing the session key, there is the
-    // generation of the two session keys (for symm. encr. and MAC) 
-    digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256())); // check malloc return value
-    ctx_digest = EVP_MD_CTX_new();
-
-
     return 1;
-    */
-
-
-   // Check all the return values of cryptographic functions (client and server)
 }
