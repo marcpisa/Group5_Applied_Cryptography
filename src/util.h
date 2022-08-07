@@ -13,12 +13,13 @@
 #include <math.h>
 #include <dirent.h>
 //#include <conio.h>
+#include "sanitization.c"
+
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
 #define COM_LEN 16
-#define MAX_LEN_USR 20
 #define MAX_LEN_FILENAME 20
 #define COMM_NUMB 8
 #define PORT_SIZE 6
@@ -68,8 +69,8 @@
 #define GRN   "\x1B[32m"
 #define RESET "\x1B[0m"
 
-#define MAX_SIZE_USERNAME 25
-#define MAX_SIZE_REQUEST 20
+#define MAX_LEN_USERNAME 25
+#define MAX_LEN_REQUEST 20
 
 #define DH_PUBKEY_SIZE 20    // 160 bit
 #define DH_PRIVKEY_SIZE 128  // 1024 bit

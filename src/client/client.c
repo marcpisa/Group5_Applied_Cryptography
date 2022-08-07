@@ -1,6 +1,5 @@
 #include "intclient.h"
 #include <openssl/evp.h>
-#include "../sanitization.c"
 
 int main(int argc, char* argv[])
 {
@@ -17,7 +16,7 @@ int main(int argc, char* argv[])
     char command1[MAX_LEN_CMD];
     char command2[MAX_LEN_CMD];
     char command3[MAX_LEN_CMD];
-    char username[MAX_LEN_USR];
+    char username[MAX_LEN_USERNAME];
 
     // Others
     struct timeval tv;
@@ -47,9 +46,9 @@ int main(int argc, char* argv[])
     printf("\n+++++++++++ FILE CLOUD MANAGER +++++++++++\n");
     
     // Checking username length and sanitize it
-    if (strlen(argv[1]) > MAX_LEN_USR)
+    if (strlen(argv[1]) > MAX_LEN_USERNAME)
     {
-        printf("Username too long... max length %i\n", MAX_LEN_USR);
+        printf("Username too long... max length %i\n", MAX_LEN_USERNAME);
         exit(-1);
     }
     if (!username_sanitization(argv[1]))

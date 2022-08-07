@@ -7,15 +7,16 @@
 /*********************************************
  *          AUXILIARY FUNCTIONS 
  ********************************************/
-
 unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len) 
 {
     BIO *bio = NULL;
     unsigned char *key = NULL;
     int key_len = 0;
+    int ret;
 
     bio = BIO_new(BIO_s_mem());
-    PEM_write_bio_PUBKEY(bio, pub_key);
+    ret = PEM_write_bio_PUBKEY(bio, pub_key);
+    if (ret != 1) exit_with_failure("PEM_write_biu_PUBKEY failed", 1);
 
     key_len = BIO_pending(bio);
     *pub_key_len = key_len;
@@ -33,9 +34,11 @@ unsigned char* cert_to_byte(X509* cert, int* cert_len)
     BIO *bio = NULL;
     unsigned char *c = NULL;
     int c_len = 0;
+    int ret;
 
     bio = BIO_new(BIO_s_mem());
-    PEM_write_bio_X509(bio, cert);
+    ret = PEM_write_bio_X509(bio, cert);
+    if (ret != 1) exit_with_failure("PEM_write_bip_X509 failed", 1);
 
     c_len = BIO_pending(bio);
     *cert_len = c_len;
@@ -62,47 +65,33 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len){
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     FILE* file_pubkey_pem = fopen(path_pubkey, "w");
-    if (file_pubkey_pem == NULL) 
-    { 
-        printf("Error writing to PEM file.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    } 
-    
+    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed", 1);
     int ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
     fclose(file_pubkey_pem);
-    if (ret != 1) {
-        printf("Error on saving DH pubkey.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
+    if (ret != 1) exit_with_failure("PEM_write_PUBKEY failed", 1);
     
     // Retrieve the saved public key
     file_pubkey_pem = fopen(path_pubkey, "r");
-    if (file_pubkey_pem == NULL) 
-    { 
-        printf("Error reading PEM file.\n");
-        // Change this later to manage properly the session
-        exit(1);
-    } 
-
+    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed", 1);
     EVP_PKEY* dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
     fclose(file_pubkey_pem);
-    if (dh_pubkey == NULL) {
-        printf("Error on reading DH pubkey from file.\n");
-        // Change this later to manage properly the session
-        exit(-1);
-    }
+    if (dh_pubkey == NULL) exit_with_failure("PEM_read_PUBKEY failed", 1);
 
     return dh_pubkey;
 }
 
 int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key)
 {
+    int ret;
+
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_VerifyInit(ctx, EVP_sha256());
-    EVP_VerifyUpdate(ctx, exp_digsig, strlen(exp_digsig));
-    int ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen(msg_to_ver), pub_rsa_key);
+    if (!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
+    
+    ret = EVP_VerifyInit(ctx, EVP_sha256());
+    if (ret != 1) exit_with_failure("VerifyInit failed", 1);
+    ret =EVP_VerifyUpdate(ctx, exp_digsig, strlen(exp_digsig));
+    if (ret != 1) exit_with_failure("VerifyUpdate failed", 1);
+    ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen(msg_to_ver), pub_rsa_key);
     if (ret != 1) return 0;
 
     EVP_MD_CTX_free(ctx);
@@ -111,68 +100,81 @@ int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_P
 
 unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, int* signature_len)
 {
+    int ret;
+
     FILE* file_prvkey_pem = fopen(path_key, 'r');
-    if(file_prvkey_pem == NULL) exit_with_failure("Open failed: ", 1);
+    if(file_prvkey_pem == NULL) exit_with_failure("Open failed", 1);
 
     EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
     fclose(file_prvkey_pem);
-    if (rsa_prvkey == NULL) exit_with_failure("PEM_read_PrivateKey failed: ", 1);
+    if (rsa_prvkey == NULL) exit_with_failure("PEM_read_PrivateKey failed", 1);
 
     EVP_MD_CTX* ctx_digsig = EVP_MD_CTX_new();
+    if(!ctx_digsig) exit_with_failure("EVP_MD_CTX_new failed", 1);
+
     unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
-    EVP_SignInit(ctx_digsig, EVP_sha256());
-    EVP_SignUpdate(ctx_digsig, msg_to_sign, sizeof(msg_to_sign));
-    EVP_SignFinal(ctx_digsig, signature, &signature_len, rsa_prvkey);
+    
+    ret = EVP_SignInit(ctx_digsig, EVP_sha256());
+    if (ret != 1) exit_with_failure("SignInit failed", 1);
+    ret = EVP_SignUpdate(ctx_digsig, msg_to_sign, strlen((char*)msg_to_sign));
+    if (ret != 1) exit_with_failure("SignUpdate failed", 1);
+    ret = EVP_SignFinal(ctx_digsig, signature, &signature_len, rsa_prvkey);
+    if (ret != 1) exit_with_failure("SignFinal failed", 1);
+
     EVP_MD_CTX_free(ctx_digsig);
 
     return signature;
 }
 
-void decrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
-{
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed: ", 1);
-    int ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
-    if(ret != 1) exit_with_failure("DecryptInit failed: ", 1);
-
-    int update_len = 0; // bytes decrypted at each chunk
-    int total_len = 0; // total decrypted bytes
-   
-    // more than one call???
-    ret = EVP_DecryptUpdate(ctx, out, &update_len, in, sizeof(in));
-    if(ret != 1) exit_with_failure("DecryptUpdate failed: ", 1);
-    total_len += update_len;
-   
-    ret = EVP_DecryptFinal(ctx, out + total_len, &update_len);
-    if(ret != 1) exit_with_failure("DecryptFinal failed: ", 1);
-    total_len += update_len;
-    out_len = total_len;
-
-    EVP_CIPHER_CTX_free(ctx);   
-}
-
 void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
 {
+    int ret;
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed: ", 1);
-    int ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
-    if(ret != 1) exit_with_failure("EncryptInit failed: ", 1);
+    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
+
+    ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
+    if (ret != 1) exit_with_failure("EncryptInit failed", 1);
     
     int update_len = 0; // bytes encrypted at each chunk
     int total_len = 0; // total encrypted bytes
 
-    // more than one call???
-    ret = EVP_EncryptUpdate(ctx, out, &update_len, in, sizeof(in));
-    if(ret != 1) exit_with_failure("EncryptUpdate failed: ", 1);
+    ret = EVP_EncryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    printf("%d\n", update_len);
+    if (ret != 1) exit_with_failure("EncryptUpdate failed", 1);
     total_len += update_len;
 
     ret = EVP_EncryptFinal(ctx, out + total_len, &update_len);
-    if(ret != 1) exit_with_failure("EncryptFinal failed: ", 1);
+    if (ret != 1) exit_with_failure("EncryptFinal failed", 1);
     total_len += update_len;
-    out_len = total_len;
-    
+    *out_len = total_len;
+
     EVP_CIPHER_CTX_free(ctx);  
+}
+
+void decrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
+{
+    int ret;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
+    
+    ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
+    if (ret != 1) exit_with_failure("DecryptInit failed", 1);
+
+    int update_len = 0; // bytes decrypted at each chunk
+    int total_len = 0; // total decrypted bytes
+   
+    ret = EVP_DecryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    if (ret != 1) exit_with_failure("DecryptUpdate failed", 1);
+    total_len += update_len;
+
+    ret = EVP_DecryptFinal(ctx, out + total_len, &update_len);
+    if (ret != 1) exit_with_failure("DecryptFinal failed", 1);
+    total_len += update_len;
+    *out_len = total_len;
+
+    EVP_CIPHER_CTX_free(ctx);   
 }
 
 
@@ -205,7 +207,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     char* path_rsa_key = "../key.pem";
     int ret;
     int msg_len;
-    char username [MAX_SIZE_USERNAME];
+    char username [MAX_LEN_USERNAME];
     int offset, old_offset;
 
     // Certificate
@@ -239,7 +241,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
-    EVP_PKEY_CTX* ctx;
+    EVP_PKEY_CTX* ctx_dh;
     EVP_PKEY* my_prvkey = NULL;
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
@@ -252,24 +254,29 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     size_t secretlen;
     FILE* file_pubkey_pem;
     EVP_PKEY* dh_pubkey;
-
-    // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
-
+    /*********************
+     * END VARIABLES
+     ********************/
+    
     // Generate DH asymmetric key(s)
     dh_params = EVP_PKEY_new();
-    EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+    ret = EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+    if (ret != 1) exit_with_failure("EVP_PKEY_set1_DH failed", 1);
 
-    ctx = EVP_PKEY_CTX_new(dh_params, NULL);
-    EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_keygen(ctx, &my_prvkey);
+    ctx_dh = EVP_PKEY_CTX_new(dh_params, NULL);
+    if(!ctx_dh) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
+    
+    ret = EVP_PKEY_keygen_init(ctx_dh);
+    if (ret != 1) exit_with_failure("keygen_init failed", 1);
+    ret = EVP_PKEY_keygen(ctx_dh, &my_prvkey);
+    if (ret != 1) exit_with_failure("keygen failed", 1);
 
     // Save DH key in PEM format and retrieve the public key
     dh_pubkey = save_read_PUBKEY(path_pubkey, my_prvkey);
     pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
-    
-    free(ctx);
-    free(dh_params);
  
+    free(ctx_dh);
+    free(dh_params);
 
 
 
@@ -279,32 +286,26 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memset(bufferSupp2, 0, BUF_LEN);
     memset(bufferSupp3, 0, BUF_LEN);
     memset(bufferSupp4, 0, BUF_LEN);
-    memcpy(bufferSupp1, &*(rec_mex+MAX_SIZE_REQUEST+strlen(" ")), \
-    MAX_SIZE_USERNAME);
-    memcpy(bufferSupp2, &*(rec_mex+MAX_SIZE_REQUEST+strlen(" ")+ \
-    MAX_SIZE_USERNAME+strlen(" ")), DH_PUBKEY_SIZE);
-    memcpy(bufferSupp3, &*(rec_mex+MAX_SIZE_REQUEST+strlen(" ")+ \
-    MAX_SIZE_USERNAME+strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")), IV_LEN);
+    memcpy(bufferSupp1, &*(rec_mex+MAX_LEN_REQUEST+strlen(" ")), MAX_LEN_USERNAME); // username
+    memcpy(bufferSupp2, &*(rec_mex+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+ \
+    strlen(" ")), DH_PUBKEY_SIZE); // dh pubkey
+    memcpy(bufferSupp3, &*(rec_mex+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+ \
+    strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")), IV_LEN); // iv
 
-    old_offset = MAX_SIZE_REQUEST+strlen(" ")+MAX_SIZE_USERNAME+strlen(" ") \
+    old_offset = MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ") \
     +DH_PUBKEY_SIZE+strlen(" ")+IV_LEN;
     offset = str_ssplit(&*(rec_mex+old_offset), delim);
     memcpy(bufferSupp4, &*(rec_mex+old_offset), offset); // signature
-    //old_offset = offset;
 
     //printf("%s\n%s\n%s\n", bufferSupp1, bufferSupp2, bufferSupp3);
     
-    //SANITIZE AND CHECK THE CORRECTNESS OF BUFFERS' CONTENTS
-
-    // Check username
+    // Sanitize and check username
+    if (!username_sanitization(bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
     chdir(MAIN_FOLDER_SERVER);
     ret = chdir(bufferSupp1);
-    if (ret == -1)
-    {
-        printf("Error: username doesn't exists...\n");
-        exit(1);
-    }
-    memset(username, 0, MAX_SIZE_USERNAME);
+    if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
+  
+    memset(username, 0, MAX_LEN_USERNAME);
     memcpy(username, bufferSupp1, BUF_LEN);
 
     // Retrieve the client pubkey
@@ -317,22 +318,35 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     // Calculate K = g^a^b mod p 
     ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
-    EVP_PKEY_derive_init(ctx_drv);
-    EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
+    if (!ctx_drv) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
     
-    // Retrieving shared secret’s length
-    EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
+    ret = EVP_PKEY_derive_init(ctx_drv);
+    if (ret != 1) exit_with_failure("PKEY_derive_init failed", 1);
+    ret = EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
+    if (ret != 1) exit_with_failure("PKEY_derive_set_peer failed", 1);
+    ret = EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
+    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
 
-    // Deriving shared secret
+    // Deriving shared secret K = g^a^b mod p
     K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
-    EVP_PKEY_derive(ctx_drv, K, &secretlen);
+    if (K == NULL) exit_with_failure("Malloc K failed", 1);
+
+    ret = EVP_PKEY_derive(ctx_drv, K, &secretlen);
+    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
 
     // Obtain the two session keys
     digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
+    if (digest == NULL) exit_with_failure("Malloc digest failed", 1);
+
     ctx_digest = EVP_MD_CTX_new();
-    EVP_DigestInit(ctx_digest, EVP_sha256());
-    EVP_DigestUpdate(ctx_digest, K, sizeof(K));
-    EVP_DigestFinal(ctx_digest, digest, &digestlen);
+    if (!ctx_digest) exit_with_failure("EVP_MD_CTX_new failed", 1);
+    ret = EVP_DigestInit(ctx_digest, EVP_sha256());
+    if (ret != 1) exit_with_failure("DigestInit failed", 1);
+    ret = EVP_DigestUpdate(ctx_digest, K, sizeof(K));
+    if (ret != 1) exit_with_failure("DigestUpdate failed", 1);
+    ret = EVP_DigestFinal(ctx_digest, digest, &digestlen);
+    if (ret != 1) exit_with_failure("DigestFinal failed", 1);
+
     EVP_MD_CTX_free(ctx_digest);
 
     memcpy(session_key1, digest, 16); // 16 byte = 128 bit
@@ -342,12 +356,13 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     // TEST ---- K from 1024 to 128 bit for symm. encr.
     K_trunc = (unsigned char*) malloc(sizeof(unsigned char) * 16); 
+    if (K_trunc ==  NULL) exit_with_failure("Malloc K_trunc failed", 1);
     memcpy(K_trunc, K, EVP_CIPHER_key_length(EVP_aes_128_cbc()));
-    
     free(K);
 
     // Retrieve the IV
     iv = (unsigned char*)malloc(IV_LEN);
+    if (iv == NULL) exit_with_failure("Malloc iv failed", 1);
     memcpy(iv, bufferSupp3, IV_LEN);
 
     // Verify the digital signature (bufferSupp4)
@@ -368,11 +383,14 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     // Prepare the digital signature
     msg_len = DH_PUBKEY_SIZE+strlen(" ")+DH_PUBKEY_SIZE;
     msg_to_sign = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (msg_to_sign == NULL) exit_with_failure("Malloc msg_to_sign failed", 1);
     memcpy(msg_to_sign, buffer, DH_PUBKEY_SIZE); // peer pubkey is still inside bufferSupp2
     memcpy(&*(buffer+DH_PUBKEY_SIZE), " ", strlen(" "));
     memcpy(&*(buffer+DH_PUBKEY_SIZE+strlen(" ")), pubkey_byte, DH_PUBKEY_SIZE);
     
     signature = sign_msg(path_rsa_key, password, msg_to_sign, &signature_len);
+
+    // HERE
 
     // Encrypt the signature
     ciphertext = (unsigned char*)malloc(sizeof(signature) + BLOCK_SIZE);
@@ -387,17 +405,17 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     fclose(file_cert_rsa);
 
     if (cipherlen > 1023 || cert_len > 1023) exit_with_failure("Ciphertext or certificate too long", 0);
-    msg_len = MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")+cert_len;
+    msg_len = MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")+cert_len;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
  
     // Compose the message
-    memcpy(buffer, username, MAX_SIZE_USERNAME);
-    memcpy(&*(buffer+MAX_SIZE_USERNAME), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")), ciphertext, cipherlen);
-    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")), pubkey_byte, DH_PUBKEY_SIZE);
-    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_SIZE_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")), cert_byte, cert_len);
+    memcpy(buffer, username, MAX_LEN_USERNAME);
+    memcpy(&*(buffer+MAX_LEN_USERNAME), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")), ciphertext, cipherlen);
+    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")), pubkey_byte, DH_PUBKEY_SIZE);
+    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE), " ", strlen(" "));
+    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+DH_PUBKEY_SIZE+strlen(" ")), cert_byte, cert_len);
 
     //printf("%s\n", buffer);
     printf("I'm sending to the client the mex %s\n\n", buffer);
@@ -418,9 +436,9 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     memset(bufferSupp1, 0, BUF_LEN);
     memset(bufferSupp2, 0, BUF_LEN);
-    memcpy(bufferSupp1, buffer, MAX_SIZE_USERNAME);
+    memcpy(bufferSupp1, buffer, MAX_LEN_USERNAME);
 
-    old_offset = MAX_SIZE_USERNAME+strlen(" ");
+    old_offset = MAX_LEN_USERNAME+strlen(" ");
     offset = str_ssplit(&*(buffer+old_offset), delim);
     memcpy(bufferSupp2, &*(buffer+old_offset), offset); // signature
 

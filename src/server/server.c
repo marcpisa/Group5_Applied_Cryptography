@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
 
                     // We check the first keyword to understand what the Client wants us to do
                     memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem
-                    memcpy(bufferSupp1, buffer, MAX_SIZE_REQUEST);
+                    memcpy(bufferSupp1, buffer, MAX_LEN_REQUEST);
                     
                     
                     // ************ LOGIN REQUEST MANAGER ***********

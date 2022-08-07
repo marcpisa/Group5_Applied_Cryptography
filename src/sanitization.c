@@ -37,6 +37,10 @@ int file_name_sanitization(const char* file_name[], const char* root_dir[], char
     return 1;
 }*/
 
+/* Sanitize the username using a whitelist, the accepted characters
+ * are [abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-]
+ * Return 0 if sanitize fails, 1 otherwise
+ */
 int username_sanitization(const char* username) {
     if(strspn(username, username_allowed_chars) < strlen(username)) return 0;
     return 1;
