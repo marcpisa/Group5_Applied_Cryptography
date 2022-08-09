@@ -1,5 +1,4 @@
 #include "intclient.h"
-#include <openssl/evp.h>
 
 int main(int argc, char* argv[])
 {
@@ -20,10 +19,9 @@ int main(int argc, char* argv[])
 
     // Others
     struct timeval tv;
-    FILE* fd1;
     X509_STORE* ca_store;
-    X509* cert_serv;
-    FILE* file_cert_serv;
+    X509* cert_serv = NULL;;
+    BIO* bio_cert;
     char* path_cert_serv = "../cert.pem";
 
     // Cryptographic operation
@@ -65,21 +63,13 @@ int main(int argc, char* argv[])
 
     // CA store configuration
     ca_store = X509_STORE_new();
-    file_cert_serv = fopen(path_cert_serv, 'r');
-    if (file_cert_serv == NULL)
-    {
-        printf("Impossible to open the certificate file\n");
-        // TO STANDARDIZE
-        exit(-1);   
-    }
-    cert_serv = PEM_read_X509(file_cert_serv, NULL, NULL, NULL);
+    bio_cert = BIO_new_file(path_cert_serv, "rb");
+    if (bio_cert == NULL) exit_with_failure("BIO_new_file failed", 1);
+
+    PEM_read_bio_X509(bio_cert, &cert_serv, NULL, NULL);
+    if (cert_serv == NULL) exit_with_failure("PEM_read_bio_X509 failed", 1);
     ret = X509_STORE_add_cert(ca_store, cert_serv);
-    if (ret != 1) 
-    {
-        printf("Impossible to allocate certificate store\n");
-        // TO STANDARDIZE
-        exit(-1);
-    }
+    if (ret != 1) exit_with_failure("X509_STORE_add_cert failed", 1);
 
     // WE NEED TO SET ALSO THE CRL?????????????
 

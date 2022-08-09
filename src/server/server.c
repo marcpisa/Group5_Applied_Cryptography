@@ -115,7 +115,8 @@ int main(int argc, char* argv[])
                     {
                         printf("Done!\n\n");
                         close(listenerTCP);
-                        continue;
+                        //continue;
+                        exit(1);                        
                     }
                     else printf("Unexpected input given...\n\n");
                 }
@@ -156,7 +157,7 @@ int main(int argc, char* argv[])
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, buffer, &session_key1, &session_key2);
+                            ret = loginServer(i, buffer, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -173,7 +174,7 @@ int main(int argc, char* argv[])
                     }
 
                     /*
-                    //************ LOGOUT REQUEST MANAGER ************
+                    // ************ LOGOUT REQUEST MANAGER ************
                     else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -237,7 +238,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    //*************** RENAME REQUEST MANAGER *****************
+                    // *************** RENAME REQUEST MANAGER *****************
                     else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach

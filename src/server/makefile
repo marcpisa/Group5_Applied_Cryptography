@@ -1,10 +1,9 @@
-all: serverPr
+CC=gcc
+CFLAGS=-Wall -lcrypto
 
-serverPr: server.o intserver.o
-	gcc -Wall -o serverPr server.o intserver.o -lcrypto
-
-server.o: intserver.h
-intserver.o: intserver.h ../util.h
+serverPr: server.o intserver.o ../util.o
+	$(CC) -o serverPr ../util.o intserver.o server.o $(CFLAGS)
 
 clean:
 		rm  *.o serverPr
+

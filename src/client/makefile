@@ -1,11 +1,8 @@
-all: clientPr
+CC=gcc
+CFLAGS=-Wall -lcrypto
 
-clientPr: client.o intclient.o
-	gcc -Wall -o clientPr client.o intclient.o -lcrypto
-
-client.o: intclient.h
-intpeer.o: intclient.h ../util.h
+clientPr: client.o intclient.o ../util.o
+	$(CC) -o clientPr ../util.o intclient.o client.o $(CFLAGS)
 
 clean:
 		rm  *.o clientPr
-

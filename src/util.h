@@ -12,8 +12,10 @@
 #include <sys/stat.h>
 #include <math.h>
 #include <dirent.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
 //#include <conio.h>
-#include "sanitization.c"
 
 
 #define SELECT_SEC_TO_WAIT 5
@@ -24,7 +26,7 @@
 #define COMM_NUMB 8
 #define PORT_SIZE 6
 #define CHUNK_SIZE 512
-#define SERVER_PORT 9420
+#define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MAIN_FOLDER_SERVER "../../database"  // When you test the software on your pc change this variable
 #define MAIN_FOLDER_CLIENT "../../download"  // When you test the software on your pc change this variable
@@ -72,8 +74,22 @@
 #define MAX_LEN_USERNAME 25
 #define MAX_LEN_REQUEST 20
 
-#define DH_PUBKEY_SIZE 20    // 160 bit
-#define DH_PRIVKEY_SIZE 128  // 1024 bit
+//#define DH_PUBKEY_SIZE 20    // 160 bit
+//#define DH_PRIVKEY_SIZE 128  // 1024 bit
 #define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
 #define HASH_LEN EVP_MD_size(EVP_sha256())
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
+
+int username_sanitization(const char* username);
+void exit_with_failure(char* err, int perror_enable);
+size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim);
+unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len);
+EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len);
+X509* cert_to_X509(unsigned char* cert, int cert_len);
+EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey);
+void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key);
+void decrypt_AES_128_CBC(unsigned char* out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key);
+unsigned char* hash_SHA256(char* msg);
+unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, unsigned int* signature_len);
+int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key);
+unsigned char* cert_to_byte(X509* cert, int* cert_len);
