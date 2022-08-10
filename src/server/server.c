@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
                 else //Manager for the accepted communications
                 {
                     memset(buffer, 0, 4*strlen(buffer)); // ???
-                    printf("Now the buffer contains %s\n\n", buffer);
+                    //printf("Now the buffer contains %s\n\n", buffer);
                     ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret < 0)
                     {
@@ -131,12 +131,9 @@ int main(int argc, char* argv[])
                         close(listenerTCP);
                         exit(-1);
                     }
-                    printf("I received %s\n\n", buffer);
-
                     // We check the first keyword to understand what the Client wants us to do
-                    memset(bufferSupp1, 0, strlen(bufferSupp1)); //we clean the mem
-                    memcpy(bufferSupp1, buffer, MAX_LEN_REQUEST);
-                    
+                    memset(bufferSupp1, 0, strlen(bufferSupp1));
+                    memcpy(bufferSupp1, buffer, str_ssplit((unsigned char*) buffer, DELIM));
                     
                     // ************ LOGIN REQUEST MANAGER ***********
                     if (strcmp(bufferSupp1, LOGIN_REQUEST) == 0)
@@ -408,7 +405,7 @@ int main(int argc, char* argv[])
                     }
                     */
 
-                    else printf("Unknown type of request by the Client...");
+                    else printf("Unknown type of request by the Client...\n");
                     // Here we can also send a message to the client saying that we didn't understand what it wants
                     memset(buffer, 0, strlen(buffer));
                     close(i);

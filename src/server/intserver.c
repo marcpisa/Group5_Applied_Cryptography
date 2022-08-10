@@ -18,17 +18,17 @@ int createSocket()
 }
 
 int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
-{   
-    const unsigned char delim = ' ';
+{
     unsigned char* buffer;
     unsigned char* msg_to_sign;
+    char* temp;
     unsigned char bufferSupp1[BUF_LEN];
     unsigned char bufferSupp2[BUF_LEN];
     unsigned char bufferSupp3[BUF_LEN];
     unsigned char bufferSupp4[BUF_LEN];
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "../cert.pem";
-    char* path_cert_client_rsa = "../cert_client.pem";
+    char* path_cert_client_rsa = "cert_client.pem";
     char* path_rsa_key = "../key.pem";
     int ret;
     int msg_len;
@@ -47,6 +47,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     // Symmetric encryption
     unsigned char* ciphertext;
     unsigned char* iv;
+    unsigned int iv_len;
     int cipherlen;
 
     // Hashing
@@ -68,6 +69,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     unsigned char* K_trunc;
     unsigned char* pubkey_byte;
     int pubkey_len = 0;
+    unsigned int pubkey_len_rec;
     EVP_PKEY_CTX* ctx_drv;
     size_t secretlen;
     EVP_PKEY* dh_pubkey;
@@ -104,30 +106,42 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memset(bufferSupp2, 0, BUF_LEN);
     memset(bufferSupp3, 0, BUF_LEN);
     memset(bufferSupp4, 0, BUF_LEN);
+    temp = (char*) malloc(sizeof(char)*4);
+    if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
 
-    offset = str_ssplit(&*((unsigned char*) rec_mex+MAX_LEN_REQUEST+strlen(" ")), delim);
-    memcpy(bufferSupp1, &*(rec_mex+MAX_LEN_REQUEST+strlen(" ")), MAX_LEN_USERNAME); // username
-    printf("Offset1:%d\n",offset);
-    old_offset = offset;
+    offset = str_ssplit((unsigned char*) rec_mex, DELIM);
+    old_offset = offset+strlen(" ");
 
-    offset = str_ssplit(&*((unsigned char*) rec_mex+offset), delim);
-    memcpy(bufferSupp2, &*(rec_mex+old_offset), offset); // dh pubkey
-    printf("Offset2:%d\n",offset);
-    old_offset = offset;
+    offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
+    memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
+    old_offset += offset+strlen(" ");
 
-    offset = str_ssplit(&*((unsigned char*) rec_mex+offset), delim);
-    memcpy(bufferSupp3, &*(rec_mex+old_offset), offset); // iv
-    printf("Offset3:%d\n",offset);
-    old_offset = offset;
+    memcpy(temp, &*(rec_mex+old_offset), 4); // len pubkey
+    old_offset += 4+strlen(" ");
+    pubkey_len_rec = atoi(temp);
 
-    offset = str_ssplit(&*((unsigned char*) rec_mex+offset), delim);
-    memcpy(bufferSupp4, &*(rec_mex+old_offset), offset); // signature
-    printf("Offset4:%d\n",offset);
+    memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len_rec); // dh pubkey
+    old_offset += pubkey_len_rec+strlen(" ");
 
+    memcpy(temp, &*(rec_mex+old_offset), 4); // len iv
+    old_offset += 4+strlen(" ");
+    iv_len = atoi(temp);
+
+    memcpy(bufferSupp3, &*(rec_mex+old_offset), iv_len); // iv
+    old_offset += iv_len+strlen(" ");
+
+    memcpy(temp, &*(rec_mex+old_offset), 4); // len dig sig
+    old_offset += 4+strlen(" ");
+    signature_len = atoi(temp);
+
+    memcpy(bufferSupp4, &*(rec_mex+old_offset), signature_len); // signature
+
+    //printf("%d %d %d\n", pubkey_len_rec, iv_len, signature_len);
     //printf("Received mex:\n%s\n%s\n%s\n%s\n", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4);
     
     // Sanitize and check username
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
+    
     chdir(MAIN_FOLDER_SERVER);
     ret = chdir((char*) bufferSupp1);
     if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
@@ -137,8 +151,15 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     // Retrieve the client pubkey
     file_cert_rsa = fopen(path_cert_client_rsa, "r");
+    if (file_cert_rsa == NULL) exit_with_failure("Fopen failed", 1);
     client_cert = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
+    if (client_cert == NULL) exit_with_failure("PEM_read_X509 failed", 1);
+    printf("Debug0\n");
+
     pub_rsa_client = X509_get_pubkey(client_cert);
+    if (pub_rsa_client == NULL) exit_with_failure("X509_get_pubkey failed", 1);
+    printf("Debug0\n");
+
     fclose(file_cert_rsa);
 
     peer_pubkey = pubkey_to_PKEY(bufferSupp2, pubkey_len);
@@ -184,6 +205,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memcpy(session_key2, &*(digest+16), 16);
     //printf("Digest:%s\nS1:%s\nS2:%s\n", digest, session_key1, session_key2);
     free(digest);
+    free(temp);
 
     // TEST ---- K from 1024 to 128 bit for symm. encr.
     K_trunc = (unsigned char*) malloc(sizeof(unsigned char) * 16); 
@@ -269,7 +291,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memcpy(bufferSupp1, buffer, MAX_LEN_USERNAME);
 
     old_offset = MAX_LEN_USERNAME+strlen(" ");
-    offset = str_ssplit(&*(buffer+old_offset), delim);
+    offset = str_ssplit(&*(buffer+old_offset), DELIM);
     memcpy(bufferSupp2, &*(buffer+old_offset), offset); // signature
 
     if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username.\n", 0);

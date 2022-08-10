@@ -29,7 +29,6 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     /*********************
      * VARIABLES
      ********************/
-    const unsigned char delim = ' ';
     char* path_pubkey = "../dh_client1_pubkey.pem"; // TO CHANGE (for multiple clients)
     char* path_rsa_key = "../rsa_teo.pem"; // TO CHANGE
     char* password = "password";
@@ -39,6 +38,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     // Encryption/Decryption (AES-128-CBC)
     unsigned char* iv;
+    int iv_len;
     unsigned char* ciphertext;
     unsigned char* msg_to_ver;
     int cipherlen;
@@ -71,6 +71,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     X509_STORE_CTX* ctx_cert;
 
     int sock, ret;
+    char* temp;
     unsigned char* buffer;
     unsigned char bufferSupp1[BUF_LEN];
     unsigned char bufferSupp2[BUF_LEN];
@@ -112,31 +113,52 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     iv = (unsigned char*)malloc(IV_LEN);
     if (iv == NULL) exit_with_failure("Malloc iv failed", 1);
     RAND_poll(); // Seed OpenSSL PRNG
-    ret = RAND_bytes((unsigned char*)&iv[0],IV_LEN);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
+    iv_len = strlen((char*) iv);
     signature = sign_msg(path_rsa_key, password, iv, &signature_len);
 
-    msg_len = MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")+pubkey_len+ \
-    strlen(" ")+IV_LEN+signature_len;
+    msg_len = strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")+iv_len+strlen(" ")+ \
+    sizeof(unsigned int)+strlen(" ")+signature_len;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (buffer == NULL) exit_with_failure("Malloc buffer failed", 1);
-    
+    temp = (char*) malloc(sizeof(char)*4);
+    if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
+
     // Compose the message and send it to the server
-    memcpy(buffer, LOGIN_REQUEST, MAX_LEN_REQUEST);  // login req
-    memcpy(&*(buffer+MAX_LEN_REQUEST), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")), username, MAX_LEN_USERNAME); // username
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")), pubkey_byte, \
-    pubkey_len); // dh pubkey
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")+pubkey_len), \
+    memcpy(buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST));  // login req
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")), username, strlen(username)); // username
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)), " ", strlen(" "));
+    sprintf(temp, "%d", pubkey_len);
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")), temp, \
+    4); // len pubkey
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)), \
     " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")+pubkey_len+ \
-    strlen(" ")), iv, IV_LEN); // iv
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")+pubkey_len+ \
-    strlen(" ")+IV_LEN), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_REQUEST+strlen(" ")+MAX_LEN_USERNAME+strlen(" ")+pubkey_len+ \
-    strlen(" ")+IV_LEN+strlen(" ")), signature, signature_len); // iv dig. sig.
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")), pubkey_byte, pubkey_len); // dh pubkey
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len), " ", strlen(" ")); 
+    sprintf(temp, "%d", iv_len);
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")), temp, 4); // len iv
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")), iv, iv_len); // iv
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")+iv_len), " ", strlen(" "));
+    sprintf(temp, "%d", signature_len);
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")+iv_len+strlen(" ")), \
+    temp, 4); // len dig. sig.
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")+iv_len+strlen(" ")+ \
+    sizeof(unsigned int)), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+sizeof(unsigned int)+ \
+    strlen(" ")+pubkey_len+strlen(" ")+sizeof(unsigned int)+strlen(" ")+iv_len+strlen(" ")+ \
+    sizeof(unsigned int)+strlen(" ")), signature, signature_len); // iv dig. sig.
 
     printf("I'm sending to the server the first message.\n");
     ret = send(sock, buffer, msg_len, 0);
@@ -144,8 +166,8 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     free(buffer);
     free(signature);
+    free(temp);
 
-    exit(1);
 
 
 
@@ -163,19 +185,19 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memset(bufferSupp3, 0, BUF_LEN);
     memset(bufferSupp4, 0, BUF_LEN);
 
-    offset = str_ssplit(buffer, delim);
-    memcpy(bufferSupp1, buffer, MAX_LEN_USERNAME); // username
+    offset = str_ssplit(buffer, DELIM);
+    memcpy(bufferSupp1, buffer, strlen(username)); // username
     old_offset = offset;
 
-    offset = str_ssplit(&*(buffer+offset), delim);
+    offset = str_ssplit(&*(buffer+offset), DELIM);
     memcpy(bufferSupp2, &*(buffer+old_offset), offset); // dig.sig.
     old_offset = offset;
 
-    offset = str_ssplit(&*(buffer+offset), delim);
+    offset = str_ssplit(&*(buffer+offset), DELIM);
     memcpy(bufferSupp3, &*(buffer+old_offset), offset); // g^b
     old_offset = offset;
 
-    offset = str_ssplit(&*(buffer+offset), delim);
+    offset = str_ssplit(&*(buffer+offset), DELIM);
     memcpy(bufferSupp4, &*(buffer+old_offset), offset); // cert
     //old_offset = offset;
 
@@ -278,13 +300,13 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     encrypt_AES_128_CBC(ciphertext, &cipherlen, signature, iv, K_trunc);
     if (cipherlen > 1023) exit_with_failure("Ciphertext too long", 0);
 
-    msg_len = MAX_LEN_USERNAME + strlen(" ") + cipherlen;
+    msg_len = strlen(username) + strlen(" ") + cipherlen;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (buffer == NULL) exit_with_failure("Malloc buffer failed", 1);
  
-    memcpy(buffer, username, MAX_LEN_USERNAME);
-    memcpy(&*(buffer+MAX_LEN_USERNAME), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")), ciphertext, cipherlen);
+    memcpy(buffer, username, strlen(username));
+    memcpy(&*(buffer+strlen(username)), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(username)+strlen(" ")), ciphertext, cipherlen);
     
     //printf("%s\n", buffer);
     printf("I'm sending to the server the mex %s\n\n", buffer);

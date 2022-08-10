@@ -23,16 +23,15 @@ size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
 {
     size_t count = 0;
     unsigned char* tmp = a_str;
-    
+
     // Count how many elements there are before delim
     while (*tmp)
     {
-        printf("%s\n", *tmp);
         if (a_delim == *tmp)
         {
-            count++;
             break;
         }
+        count++;
         tmp++;
     }
 
