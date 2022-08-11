@@ -115,7 +115,6 @@ void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, un
     int total_len = 0; // total encrypted bytes
 
     ret = EVP_EncryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
-    printf("%d\n", update_len);
     if (ret != 1) exit_with_failure("EncryptUpdate failed", 1);
     total_len += update_len;
 
@@ -185,7 +184,7 @@ unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_si
     int ret;
 
     FILE* file_prvkey_pem = fopen(path_key, "r");
-    if(file_prvkey_pem == NULL) exit_with_failure("Open failed", 1);
+    if(file_prvkey_pem == NULL) exit_with_failure("Fopen failed", 1);
 
     EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
     fclose(file_prvkey_pem);
@@ -219,9 +218,10 @@ int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_P
     ret = EVP_VerifyUpdate(ctx, exp_digsig, strlen((char*)exp_digsig));
     if (ret != 1) exit_with_failure("VerifyUpdate failed", 1);
     ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen((char*)msg_to_ver), pub_rsa_key);
-    if (ret != 1) return 0;
-
+    
     EVP_MD_CTX_free(ctx);
+    
+    if (ret != 1) return 0;
     return 1;
 }
 
@@ -234,7 +234,7 @@ unsigned char* cert_to_byte(X509* cert, int* cert_len)
 
     bio = BIO_new(BIO_s_mem());
     ret = PEM_write_bio_X509(bio, cert);
-    if (ret != 1) exit_with_failure("PEM_write_bip_X509 failed", 1);
+    if (ret != 1) exit_with_failure("PEM_write_bio_X509 failed", 1);
 
     c_len = BIO_pending(bio);
     *cert_len = c_len;
@@ -245,4 +245,30 @@ unsigned char* cert_to_byte(X509* cert, int* cert_len)
     BIO_free(bio);
 
     return c;
+}
+
+unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey)
+{
+    int ret;
+    size_t secretlen;
+    unsigned char* K;
+
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(prvkey, NULL);
+    if (!ctx) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
+    
+    ret = EVP_PKEY_derive_init(ctx);
+    if (ret != 1) exit_with_failure("PKEY_derive_init failed", 1);
+    ret = EVP_PKEY_derive_set_peer(ctx, peer_pubkey);
+    if (ret != 1) exit_with_failure("PKEY_derive_set_peer failed", 1);
+    ret = EVP_PKEY_derive(ctx, NULL, &secretlen);
+    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
+
+    // Deriving shared secret K = g^a^b mod p
+    K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
+    if (K == NULL) exit_with_failure("Malloc K failed", 1);
+
+    ret = EVP_PKEY_derive(ctx, K, &secretlen);
+    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
+
+    return K;
 }

@@ -5,7 +5,7 @@ int main(int argc, char* argv[])
     //*********** VARIABLES ************
     
     // Socket management variables
-    int ret, pid, listenerTCP, len, i, nbytes, fdmax, new_sd, s;
+    int ret, pid, listenerTCP, i, fdmax, new_sd;
     uint32_t addr_app;
     fd_set master;
     fd_set read_fds;
@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
     struct sockaddr_in srv_addr, cl_addr;
     
     // Buffers
-    char buffer[BUF_LEN];
+    char buffer[4*BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
@@ -115,16 +115,15 @@ int main(int argc, char* argv[])
                     {
                         printf("Done!\n\n");
                         close(listenerTCP);
-                        //continue;
-                        exit(1);                        
+                        continue;
                     }
                     else printf("Unexpected input given...\n\n");
                 }
                 else //Manager for the accepted communications
                 {
-                    memset(buffer, 0, 4*strlen(buffer)); // ???
+                    memset(buffer, 0, 4*BUF_LEN); // ???
                     //printf("Now the buffer contains %s\n\n", buffer);
-                    ret = recv(i, buffer, BUF_LEN, 0);
+                    ret = recv(i, buffer, 4*BUF_LEN, 0);
                     if (ret < 0)
                     {
                         perror("Errore during recv operation: ");

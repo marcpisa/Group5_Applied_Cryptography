@@ -73,6 +73,7 @@
 
 #define MAX_LEN_USERNAME 25
 #define MAX_LEN_REQUEST 20
+#define LEN_SIZE 4
 
 #define DELIM ' '
 
@@ -93,3 +94,4 @@ unsigned char* hash_SHA256(char* msg);
 unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, unsigned int* signature_len);
 int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key);
 unsigned char* cert_to_byte(X509* cert, int* cert_len);
+unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey);

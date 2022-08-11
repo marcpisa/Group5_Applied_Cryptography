@@ -27,16 +27,17 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     unsigned char bufferSupp3[BUF_LEN];
     unsigned char bufferSupp4[BUF_LEN];
     char* path_pubkey = "../dh_server_pubkey.pem";
-    char* path_cert_rsa = "../cert.pem";
-    char* path_cert_client_rsa = "cert_client.pem";
-    char* path_rsa_key = "../key.pem";
+    char* path_cert_rsa = "cert.pem";
+    char* path_cert_client_rsa = "cert_teo.pem";
+    char* path_rsa_key = "key.pem";
     int ret;
     int msg_len;
     char username [MAX_LEN_USERNAME];
     int offset, old_offset;
 
     // Certificate
-    X509* cert_rsa;
+    BIO* bio_cert;
+    X509* cert_rsa = NULL;
     FILE* file_cert_rsa;
     unsigned char* cert_byte;
     int cert_len = 0;
@@ -70,8 +71,6 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     unsigned char* pubkey_byte;
     int pubkey_len = 0;
     unsigned int pubkey_len_rec;
-    EVP_PKEY_CTX* ctx_drv;
-    size_t secretlen;
     EVP_PKEY* dh_pubkey;
     /*********************
      * END VARIABLES
@@ -106,7 +105,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memset(bufferSupp2, 0, BUF_LEN);
     memset(bufferSupp3, 0, BUF_LEN);
     memset(bufferSupp4, 0, BUF_LEN);
-    temp = (char*) malloc(sizeof(char)*4);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
 
     offset = str_ssplit((unsigned char*) rec_mex, DELIM);
@@ -116,33 +115,38 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
     old_offset += offset+strlen(" ");
 
-    memcpy(temp, &*(rec_mex+old_offset), 4); // len pubkey
-    old_offset += 4+strlen(" ");
+    memcpy(temp, &*(rec_mex+old_offset), LEN_SIZE); // len pubkey
+    old_offset += LEN_SIZE+strlen(" ");
     pubkey_len_rec = atoi(temp);
 
     memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len_rec); // dh pubkey
     old_offset += pubkey_len_rec+strlen(" ");
 
-    memcpy(temp, &*(rec_mex+old_offset), 4); // len iv
-    old_offset += 4+strlen(" ");
+    memcpy(temp, &*(rec_mex+old_offset), LEN_SIZE); // len iv
+    old_offset += LEN_SIZE+strlen(" ");
     iv_len = atoi(temp);
 
     memcpy(bufferSupp3, &*(rec_mex+old_offset), iv_len); // iv
     old_offset += iv_len+strlen(" ");
 
-    memcpy(temp, &*(rec_mex+old_offset), 4); // len dig sig
-    old_offset += 4+strlen(" ");
+    memcpy(temp, &*(rec_mex+old_offset), LEN_SIZE); // len dig sig
+    old_offset += LEN_SIZE+strlen(" ");
     signature_len = atoi(temp);
 
     memcpy(bufferSupp4, &*(rec_mex+old_offset), signature_len); // signature
 
+    free(temp);
+
     //printf("%d %d %d\n", pubkey_len_rec, iv_len, signature_len);
-    //printf("Received mex:\n%s\n%s\n%s\n%s\n", bufferSupp1, bufferSupp2, bufferSupp3, bufferSupp4);
-    
+    /* for(int i = 0; i < 1218; i++) { printf("%c", *(rec_mex+i)); }
+    printf("\n\n"); 
+    */
+
     // Sanitize and check username
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
     
-    chdir(MAIN_FOLDER_SERVER);
+    ret = chdir(MAIN_FOLDER_SERVER);
+    if (ret == -1) exit_with_failure("No such directory.\n", 0);
     ret = chdir((char*) bufferSupp1);
     if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
   
@@ -154,38 +158,15 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     if (file_cert_rsa == NULL) exit_with_failure("Fopen failed", 1);
     client_cert = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
     if (client_cert == NULL) exit_with_failure("PEM_read_X509 failed", 1);
-    printf("Debug0\n");
-
     pub_rsa_client = X509_get_pubkey(client_cert);
     if (pub_rsa_client == NULL) exit_with_failure("X509_get_pubkey failed", 1);
-    printf("Debug0\n");
-
     fclose(file_cert_rsa);
 
     peer_pubkey = pubkey_to_PKEY(bufferSupp2, pubkey_len);
 
-    printf("Debug1\n");
-
     // Calculate K = g^a^b mod p 
-    ctx_drv = EVP_PKEY_CTX_new(my_prvkey, NULL);
-    if (!ctx_drv) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
+    K = key_derivation(my_prvkey, peer_pubkey);
     
-    ret = EVP_PKEY_derive_init(ctx_drv);
-    if (ret != 1) exit_with_failure("PKEY_derive_init failed", 1);
-    ret = EVP_PKEY_derive_set_peer(ctx_drv, peer_pubkey);
-    if (ret != 1) exit_with_failure("PKEY_derive_set_peer failed", 1);
-    ret = EVP_PKEY_derive(ctx_drv, NULL, &secretlen);
-    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
-
-    // Deriving shared secret K = g^a^b mod p
-    K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
-    if (K == NULL) exit_with_failure("Malloc K failed", 1);
-
-    printf("Debug2\n");
-
-    ret = EVP_PKEY_derive(ctx_drv, K, &secretlen);
-    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
-
     // Obtain the two session keys
     digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
     if (digest == NULL) exit_with_failure("Malloc digest failed", 1);
@@ -203,9 +184,8 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
     memcpy(session_key1, digest, 16); // 16 byte = 128 bit
     memcpy(session_key2, &*(digest+16), 16);
-    //printf("Digest:%s\nS1:%s\nS2:%s\n", digest, session_key1, session_key2);
+    
     free(digest);
-    free(temp);
 
     // TEST ---- K from 1024 to 128 bit for symm. encr.
     K_trunc = (unsigned char*) malloc(sizeof(unsigned char) * 16); 
@@ -213,22 +193,20 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memcpy(K_trunc, K, EVP_CIPHER_key_length(EVP_aes_128_cbc()));
     free(K);
 
-    printf("Debug3\n");
-
     // Retrieve the IV
-    iv = (unsigned char*)malloc(IV_LEN);
+    iv = (unsigned char*)malloc(iv_len);
     if (iv == NULL) exit_with_failure("Malloc iv failed", 1);
-    memcpy(iv, bufferSupp3, IV_LEN);
+    memcpy(iv, bufferSupp3, iv_len);
+
 
     // Verify the digital signature (bufferSupp4)
     ret = verify_signature(bufferSupp3, bufferSupp4, pub_rsa_client);
-    if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
+    // TO DECOMMENT if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
 
 
 
     /* --- Send response (username, dig.sign, DH pubkey, cert) --- */
-    printf("Issuing the response.\n");
     pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
 
     // Prepare the digital signature
@@ -239,73 +217,126 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     memcpy(&*(msg_to_sign+pubkey_len), " ", strlen(" "));
     memcpy(&*(msg_to_sign+pubkey_len+strlen(" ")), pubkey_byte, pubkey_len);
     
+    ret = chdir("../../src");
+    if (ret == -1) exit_with_failure("No such directory.\n", 0);
     signature = sign_msg(path_rsa_key, password, msg_to_sign, &signature_len);
-
+    
     // Encrypt the signature
     ciphertext = (unsigned char*)malloc(sizeof(signature) + BLOCK_SIZE);
     if (ciphertext == NULL) exit_with_failure("Malloc ciphertext failed", 1);
     encrypt_AES_128_CBC(ciphertext, &cipherlen, signature, iv, K_trunc);
 
-
     // Serialize the certificate
-    file_cert_rsa = fopen(path_cert_rsa, "r");
-    if (file_cert_rsa == NULL) exit_with_failure("Fopen failed", 1);
-    cert_rsa = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
-    cert_byte = cert_to_byte(cert_rsa, &cert_len);
-    fclose(file_cert_rsa);
+    bio_cert = BIO_new(BIO_s_mem());
+    BIO_read_filename(bio_cert, path_cert_rsa); // reading certificate to bio
+    cert_rsa = PEM_read_bio_X509_AUX(bio_cert, NULL, 0, NULL);  //converting to x509  
+    cert_len = i2d_X509(cert_rsa, &cert_byte);  // converting to unsigned char*
+    //cert_byte = cert_to_byte(cert_rsa, &cert_len);
+    X509_free(cert_rsa);
+    BIO_free_all(bio_cert);
 
-    if (cipherlen > 1023 || cert_len > 1023) exit_with_failure("Ciphertext or certificate too long", 0);
-    msg_len = MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+pubkey_len+strlen(" ")+cert_len;
+    // Come back to the user directory
+    ret = chdir("../database/");
+    if (ret == -1) exit_with_failure("No such directory.\n", 0);
+    ret = chdir(username);
+    if (ret == -1) exit_with_failure("No such directory.\n", 0);
+
+    if (cipherlen > 1023) exit_with_failure("Ciphertext too long", 0);
+    if (cert_len > 1023) exit_with_failure("Certificate too long", 0);
+    msg_len = strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+LEN_SIZE+strlen(" ")+ \
+    pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+cert_len;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (buffer == NULL) exit_with_failure("Malloc buffer failed", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
 
     // Compose the message
-    memcpy(buffer, username, MAX_LEN_USERNAME);
-    memcpy(&*(buffer+MAX_LEN_USERNAME), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")), ciphertext, cipherlen);
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")), pubkey_byte, pubkey_len);
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+pubkey_len), " ", strlen(" "));
-    memcpy(&*(buffer+MAX_LEN_USERNAME+strlen(" ")+cipherlen+strlen(" ")+pubkey_len+strlen(" ")), cert_byte, cert_len);
+    memcpy(buffer, username, strlen(username)); // username
+    memcpy(&*(buffer+strlen(username)), " ", strlen(" "));
+
+    sprintf(temp, "%d", cipherlen);
+    memcpy(&*(buffer+strlen(username)+strlen(" ")), temp, LEN_SIZE); // len dig. sig.
+
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")), ciphertext, cipherlen); // dig. sig.
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen), " ", strlen(" "));
+
+    sprintf(temp, "%d", pubkey_len);
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")) \
+    , temp, LEN_SIZE); // len pubkey
+
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE+strlen(" ")), pubkey_byte, pubkey_len); // pubkey
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE+strlen(" ")+pubkey_len), " ", strlen(" "));
+
+    sprintf(temp, "%d", cert_len);
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE+strlen(" ")+pubkey_len+strlen(" ")), temp, LEN_SIZE); // len cert    
+
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE+strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE), " ", strlen(" "));
+    memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
+    LEN_SIZE+strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")), cert_byte, cert_len); // cert.
 
     //printf("%s\n", buffer);
-    printf("I'm sending to the client the mex %s\n\n", buffer);
+    printf("I'm sending to the client the response.\n");
     ret = send(sd, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed: ", 1);
 
+    free(temp);
     free(buffer);
     free(pubkey_byte);
     free(cert_byte);
     free(ciphertext);
     free(signature);
 
+
+
     
     /* Parse the client message and verify the fields */
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*2*BUF_LEN);
+    printf("Debug1\n");
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*(2*BUF_LEN));
     if (buffer == NULL) exit_with_failure("Malloc buffer failed", 1);
     ret = recv(sd, buffer, 2*BUF_LEN, 0);
     if (ret == -1) exit_with_failure("Receive failed: ", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
+
+    printf("Debug1\n");
 
     memset(bufferSupp1, 0, BUF_LEN);
     memset(bufferSupp2, 0, BUF_LEN);
-    memcpy(bufferSupp1, buffer, MAX_LEN_USERNAME);
+    
+    offset = str_ssplit(buffer, DELIM);
+    memcpy(bufferSupp1, buffer, offset); // username
+    offset += strlen(" ");
 
-    old_offset = MAX_LEN_USERNAME+strlen(" ");
-    offset = str_ssplit(&*(buffer+old_offset), DELIM);
-    memcpy(bufferSupp2, &*(buffer+old_offset), offset); // signature
+    memcpy(temp, &*(buffer+offset), LEN_SIZE); // len dig.sig.
+    offset += LEN_SIZE+strlen(" ");
+    signature_len = atoi(temp);
+    
+    memcpy(bufferSupp2, &*(buffer+offset), signature_len); // signature
 
+    printf("Debug1\n");
     if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username.\n", 0);
 
     // Decrypt and verify signature
     signature = malloc(EVP_PKEY_size(pub_rsa_client));
     decrypt_AES_128_CBC(signature, &signature_len, bufferSupp2, iv, K_trunc);
 
+    printf("Debug1\n");
     ret = verify_signature(msg_to_sign, signature, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
+
+    printf("Debug1\n");
 
     free(msg_to_sign);
     free(signature);
     free(buffer);
+    free(temp);
 
     return 1;
 }
