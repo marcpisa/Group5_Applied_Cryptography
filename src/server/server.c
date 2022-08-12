@@ -406,7 +406,7 @@ int main(int argc, char* argv[])
 
                     else printf("Unknown type of request by the Client...\n");
                     // Here we can also send a message to the client saying that we didn't understand what it wants
-                    memset(buffer, 0, strlen(buffer));
+                    memset(buffer, 0, 4*BUF_LEN);
                     close(i);
                     FD_CLR(i, &master);
                 }

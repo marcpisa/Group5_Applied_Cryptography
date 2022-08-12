@@ -51,7 +51,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     unsigned char* pubkey_byte;
     int pubkey_len = 0;
     int rcv_pubkey_len;
-    EVP_PKEY* dh_pubkey;
+    EVP_PKEY* dh_pubkey = NULL;
 
     // Certificate
     X509* serv_cert;
@@ -89,7 +89,10 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     // Save DH key in PEM format and retrieve the public key
     dh_pubkey = save_read_PUBKEY(path_pubkey, my_prvkey);
-    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    if (dh_pubkey == NULL) exit_with_failure("save_read_PUBKEY failed", 0);
+    pubkey_len = i2d_PUBKEY(dh_pubkey, &pubkey_byte);
+    if (pubkey_len == 0) exit_with_failure("id2_PUBKEY failed", 0);
+    //pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
  
     free(ctx_dh);
     free(dh_params);
@@ -98,7 +101,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
 
     /* ---- 1st message: login request message + username + DH pubkey + IV + dig.sig.(IV) ---- */
-    // Generate the IV and the related hash
+    // Generate the IV and the related digital signature
     iv = (unsigned char*)malloc(IV_LEN);
     if (iv == NULL) exit_with_failure("Malloc iv failed", 1);
     RAND_poll(); // Seed OpenSSL PRNG
@@ -115,7 +118,8 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
 
-    // Compose the message and send it to the server
+    /* Compose the message and send it to the server (login_request username len_pubkey pubkey 
+    len_iv iv len_digsig signature_iv) */
     memcpy(buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST));  // login req
     memcpy(&*(buffer+strlen(LOGIN_REQUEST)), " ", strlen(" "));
     memcpy(&*(buffer+strlen(LOGIN_REQUEST)+strlen(" ")), username, strlen(username)); // username
@@ -216,14 +220,13 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
 
     // Sanitization username and check validity
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails\n", 0);    
-    //printf("%s %s\n", username, (char*) bufferSupp1);
     if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username\n", 0);
 
     // Obtain the public key, derive the established key
     peer_pubkey = pubkey_to_PKEY(bufferSupp3, pubkey_len);
     K = key_derivation(my_prvkey, peer_pubkey);
 
-    // Obtain the two session keys
+    // Obtain the two session keys from the established key
     digest = (unsigned char*)malloc(EVP_MD_size(EVP_sha256()));
     if (digest == NULL) exit_with_failure("Malloc digest failed", 1);
 
@@ -248,13 +251,13 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(K_trunc, K, EVP_CIPHER_key_length(EVP_aes_128_cbc()));
     free(K);
 
-    // Decrypt the message (bufferSupp2)
+    // Decrypt the message (digital signature) (bufferSupp2)
     msg_to_ver = (unsigned char*) malloc(sizeof(unsigned char) * BUF_LEN);
     if (msg_to_ver ==  NULL) exit_with_failure("Malloc msg_to_ver failed", 1);
     decrypt_AES_128_CBC(msg_to_ver, &msg_len, bufferSupp2, iv, K_trunc);
     free(K_trunc);
 
-    // Obtain the RSA public key and verify the certificate
+    // Obtain the RSA public key and verify the certificate of the server
     serv_cert = cert_to_X509(bufferSupp4, sizeof(bufferSupp4));
     pub_rsa_key_serv = X509_get_pubkey(serv_cert);
 
@@ -276,7 +279,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(&*(exp_digsig+pubkey_len), " ", strlen(" "));
     memcpy(&*(exp_digsig+pubkey_len+strlen(" ")), bufferSupp3, pubkey_len); // peer pubkey is still inside bufferSupp3
     
-    // Verify the digital signature received
+    // Verify the digital signature received (decrypted in the previous step)
     ret = verify_signature(exp_digsig, msg_to_ver, pub_rsa_key_serv);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
@@ -300,6 +303,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (temp == NULL) exit_with_failure("Malloc temp failed", 1);
 
+    /* Compose the message (username len_digsig signature) */
     memcpy(buffer, username, strlen(username)); // username
     memcpy(&*(buffer+strlen(username)), " ", strlen(" "));
 
