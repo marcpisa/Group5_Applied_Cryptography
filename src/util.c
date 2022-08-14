@@ -190,24 +190,24 @@ unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_si
     fclose(file_prvkey_pem);
     if (rsa_prvkey == NULL) exit_with_failure("PEM_read_PrivateKey failed", 1);
 
-    EVP_MD_CTX* ctx_digsig = EVP_MD_CTX_new();
-    if(!ctx_digsig) exit_with_failure("EVP_MD_CTX_new failed", 1);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if(!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
 
     unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
     
-    ret = EVP_SignInit(ctx_digsig, EVP_sha256());
+    ret = EVP_SignInit(ctx, EVP_sha256());
     if (ret != 1) exit_with_failure("SignInit failed", 1);
-    ret = EVP_SignUpdate(ctx_digsig, msg_to_sign, strlen((char*)msg_to_sign));
+    ret = EVP_SignUpdate(ctx, msg_to_sign, strlen((char*)msg_to_sign));
     if (ret != 1) exit_with_failure("SignUpdate failed", 1);
-    ret = EVP_SignFinal(ctx_digsig, signature, signature_len, rsa_prvkey);
+    ret = EVP_SignFinal(ctx, signature, signature_len, rsa_prvkey);
     if (ret != 1) exit_with_failure("SignFinal failed", 1);
 
-    EVP_MD_CTX_free(ctx_digsig);
+    EVP_MD_CTX_free(ctx);
 
     return signature;
 }
 
-int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key)
+int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned char* msg_to_ver, int len_msg_ver, EVP_PKEY* pub_rsa_key)
 {
     int ret;
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
@@ -215,14 +215,39 @@ int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_P
     
     ret = EVP_VerifyInit(ctx, EVP_sha256());
     if (ret != 1) exit_with_failure("VerifyInit failed", 1);
-    ret = EVP_VerifyUpdate(ctx, exp_digsig, strlen((char*)exp_digsig));
+    ret = EVP_VerifyUpdate(ctx, exp_digsig, len_exp_digsig);
     if (ret != 1) exit_with_failure("VerifyUpdate failed", 1);
-    ret = EVP_VerifyFinal(ctx, msg_to_ver, strlen((char*)msg_to_ver), pub_rsa_key);
+    ret = EVP_VerifyFinal(ctx, msg_to_ver, len_msg_ver, pub_rsa_key);
     
     EVP_MD_CTX_free(ctx);
     
     if (ret != 1) return 0;
     return 1;
+}
+
+
+unsigned char* read_cert(char* path_cert, int* cert_len)
+{
+    FILE* file_cert = fopen(path_cert, "r");
+    if(!file_cert) exit_with_failure("Fopen failed", 1);
+
+    X509* server_cert = PEM_read_X509(file_cert, NULL, 0, NULL);
+    if(!server_cert) {
+       fclose(file_cert);
+        exit_with_failure("PEM_read_X509 failed", 1);
+    }
+
+    // Write cert into bio
+    BIO* bio = BIO_new(BIO_s_mem());
+    PEM_write_bio_X509(bio, server_cert);
+
+    // Serialize the certificate
+    unsigned char* cert_byte = NULL;
+    *cert_len = BIO_get_mem_data(bio, &cert_byte);
+    if((*cert_len) < 0) exit_with_failure("BIO_get_mem_data failed", 1);
+
+    return cert_byte;
+
 }
 
 unsigned char* cert_to_byte(X509* cert, int* cert_len)

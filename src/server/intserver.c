@@ -28,16 +28,14 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     unsigned char bufferSupp4[BUF_LEN];
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "cert.pem";
+    char* path_rsa_key = "rsa_prvkey.pem";
     char* path_cert_client_rsa = "cert_teo.pem";
-    char* path_rsa_key = "key.pem";
     int ret;
     int msg_len;
     char username [MAX_LEN_USERNAME];
     int offset, old_offset;
 
     // Certificate
-    BIO* bio_cert;
-    X509* cert_rsa = NULL;
     FILE* file_cert_rsa;
     unsigned char* cert_byte;
     int cert_len = 0;
@@ -60,6 +58,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     unsigned char* signature;
     unsigned int signature_len;
     char* password = "password";
+    int msg_to_sign_len;
 
     // Diffie-Hellman variables
     EVP_PKEY* dh_params;
@@ -68,13 +67,22 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
     unsigned char* K_trunc;
-    unsigned char* pubkey_byte;
+    unsigned char* pubkey_byte = NULL;
     int pubkey_len = 0;
     unsigned int pubkey_len_rec;
     EVP_PKEY* dh_pubkey = NULL;
     /*********************
      * END VARIABLES
      ********************/
+    
+    /* Generate private and certificate for public key
+     * Private key
+     *      openssl genrsa -aes128 -out rsa_prvkey.pem 3072
+     * Public key
+     *      openssl rsa -pubout -in rsa_prvkey.pem -out rsa_pubkey.pem
+     * Certificate
+     * openssl req -new -x509 -key rsa_prvkey.pem -out cert.pem -days 360
+     */
     
     // Generate DH asymmetric key(s)
     dh_params = EVP_PKEY_new();
@@ -92,10 +100,9 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     // Save DH key in PEM format and retrieve the public key
     dh_pubkey = save_read_PUBKEY(path_pubkey, my_prvkey);
     if (dh_pubkey == NULL) exit_with_failure("save_read_PUBKEY failed", 0);
-    pubkey_len = i2d_PUBKEY(dh_pubkey, &pubkey_byte);
-    if (pubkey_len == 0) exit_with_failure("id2_PUBKEY failed", 0);
-    //pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
- 
+    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    if (pubkey_byte == NULL) exit_with_failure("pubkey_to_byte failed", 0);
+
     free(ctx_dh);
     free(dh_params);
 
@@ -193,6 +200,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     K_trunc = (unsigned char*) malloc(sizeof(unsigned char) * 16); 
     if (K_trunc ==  NULL) exit_with_failure("Malloc K_trunc failed", 1);
     memcpy(K_trunc, K, EVP_CIPHER_key_length(EVP_aes_128_cbc()));
+    
     free(K);
 
     // Retrieve the IV
@@ -202,7 +210,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
 
     // Verify the digital signature (bufferSupp4) of the iv
-    ret = verify_signature(bufferSupp3, bufferSupp4, pub_rsa_client);
+    ret = verify_signature(bufferSupp3, iv_len, bufferSupp4, signature_len, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
     printf("First message is correct. Preparing the response...\n");
@@ -211,12 +219,12 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
 
 
     /* --- Send response (username, dig.sign, DH pubkey, cert) --- */
-    pubkey_len = i2d_PUBKEY(dh_pubkey, &pubkey_byte);
-    //pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
 
     // Prepare the digital signature
-    msg_len = pubkey_len+strlen(" ")+pubkey_len;
-    msg_to_sign = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (pubkey_len_rec != pubkey_len) exit_with_failure("Pubkey length wrong.\n", 0);
+    msg_to_sign_len = pubkey_len+strlen(" ")+pubkey_len;
+    msg_to_sign = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_sign_len);
     if (msg_to_sign == NULL) exit_with_failure("Malloc msg_to_sign failed", 1);
     memcpy(msg_to_sign, bufferSupp2, pubkey_len); // peer pubkey is still inside bufferSupp2
     memcpy(&*(msg_to_sign+pubkey_len), " ", strlen(" "));
@@ -232,17 +240,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     encrypt_AES_128_CBC(ciphertext, &cipherlen, signature, iv, K_trunc);
 
     // Serialize the certificate
-    file_cert_rsa = fopen(path_cert_rsa, "rb");
-    if (!file_cert_rsa) exit_with_failure("Fopen failed", 1);
-    cert_rsa = PEM_read_X509(file_cert_rsa, NULL, 0, NULL);  
-    if (!cert_rsa) {
-        exit_with_failure("PEM_read_X509 failed", 1);
-        fclose(file_cert_rsa);
-    }
-    cert_len = i2d_X509(cert_rsa, &cert_byte);  // converting to unsigned char*
-    //cert_byte = cert_to_byte(cert_rsa, &cert_len);
-    X509_free(cert_rsa);
-    fclose(file_cert_rsa);
+    cert_byte = read_cert(path_cert_rsa, &cert_len);
 
     // Come back to the user directory
     ret = chdir("../database/");
@@ -253,7 +251,7 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     msg_len = strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+LEN_SIZE+strlen(" ")+ \
     pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+cert_len;
     
-    printf("%d\n", msg_len);
+    printf("%d %d %d\n", cipherlen, cert_len, msg_len);
     if (cipherlen > 1023) exit_with_failure("Ciphertext too long", 0);
     if (cert_len > 1023) exit_with_failure("Certificate too long", 0);
     
@@ -336,13 +334,16 @@ int loginServer(int sd, char* rec_mex, char* session_key1, char* session_key2)
     signature = malloc(EVP_PKEY_size(pub_rsa_client));
     decrypt_AES_128_CBC(signature, &signature_len, bufferSupp2, iv, K_trunc);
 
-    ret = verify_signature(msg_to_sign, signature, pub_rsa_client);
+    ret = verify_signature(msg_to_sign, msg_to_sign_len, signature, signature_len, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
     free(msg_to_sign);
     free(signature);
     free(buffer);
     free(temp);
+
+    free(iv);
+    free(K_trunc);
 
     return 1;
 }

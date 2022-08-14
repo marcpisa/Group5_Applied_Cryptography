@@ -48,7 +48,7 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     EVP_PKEY* peer_pubkey;
     unsigned char* K;
     unsigned char* K_trunc;
-    unsigned char* pubkey_byte;
+    unsigned char* pubkey_byte = NULL;
     int pubkey_len = 0;
     int rcv_pubkey_len;
     EVP_PKEY* dh_pubkey = NULL;
@@ -90,10 +90,9 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     // Save DH key in PEM format and retrieve the public key
     dh_pubkey = save_read_PUBKEY(path_pubkey, my_prvkey);
     if (dh_pubkey == NULL) exit_with_failure("save_read_PUBKEY failed", 0);
-    pubkey_len = i2d_PUBKEY(dh_pubkey, &pubkey_byte);
-    if (pubkey_len == 0) exit_with_failure("id2_PUBKEY failed", 0);
-    //pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
- 
+    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    if (pubkey_byte == NULL) exit_with_failure("pubkey_to_byte failed", 0);
+
     free(ctx_dh);
     free(dh_params);
 
@@ -280,12 +279,11 @@ int loginClient(char* session_key1, char* session_key2, char* username, struct s
     memcpy(&*(exp_digsig+pubkey_len+strlen(" ")), bufferSupp3, pubkey_len); // peer pubkey is still inside bufferSupp3
     
     // Verify the digital signature received (decrypted in the previous step)
-    ret = verify_signature(exp_digsig, msg_to_ver, pub_rsa_key_serv);
+    ret = verify_signature(exp_digsig, expected_len, msg_to_ver, msg_len, pub_rsa_key_serv);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
 
     free(pubkey_byte);
     free(msg_to_ver);
-
 
 
 

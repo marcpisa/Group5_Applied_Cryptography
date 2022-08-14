@@ -92,6 +92,7 @@ void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, un
 void decrypt_AES_128_CBC(unsigned char* out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key);
 unsigned char* hash_SHA256(char* msg);
 unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, unsigned int* signature_len);
-int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key);
+int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned char* msg_to_ver, int len_msg_ver, EVP_PKEY* pub_rsa_key);
 unsigned char* cert_to_byte(X509* cert, int* cert_len);
 unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey);
+unsigned char* read_cert(char* path_cert, int* cert_len);
