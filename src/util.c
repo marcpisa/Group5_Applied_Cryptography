@@ -67,6 +67,7 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len)
 
     EVP_PKEY* pk = NULL;
     pk = PEM_read_bio_PUBKEY(mbio, NULL, NULL, NULL);
+    
     BIO_free(mbio);
 
     return pk;
@@ -78,6 +79,7 @@ X509* cert_to_X509(unsigned char* cert, int cert_len)
     BIO_write(mbio, cert, cert_len);
 
     X509* crt = PEM_read_bio_X509(mbio, NULL, NULL, NULL);
+    
     BIO_free(mbio);
 
     return crt;
@@ -85,27 +87,31 @@ X509* cert_to_X509(unsigned char* cert, int cert_len)
 
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
+    int ret;
+
     FILE* file_pubkey_pem = fopen(path_pubkey, "w");
-    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed", 1);
-    int ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
+    if (!file_pubkey_pem) exit_with_failure("Fopen failed", 1);
+    
+    ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
     fclose(file_pubkey_pem);
     if (ret != 1) exit_with_failure("PEM_write_PUBKEY failed", 1);
     
     // Retrieve the saved public key
     file_pubkey_pem = fopen(path_pubkey, "r");
-    if (file_pubkey_pem == NULL) exit_with_failure("Fopen failed", 1);
+    if (!file_pubkey_pem) exit_with_failure("Fopen failed", 1);
     EVP_PKEY* dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
     fclose(file_pubkey_pem);
-    if (dh_pubkey == NULL) exit_with_failure("PEM_read_PUBKEY failed", 1);
+    if (!dh_pubkey) exit_with_failure("PEM_read_PUBKEY failed", 1);
 
     return dh_pubkey;
 }
 
-void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
+void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, unsigned int inl, unsigned char* iv, unsigned char* key)
 {
     int ret;
+    EVP_CIPHER_CTX *ctx;
 
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
     ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
@@ -114,19 +120,20 @@ void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, un
     int update_len = 0; // bytes encrypted at each chunk
     int total_len = 0; // total encrypted bytes
 
-    ret = EVP_EncryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    ret = EVP_EncryptUpdate(ctx, *out, &update_len, in, inl);
     if (ret != 1) exit_with_failure("EncryptUpdate failed", 1);
     total_len += update_len;
 
-    ret = EVP_EncryptFinal(ctx, out + total_len, &update_len);
+    ret = EVP_EncryptFinal(ctx, *out+total_len, &update_len);
     if (ret != 1) exit_with_failure("EncryptFinal failed", 1);
     total_len += update_len;
+    
     *out_len = total_len;
 
     EVP_CIPHER_CTX_free(ctx);  
 }
 
-void decrypt_AES_128_CBC(unsigned char* out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
+void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
 {
     int ret;
 
@@ -139,11 +146,11 @@ void decrypt_AES_128_CBC(unsigned char* out, unsigned int* out_len, unsigned cha
     int update_len = 0; // bytes decrypted at each chunk
     int total_len = 0; // total decrypted bytes
    
-    ret = EVP_DecryptUpdate(ctx, out, &update_len, in, strlen((char*)in));
+    ret = EVP_DecryptUpdate(ctx, *out, &update_len, in, strlen((char*)in));
     if (ret != 1) exit_with_failure("DecryptUpdate failed", 1);
     total_len += update_len;
 
-    ret = EVP_DecryptFinal(ctx, out + total_len, &update_len);
+    ret = EVP_DecryptFinal(ctx, *out+total_len, &update_len);
     if (ret != 1) exit_with_failure("DecryptFinal failed", 1);
     total_len += update_len;
     *out_len = total_len;
@@ -179,30 +186,31 @@ unsigned char* hash_SHA256(char* msg)
     return digest;
 }
 
-unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, unsigned int* signature_len)
+unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len, unsigned int* signature_len)
 {
     int ret;
-
+    
     FILE* file_prvkey_pem = fopen(path_key, "r");
-    if(file_prvkey_pem == NULL) exit_with_failure("Fopen failed", 1);
+    if(!file_prvkey_pem) exit_with_failure("Fopen failed", 1);
 
-    EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, password);
+    EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, NULL);
     fclose(file_prvkey_pem);
-    if (rsa_prvkey == NULL) exit_with_failure("PEM_read_PrivateKey failed", 1);
+    if (!rsa_prvkey) exit_with_failure("PEM_read_PrivateKey failed", 1);
 
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
     if(!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
 
     unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
-    
+
     ret = EVP_SignInit(ctx, EVP_sha256());
     if (ret != 1) exit_with_failure("SignInit failed", 1);
-    ret = EVP_SignUpdate(ctx, msg_to_sign, strlen((char*)msg_to_sign));
+    ret = EVP_SignUpdate(ctx, msg_to_sign, msg_len);
     if (ret != 1) exit_with_failure("SignUpdate failed", 1);
     ret = EVP_SignFinal(ctx, signature, signature_len, rsa_prvkey);
     if (ret != 1) exit_with_failure("SignFinal failed", 1);
 
     EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(rsa_prvkey);
 
     return signature;
 }
@@ -246,6 +254,10 @@ unsigned char* read_cert(char* path_cert, int* cert_len)
     *cert_len = BIO_get_mem_data(bio, &cert_byte);
     if((*cert_len) < 0) exit_with_failure("BIO_get_mem_data failed", 1);
 
+    // Free
+    X509_free(server_cert);
+    BIO_free(bio);
+
     return cert_byte;
 
 }
@@ -272,10 +284,9 @@ unsigned char* cert_to_byte(X509* cert, int* cert_len)
     return c;
 }
 
-unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey)
+unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey, size_t* secretlen)
 {
     int ret;
-    size_t secretlen;
     unsigned char* K;
 
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(prvkey, NULL);
@@ -285,15 +296,115 @@ unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey)
     if (ret != 1) exit_with_failure("PKEY_derive_init failed", 1);
     ret = EVP_PKEY_derive_set_peer(ctx, peer_pubkey);
     if (ret != 1) exit_with_failure("PKEY_derive_set_peer failed", 1);
-    ret = EVP_PKEY_derive(ctx, NULL, &secretlen);
+    ret = EVP_PKEY_derive(ctx, NULL, secretlen);
     if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
 
     // Deriving shared secret K = g^a^b mod p
-    K = (unsigned char*)malloc(secretlen); // 128 byte = 1024 bit
-    if (K == NULL) exit_with_failure("Malloc K failed", 1);
+    K = (unsigned char*)malloc(*secretlen); // 128 byte = 1024 bit
+    if (!K) exit_with_failure("Malloc K failed", 1);
 
-    ret = EVP_PKEY_derive(ctx, K, &secretlen);
+    ret = EVP_PKEY_derive(ctx, K, secretlen);
     if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
 
+    // Free
+    EVP_PKEY_CTX_free(ctx);
+
     return K;
+}
+
+unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** dh_pubkey, int* pubkey_len)
+{
+    int ret;
+    EVP_PKEY* dh_params;
+    EVP_PKEY_CTX* ctx;
+    unsigned char* pubkey_byte;
+
+    dh_params = EVP_PKEY_new();
+    ret = EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+    if (ret != 1) exit_with_failure("EVP_PKEY_set1_DH failed", 1);
+
+    ctx = EVP_PKEY_CTX_new(dh_params, NULL);
+    if(!ctx) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
+    
+    ret = EVP_PKEY_keygen_init(ctx);
+    if (ret != 1) exit_with_failure("keygen_init failed", 1);
+    ret = EVP_PKEY_keygen(ctx, my_prvkey);
+    if (ret != 1 || (!(*my_prvkey))) exit_with_failure("keygen failed", 1);
+
+    // Save DH key in PEM format and retrieve the public key
+    *dh_pubkey = save_read_PUBKEY(path_pubkey, *my_prvkey);
+    //if (!dh_pubkey) exit_with_failure("save_read_PUBKEY failed", 0);
+    pubkey_byte = pubkey_to_byte(*dh_pubkey, pubkey_len);
+    if (!pubkey_byte) exit_with_failure("pubkey_to_byte failed", 0);
+
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(dh_params);
+
+    return pubkey_byte;
+}
+
+EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa)
+{
+    EVP_PKEY* pub_rsa_client;
+    X509* client_cert;
+
+    FILE* file_cert_rsa = fopen(path_cert_client_rsa, "r");
+    if (!file_cert_rsa) exit_with_failure("Fopen failed", 1);
+    client_cert = PEM_read_X509(file_cert_rsa, NULL, NULL, NULL);
+    if (!client_cert) 
+    {
+        fclose(file_cert_rsa);
+        exit_with_failure("PEM_read_X509 failed", 1);
+    }
+    fclose(file_cert_rsa);
+    pub_rsa_client = X509_get_pubkey(client_cert);
+    if (!pub_rsa_client) exit_with_failure("X509_get_pubkey failed", 1);
+
+    X509_free(client_cert);
+
+    return pub_rsa_client;
+}
+
+void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2)
+{
+    int ret;
+    EVP_MD_CTX* ctx;
+    unsigned char* digest = (unsigned char*) malloc(EVP_MD_size(EVP_sha256()));
+    if (!digest) exit_with_failure("Malloc digest failed", 1);
+
+    ctx = EVP_MD_CTX_new();
+    if (!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
+    ret = EVP_DigestInit(ctx, EVP_sha256());
+    if (ret != 1) exit_with_failure("DigestInit failed", 1);
+    ret = EVP_DigestUpdate(ctx, K, K_len);
+    if (ret != 1) exit_with_failure("DigestUpdate failed", 1);
+    ret = EVP_DigestFinal(ctx, digest, NULL);
+    if (ret != 1) exit_with_failure("DigestFinal failed", 1);
+
+    EVP_MD_CTX_free(ctx);
+
+    memcpy(session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(session_key2, &*(digest+16), 16);
+    
+    free(digest);
+}
+
+EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store)
+{
+    int ret;
+    X509_STORE_CTX* ctx;
+    EVP_PKEY* pub_rsa_key_serv;
+
+    pub_rsa_key_serv = X509_get_pubkey(serv_cert);
+    
+    ctx = X509_STORE_CTX_new();
+    if (!ctx) exit_with_failure("X509_STORE_CTX_new failed", 1);
+    ret = X509_STORE_CTX_init(ctx, ca_store, serv_cert, NULL);
+    if (ret != 1) exit_with_failure("X509_STORE_CTX_init failed", 1);
+    ret = X509_verify_cert(ctx);
+    if (ret != 1) exit_with_failure("X509_verify_cert failed", 1);
+
+    X509_STORE_CTX_free(ctx);
+
+    return pub_rsa_key_serv;
 }

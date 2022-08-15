@@ -25,11 +25,11 @@ int main(int argc, char* argv[])
     char* path_cert_serv = "../cert.pem";
 
     // Cryptographic operation
-    char* session_key1;
-    char* session_key2;
-    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
-    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
-    if(session_key1 == NULL || session_key2 == NULL)
+    unsigned char* session_key1;
+    unsigned char* session_key2;
+    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    if(!session_key1 || !session_key2)
     {
         printf("Unable to allocate session keys...\n\n");
         return -1;
