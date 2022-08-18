@@ -244,11 +244,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     free(signature);
     
     EVP_PKEY_free(dh_pubkey);
-    printf("Done\n");
-    exit(1);
 
 
- 
+
+
     /* Parse the client message and verify the fields */
     msg_len = 2*BUF_LEN;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
@@ -277,7 +276,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     // Decrypt and verify signature
     signature = malloc(EVP_PKEY_size(pub_rsa_client));
-    decrypt_AES_128_CBC(&signature, &signature_len, bufferSupp2, iv, K);
+    decrypt_AES_128_CBC(&signature, &signature_len, bufferSupp2, signature_len, iv, K);
 
     ret = verify_signature(msg_to_sign, msg_to_sign_len, signature, signature_len, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);

@@ -75,11 +75,16 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len)
 
 X509* cert_to_X509(unsigned char* cert, int cert_len)
 {
-    BIO* mbio = BIO_new(BIO_s_mem());
+    X509* crt = NULL;
+    BIO* mbio = NULL;
+    
+    mbio = BIO_new(BIO_s_mem());
+    if (!mbio) exit_with_failure("BIO_new failed", 1);
     BIO_write(mbio, cert, cert_len);
 
-    X509* crt = PEM_read_bio_X509(mbio, NULL, NULL, NULL);
-    
+    crt = PEM_read_bio_X509(mbio, NULL, NULL, NULL);
+    if (!crt) exit_with_failure("PEM_read_bio_X509 failed", 1);
+
     BIO_free(mbio);
 
     return crt;
@@ -88,6 +93,7 @@ X509* cert_to_X509(unsigned char* cert, int cert_len)
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     int ret;
+    EVP_PKEY* dh_pubkey = NULL;
 
     FILE* file_pubkey_pem = fopen(path_pubkey, "w");
     if (!file_pubkey_pem) exit_with_failure("Fopen failed", 1);
@@ -99,7 +105,7 @@ EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
     // Retrieve the saved public key
     file_pubkey_pem = fopen(path_pubkey, "r");
     if (!file_pubkey_pem) exit_with_failure("Fopen failed", 1);
-    EVP_PKEY* dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
+    dh_pubkey = PEM_read_PUBKEY(file_pubkey_pem, NULL, NULL, NULL);
     fclose(file_pubkey_pem);
     if (!dh_pubkey) exit_with_failure("PEM_read_PUBKEY failed", 1);
 
@@ -133,7 +139,7 @@ void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, u
     EVP_CIPHER_CTX_free(ctx);  
 }
 
-void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key)
+void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned char* in, unsigned int inl, unsigned char* iv, unsigned char* key)
 {
     int ret;
 
@@ -146,7 +152,7 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     int update_len = 0; // bytes decrypted at each chunk
     int total_len = 0; // total decrypted bytes
    
-    ret = EVP_DecryptUpdate(ctx, *out, &update_len, in, strlen((char*)in));
+    ret = EVP_DecryptUpdate(ctx, *out, &update_len, in, inl);
     if (ret != 1) exit_with_failure("DecryptUpdate failed", 1);
     total_len += update_len;
 
@@ -189,18 +195,20 @@ unsigned char* hash_SHA256(char* msg)
 unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len, unsigned int* signature_len)
 {
     int ret;
-    
+    EVP_PKEY* rsa_prvkey = NULL;
+    EVP_MD_CTX* ctx = NULL;
+
     FILE* file_prvkey_pem = fopen(path_key, "r");
     if(!file_prvkey_pem) exit_with_failure("Fopen failed", 1);
 
-    EVP_PKEY* rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, NULL);
+    rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, NULL);
     fclose(file_prvkey_pem);
     if (!rsa_prvkey) exit_with_failure("PEM_read_PrivateKey failed", 1);
 
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    ctx = EVP_MD_CTX_new();
     if(!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
 
-    unsigned char* signature = malloc(EVP_PKEY_size(rsa_prvkey));
+    unsigned char* signature = (unsigned char*) malloc(sizeof(unsigned char)*EVP_PKEY_size(rsa_prvkey));
 
     ret = EVP_SignInit(ctx, EVP_sha256());
     if (ret != 1) exit_with_failure("SignInit failed", 1);
@@ -239,11 +247,12 @@ unsigned char* read_cert(char* path_cert, int* cert_len)
     FILE* file_cert = fopen(path_cert, "r");
     if(!file_cert) exit_with_failure("Fopen failed", 1);
 
-    X509* server_cert = PEM_read_X509(file_cert, NULL, 0, NULL);
+    X509* server_cert = PEM_read_X509(file_cert, NULL, NULL, NULL);
     if(!server_cert) {
-       fclose(file_cert);
+        fclose(file_cert);
         exit_with_failure("PEM_read_X509 failed", 1);
     }
+    fclose(file_cert);
 
     // Write cert into bio
     BIO* bio = BIO_new(BIO_s_mem());
@@ -254,11 +263,15 @@ unsigned char* read_cert(char* path_cert, int* cert_len)
     *cert_len = BIO_get_mem_data(bio, &cert_byte);
     if((*cert_len) < 0) exit_with_failure("BIO_get_mem_data failed", 1);
 
+    unsigned char* result = (unsigned char*) malloc((*cert_len)*sizeof(unsigned char));
+    memcpy(result, cert_byte, *cert_len);
+
     // Free
+    //free(cert_byte);
     X509_free(server_cert);
     BIO_free(bio);
 
-    return cert_byte;
+    return result;
 
 }
 

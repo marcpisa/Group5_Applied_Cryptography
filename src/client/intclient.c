@@ -77,12 +77,12 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
     /* ---- 1st message: login request message + username + DH pubkey + IV + dig.sig.(IV) ---- */
     // Generate the IV
-    iv = (unsigned char*) malloc(IV_LEN);
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     RAND_poll(); // Seed OpenSSL PRNG
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-    iv_len = strlen((char*) iv);
+    iv_len = IV_LEN;
 
     // IV digital signature
     signature = sign_msg(path_rsa_key, iv, iv_len, &signature_len);  
@@ -192,7 +192,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     cert_len = atoi(temp);
 
     // The certificate is greater than 1024
-    cert_buffer = (unsigned char*) malloc(cert_len*sizeof(unsigned char));
+    cert_buffer = (unsigned char*) malloc((cert_len+1)*sizeof(unsigned char));
     if (!cert_buffer) exit_with_failure("cert_buffer malloc failed", 1);
     memcpy(cert_buffer, &*(buffer+offset), cert_len); // cert
     
@@ -213,8 +213,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     // Decrypt the message (digital signature) (bufferSupp2)
     msg_to_ver = (unsigned char*) malloc(sizeof(unsigned char) * BUF_LEN);
     if (!msg_to_ver) exit_with_failure("Malloc msg_to_ver failed", 1);
-    decrypt_AES_128_CBC(&msg_to_ver, &msg_len, bufferSupp2, iv, K);
-
+    decrypt_AES_128_CBC(&msg_to_ver, &msg_len, bufferSupp2, signature_len, iv, K);
+   
     // Obtain the RSA public key and verify the certificate of the server
     serv_cert = cert_to_X509(cert_buffer, cert_len);
     if (!serv_cert) exit_with_failure("cert_to_X509 failed", 1);
@@ -239,8 +239,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     free(msg_to_ver);
     EVP_PKEY_free(pub_rsa_key_serv);
 
-    printf("Done.\n");
-    exit(1);
+
+
 
     /* Generate last message for the server (username + digital signature) */
     // Sign exp_digsig with private key of client and encrypt the signature with K
