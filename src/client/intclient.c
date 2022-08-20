@@ -19,8 +19,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     /*********************
      * VARIABLES
      ********************/
-    char* path_pubkey = "../dh_client1_pubkey.pem"; // TO CHANGE (for multiple clients)
-    char* path_rsa_key = "../../database/teo/rsa_teo.pem"; // TO CHANGE
+    char* path_pubkey;
+    char* path_rsa_key;
     unsigned int msg_len;
     size_t offset;
     size_t K_len;
@@ -72,8 +72,20 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     sock = createSocket();
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
 
+    // Compose the path for the current user
+    path_pubkey = (char*) malloc(sizeof(char)*(15+strlen(username)+14));
+    memcpy(path_pubkey, "../../database/", 15);
+    memcpy(&*(path_pubkey+15), username, strlen(username));
+    memcpy(&*(path_pubkey+15+strlen(username)), "/dh_pubkey.pem", 14);
+    
+    path_rsa_key = (char*) malloc(sizeof(char)*(15+strlen(username)+8));
+    memcpy(path_rsa_key, "../../database/", 15);
+    memcpy(&*(path_rsa_key+15), username, strlen(username));
+    memcpy(&*(path_rsa_key+15+strlen(username)), "/rsa.pem", 8);
+
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &dh_pubkey, &pubkey_len);
+
 
     /* ---- 1st message: login request message + username + DH pubkey + IV + dig.sig.(IV) ---- */
     // Generate the IV
@@ -278,6 +290,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     free(exp_digsig);
     free(iv);
     free(K);
+
+
 
     /*CHECK IF ALL IS CORRECT WITH THE LAST MESSAGE OF THE SERVER */
     

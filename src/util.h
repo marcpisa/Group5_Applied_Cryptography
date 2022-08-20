@@ -41,6 +41,7 @@
 #define SHARE "share"
 #define DELETE "delete"
 #define HELP "help"
+#define EXIT "exit"
 
 #define LOGIN_REQUEST "logi_req"
 #define LOGOUT_REQUEST "logo_req"

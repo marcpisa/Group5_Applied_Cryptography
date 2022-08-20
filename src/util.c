@@ -96,7 +96,7 @@ EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
     EVP_PKEY* dh_pubkey = NULL;
 
     FILE* file_pubkey_pem = fopen(path_pubkey, "w");
-    if (!file_pubkey_pem) exit_with_failure("Fopen failed", 1);
+    if (!file_pubkey_pem) exit_with_failure("Fopen (save_read_PUBKEY) failed", 1);
     
     ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
     fclose(file_pubkey_pem);

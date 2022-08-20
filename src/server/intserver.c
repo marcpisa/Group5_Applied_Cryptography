@@ -30,7 +30,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "cert.pem";
     char* path_rsa_key = "rsa_prvkey.pem";
-    char* path_cert_client_rsa = "cert_teo.pem";
+    char* path_cert_client_rsa;
     int ret;
     int msg_len;
     char username [MAX_LEN_USERNAME];
@@ -133,6 +133,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     memcpy(username, bufferSupp1, BUF_LEN);
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
+    path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+strlen(username)+4));
+    memcpy(path_cert_client_rsa, "cert_", 5);
+    memcpy(&*(path_cert_client_rsa+5), username, strlen(username));
+    memcpy(&*(path_cert_client_rsa+5+strlen(username)), ".pem", 4);
     pub_rsa_client = get_client_pubkey(path_cert_client_rsa);
     
     // Calculate K = g^a^b mod p, established key
@@ -271,8 +275,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     memcpy(bufferSupp2, &*(buffer+offset), signature_len); // signature
 
-    // Check correctness of username
-    if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username.\n", 0);
+    // Sanitization username and check validity
+    if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails\n", 0);    
+    if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username\n", 0);
 
     // Decrypt and verify signature
     signature = malloc(EVP_PKEY_size(pub_rsa_client));

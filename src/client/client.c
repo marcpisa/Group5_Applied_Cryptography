@@ -9,6 +9,7 @@ int main(int argc, char* argv[])
     int new_sd, listenerTCP, ret, fdmax, pid, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
+    int exit_flag = 0;
 
     //Buffers
     char buffer[BUF_LEN];
@@ -128,7 +129,7 @@ int main(int argc, char* argv[])
     if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
     else fdmax = fileno(stdin);
 
-    while(1)
+    while(!exit_flag)
     {
         read_fds = master;
         
@@ -168,6 +169,8 @@ int main(int argc, char* argv[])
                     DOWNLOAD = 6;
                     UPLOAD = 7;
                     SHARE = 8;
+                    HELP = 9
+                    EXIT = 10;
                     WRONG COMMAND = 0;*/
 
                     //s = input_sanitization_commands(command1);
@@ -182,6 +185,7 @@ int main(int argc, char* argv[])
                     else if (strcmp(command1, UPLOAD) == 0) s = 7;
                     else if (strcmp(command1, SHARE) == 0) s = 8;
                     else if (strcmp(command1, HELP) == 0) s = 9; 
+                    else if (strcmp(command1, EXIT) == 0) s = 10; 
                     else s = 0;
 
                     switch(s)
@@ -324,6 +328,17 @@ int main(int argc, char* argv[])
 
                                break; 
 
+                        case 10:
+                                if(connected == 1)
+                                {
+                                    //logout
+                                    // if (ret == -1)
+                                    printf("Logging out...\n");
+                                }
+
+                                printf("Exiting the program.\n");
+                                exit_flag = 1;
+                                break;
 
                         default:
                             printf("Command inserted is wrong: retry...\n\n");
@@ -368,5 +383,7 @@ int main(int argc, char* argv[])
     }
     close(listenerTCP);
     X509_STORE_free(ca_store);
+    //free(session_key1);
+    //free(session_key2);
     return 0;
 }
