@@ -23,10 +23,10 @@ int main(int argc, char* argv[])
     struct timeval tv;
 
     // Cryptographic operation
-    char* session_key1;
-    char* session_key2;
-    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
-    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
+    unsigned char* session_key1;
+    unsigned char* session_key2;
+    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(session_key1 == NULL || session_key2 == NULL)
     {
         printf("Unable to allocate session keys...\n\n");
@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
                         exit(-1);
                     }
                     // We check the first keyword to understand what the Client wants us to do
-                    memset(bufferSupp1, 0, strlen(bufferSupp1));
+                    memset(bufferSupp1, 0, BUF_LEN);
                     memcpy(bufferSupp1, buffer, str_ssplit((unsigned char*) buffer, DELIM));
                     
                     // ************ LOGIN REQUEST MANAGER ***********

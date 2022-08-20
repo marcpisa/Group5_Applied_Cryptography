@@ -41,6 +41,7 @@
 #define SHARE "share"
 #define DELETE "delete"
 #define HELP "help"
+#define EXIT "exit"
 
 #define LOGIN_REQUEST "logi_req"
 #define LOGOUT_REQUEST "logo_req"
@@ -88,10 +89,17 @@ unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len);
 EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len);
 X509* cert_to_X509(unsigned char* cert, int cert_len);
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey);
-void encrypt_AES_128_CBC(unsigned char* out, int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key);
-void decrypt_AES_128_CBC(unsigned char* out, unsigned int* out_len, unsigned char* in, unsigned char* iv, unsigned char* key);
+void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, unsigned int inl, unsigned char* iv, unsigned char* key);
+void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned char* in, unsigned int inl, unsigned char* iv, unsigned char* key);
 unsigned char* hash_SHA256(char* msg);
-unsigned char* sign_msg(char* path_key, char* password, unsigned char* msg_to_sign, unsigned int* signature_len);
-int verify_signature(unsigned char* exp_digsig, unsigned char* msg_to_ver, EVP_PKEY* pub_rsa_key);
+unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len, unsigned int* signature_len);
+int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned char* msg_to_ver, int len_msg_ver, EVP_PKEY* pub_rsa_key);
 unsigned char* cert_to_byte(X509* cert, int* cert_len);
-unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey);
+unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey, size_t* secretlen);
+unsigned char* read_cert(char* path_cert, int* cert_len);
+unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** dh_pubkey, int* pubkey_len);
+EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa);
+void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2);
+EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store);
+
+int pass_cb(char *buf, int size, int rwflag, void *u);
