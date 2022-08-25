@@ -169,8 +169,7 @@ int main(int argc, char* argv[])
                         }
                     }
 
-                    /*
-                    // ************ LOGOUT REQUEST MANAGER ************
+                     //************ LOGOUT REQUEST MANAGER ************
                     else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -234,7 +233,7 @@ int main(int argc, char* argv[])
                     }
 
 
-                    // *************** RENAME REQUEST MANAGER *****************
+                    //*************** RENAME REQUEST MANAGER *****************
                     else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
@@ -402,7 +401,6 @@ int main(int argc, char* argv[])
                             exit(0);
                         }
                     }
-                    */
 
                     else printf("Unknown type of request by the Client...\n");
                     // Here we can also send a message to the client saying that we didn't understand what it wants

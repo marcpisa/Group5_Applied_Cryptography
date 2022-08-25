@@ -18,7 +18,11 @@ int main(int argc, char* argv[])
     char command3[MAX_LEN_CMD];
     char username[MAX_LEN_USERNAME];
 
+    // Variables for file management
+    FILE* fd1;
+
     // Others
+    
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
@@ -78,6 +82,8 @@ int main(int argc, char* argv[])
     // Set the value of the max interval that the select function wait for an action to do
     tv.tv_sec = SELECT_SEC_TO_WAIT;
 	tv.tv_usec = 0;
+
+
 
     // CONFIGURATION OF THE SERVER INFO
     memset(&srv_addr, 0, sizeof(srv_addr));
@@ -231,8 +237,8 @@ int main(int argc, char* argv[])
                                 break;
                             }*/
 
-                            //ret = listClient(username, srv_addr);
-                            //if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            ret = listClient(username, srv_addr);
+                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
                         
@@ -243,12 +249,12 @@ int main(int argc, char* argv[])
                                 break;
                             }*/
                             //printf("Command3 is %s\n", command3);
-                            //ret = renameClient(username, command2, command3, srv_addr);
-                            //if (ret == -1)
-                            //{
-                            //    printf("Error during the rename operation request!\n\n");
-                            //    exit(1);
-                            //}
+                            ret = renameClient(username, command2, command3, srv_addr);
+                            if (ret == -1)
+                            {
+                                printf("Error during the rename operation request!\n\n");
+                                exit(1);
+                            }
                             break;
 
                         case 5: //*********** DELETE **********
@@ -257,8 +263,8 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            //ret = deleteClient(username,command2, srv_addr);
-                            //if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
+                            ret = deleteClient(username,command2, srv_addr);
+                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
 
@@ -268,12 +274,12 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            //ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
-                            //if (ret == -1)
-                            //{
-                            //    printf("Error during the download operation request!\n\n");
-                            //    exit(1);
-                            //}
+                            ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
+                            if (ret == -1)
+                            {
+                                printf("Error during the download operation request!\n\n");
+                                exit(1);
+                            }
 
                             break;
 
@@ -283,12 +289,12 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }*/
-                            /*ret = uploadClient(username, command2, srv_addr);
+                            ret = uploadClient(username, command2, srv_addr);
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
                                 exit(1);
-                            }*/
+                            }
 
                             break;
 
@@ -300,15 +306,14 @@ int main(int argc, char* argv[])
                             }
                             */
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            /*ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");
                                 exit(1);
-                            }*/
+                            }
 
                             break;
-
                         
                         case 9: //************HELP***************//
                                if (connected == 0 || connected == 1) 
@@ -366,12 +371,12 @@ int main(int argc, char* argv[])
                     {
                         close(listenerTCP);
                         //We are in the son part of code
-                        /*ret = shareReceivedClient(i, buffer);
+                        ret = shareReceivedClient(i, buffer);
                         if (ret == -1)
                         {
                             //printf("Error during received share request!\n\n");
                             exit(1);
-                        }*/
+                        }
                         close(i);
                         exit(0);
                     }
