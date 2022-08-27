@@ -73,19 +73,19 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
 
     // Compose the path for the current user
-    path_pubkey = (char*) malloc(sizeof(char)*(15+strlen(username)+14));
+    path_pubkey = (char*) malloc(sizeof(char)*(15+strlen(username)+14+1));
     memcpy(path_pubkey, "../../database/", 15);
     memcpy(&*(path_pubkey+15), username, strlen(username));
-    memcpy(&*(path_pubkey+15+strlen(username)), "/dh_pubkey.pem", 14);
+    memcpy(&*(path_pubkey+15+strlen(username)), "/dh_pubkey.pem\0", 14+1);
     
-    path_rsa_key = (char*) malloc(sizeof(char)*(15+strlen(username)+8));
+    path_rsa_key = (char*) malloc(sizeof(char)*(15+strlen(username)+8+1));
     memcpy(path_rsa_key, "../../database/", 15);
     memcpy(&*(path_rsa_key+15), username, strlen(username));
-    memcpy(&*(path_rsa_key+15+strlen(username)), "/rsa.pem", 8);
+    memcpy(&*(path_rsa_key+15+strlen(username)), "/rsa.pem\0", 8+1);
 
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &dh_pubkey, &pubkey_len);
-
+    
 
     /* ---- 1st message: login request message + username + DH pubkey + IV + dig.sig.(IV) ---- */
     // Generate the IV

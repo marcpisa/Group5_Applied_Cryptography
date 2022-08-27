@@ -63,7 +63,8 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     int pubkey_len = 0;
     unsigned int pubkey_len_rec;
-    
+    int len_username;
+
     /*********************
      * END VARIABLES
      ********************/
@@ -94,6 +95,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
     memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
+    len_username = offset;
     old_offset += offset+strlen(" ");
 
     memcpy(temp, &*(rec_mex+old_offset), LEN_SIZE); // len pubkey
@@ -130,10 +132,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
   
     memset(username, 0, MAX_LEN_USERNAME);
-    memcpy(username, bufferSupp1, BUF_LEN);
+    memcpy(username, bufferSupp1, len_username);
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
-    path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+strlen(username)+4));
+    path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4));
     memcpy(path_cert_client_rsa, "cert_", 5);
     memcpy(&*(path_cert_client_rsa+5), username, strlen(username));
     memcpy(&*(path_cert_client_rsa+5+strlen(username)), ".pem", 4);
@@ -149,7 +151,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     issue_session_keys(K, K_len, &session_key1, &session_key2);
     
     // Retrieve the IV
-    iv = (unsigned char*) malloc(iv_len);
+    iv = (unsigned char*) malloc(iv_len*sizeof(unsigned char));
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     memcpy(iv, bufferSupp3, iv_len);
 
@@ -261,7 +263,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     ret = recv(sd, buffer, msg_len, 0);
     if (ret == -1) exit_with_failure("Receive failed: ", 1);
-    
+ 
     memset(bufferSupp1, 0, BUF_LEN);
     memset(bufferSupp2, 0, BUF_LEN);
     
@@ -278,14 +280,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     // Sanitization username and check validity
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails\n", 0);    
     if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username\n", 0);
-
+    
+    printf("Debug1\n");
     // Decrypt and verify signature
-    signature = malloc(EVP_PKEY_size(pub_rsa_client));
+    signature = (unsigned char*) malloc(sizeof(unsigned char)*EVP_PKEY_size(pub_rsa_client));
     decrypt_AES_128_CBC(&signature, &signature_len, bufferSupp2, signature_len, iv, K);
-
+    printf("Debug1\n");
     ret = verify_signature(msg_to_sign, msg_to_sign_len, signature, signature_len, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
-
+    printf("Debug1\n");
     
     free(signature);
     free(buffer);

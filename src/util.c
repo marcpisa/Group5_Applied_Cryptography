@@ -94,8 +94,9 @@ EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     int ret;
     EVP_PKEY* dh_pubkey = NULL;
-
-    FILE* file_pubkey_pem = fopen(path_pubkey, "w");
+    FILE* file_pubkey_pem;
+    
+    file_pubkey_pem = fopen(path_pubkey, "w");
     if (!file_pubkey_pem) exit_with_failure("Fopen (save_read_PUBKEY) failed", 1);
     
     ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
@@ -226,7 +227,9 @@ unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len,
 int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned char* msg_to_ver, int len_msg_ver, EVP_PKEY* pub_rsa_key)
 {
     int ret;
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX* ctx;
+    
+    ctx = EVP_MD_CTX_new();
     if(!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
     
     ret = EVP_VerifyInit(ctx, EVP_sha256());
@@ -240,7 +243,6 @@ int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned cha
     if (ret != 1) return 0;
     return 1;
 }
-
 
 unsigned char* read_cert(char* path_cert, int* cert_len)
 {
@@ -338,7 +340,7 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 
     ctx = EVP_PKEY_CTX_new(dh_params, NULL);
     if(!ctx) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
-    
+
     ret = EVP_PKEY_keygen_init(ctx);
     if (ret != 1) exit_with_failure("keygen_init failed", 1);
     ret = EVP_PKEY_keygen(ctx, my_prvkey);
@@ -346,6 +348,7 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 
     // Save DH key in PEM format and retrieve the public key
     *dh_pubkey = save_read_PUBKEY(path_pubkey, *my_prvkey);
+
     //if (!dh_pubkey) exit_with_failure("save_read_PUBKEY failed", 0);
     pubkey_byte = pubkey_to_byte(*dh_pubkey, pubkey_len);
     if (!pubkey_byte) exit_with_failure("pubkey_to_byte failed", 0);
@@ -396,8 +399,8 @@ void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key
 
     EVP_MD_CTX_free(ctx);
 
-    memcpy(session_key1, digest, 16); // 16 byte = 128 bit
-    memcpy(session_key2, &*(digest+16), 16);
+    memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(*session_key2, &*(digest+16), 16);
     
     free(digest);
 }

@@ -1,9 +1,10 @@
 #include "intserver.h"
-
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
     
+    int exit_flag = 0;
+
     // Socket management variables
     int ret, pid, listenerTCP, i, fdmax, new_sd;
     uint32_t addr_app;
@@ -24,7 +25,8 @@ int main(int argc, char* argv[])
 
     // Cryptographic operation
     unsigned char* session_key1;
-    unsigned char* session_key2;
+    unsigned char* session_key2;    
+    
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(session_key1 == NULL || session_key2 == NULL)
@@ -84,7 +86,8 @@ int main(int argc, char* argv[])
     if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
     else fdmax = fileno(stdin);
     printf("I'm using the select function to attend for more than one event...\n\n");
-    while(1)
+    
+    while(!exit_flag)
     {
         //printf("Another turn of select has been done. It means that the software is behaving correctly..\n\n");
         read_fds = master;
@@ -114,6 +117,7 @@ int main(int argc, char* argv[])
                     if (strcmp(command1, "exit") == 0)
                     {
                         printf("Done!\n\n");
+                        exit_flag = 1;
                         close(listenerTCP);
                         continue;
                     }
