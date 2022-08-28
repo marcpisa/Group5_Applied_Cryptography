@@ -74,6 +74,9 @@ int main(int argc, char* argv[])
     ret = X509_STORE_add_cert(ca_store, cert_serv);
     if (ret != 1) exit_with_failure("X509_STORE_add_cert failed", 1);
 
+    X509_free(cert_serv);
+    BIO_free(bio_cert);
+    
     // WE NEED TO SET ALSO THE CRL?????????????
 
 
@@ -415,9 +418,12 @@ int main(int argc, char* argv[])
             }
         }
     }
+
     close(listenerTCP);
-    //X509_STORE_free(ca_store);
-    //free(session_key1);
-    //free(session_key2);
+    
+    X509_STORE_free(ca_store);
+    free(session_key1);
+    free(session_key2);
+    
     return 0;
 }

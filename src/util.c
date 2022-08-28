@@ -25,7 +25,7 @@ size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
     unsigned char* tmp = a_str;
 
     // Count how many elements there are before delim
-    while (*tmp)
+    while (*tmp != '\0')
     {
         if (a_delim == *tmp)
         {

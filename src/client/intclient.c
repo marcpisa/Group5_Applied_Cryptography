@@ -102,8 +102,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     // Calculate the message length and allocate the memory
     msg_len = strlen(LOGIN_REQUEST)+strlen(" ")+strlen(username)+strlen(" ")+LEN_SIZE+ \
     strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+iv_len+strlen(" ")+ \
-    LEN_SIZE+strlen(" ")+signature_len;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    LEN_SIZE+strlen(" ")+signature_len+1;
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*(msg_len+1));
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -149,6 +149,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+iv_len+strlen(" ")+ \
     LEN_SIZE+strlen(" ")), signature, signature_len); // iv dig. sig.
 
+    memcpy(&*(buffer+msg_len-1), "\0", 1);
     /* 
     for(int i = 0; i < msg_len; i++) { printf("%c", *(buffer+i)); }
     printf("\n\n");    
@@ -250,6 +251,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     free(pubkey_byte);
     free(msg_to_ver);
     EVP_PKEY_free(pub_rsa_key_serv);
+    EVP_PKEY_free(my_prvkey);
 
 
 
@@ -282,6 +284,9 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     printf("I'm sending to the server the last message.\n");
     ret = send(sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
+
+    free(path_pubkey);
+    free(path_rsa_key);
 
     free(temp);
     free(buffer);

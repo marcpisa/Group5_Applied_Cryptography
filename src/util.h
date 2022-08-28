@@ -74,7 +74,7 @@
 
 #define MAX_LEN_USERNAME 25
 #define MAX_LEN_REQUEST 20
-#define LEN_SIZE 4
+#define LEN_SIZE 5
 
 #define DELIM ' '
 

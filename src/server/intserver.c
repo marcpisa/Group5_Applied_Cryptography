@@ -135,17 +135,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     memcpy(username, bufferSupp1, len_username);
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
-    path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4));
+    path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4+1));
     memcpy(path_cert_client_rsa, "cert_", 5);
     memcpy(&*(path_cert_client_rsa+5), username, strlen(username));
-    memcpy(&*(path_cert_client_rsa+5+strlen(username)), ".pem", 4);
+    memcpy(&*(path_cert_client_rsa+5+strlen(username)), ".pem\0", 4+1);
     pub_rsa_client = get_client_pubkey(path_cert_client_rsa);
     
     // Calculate K = g^a^b mod p, established key
     peer_pubkey = pubkey_to_PKEY(bufferSupp2, pubkey_len);
     K = key_derivation(my_prvkey, peer_pubkey, &K_len);
-    
-    EVP_PKEY_free(peer_pubkey);
 
     // Obtain the two session keys from the established key
     issue_session_keys(K, K_len, &session_key1, &session_key2);
@@ -162,12 +160,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     printf("First message is correct. Preparing the response...\n");
 
     free(temp);
+    free(path_cert_client_rsa);
+    EVP_PKEY_free(my_prvkey);
+    EVP_PKEY_free(peer_pubkey);
 
 
 
 
     /* --- Send response (username, dig.sign, DH pubkey, cert) --- */
-    pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
+    //pubkey_byte = pubkey_to_byte(dh_pubkey, &pubkey_len);
 
     // Prepare the digital signature
     if ((int)pubkey_len_rec != pubkey_len) exit_with_failure("Pubkey length wrong.\n", 0);
@@ -199,7 +200,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     // Calculating message length and allocate memory for it
     msg_len = strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+LEN_SIZE+strlen(" ")+ \
-    pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+cert_len;
+    pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")+cert_len+1;
     
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
@@ -236,6 +237,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     LEN_SIZE+strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE), " ", strlen(" "));
     memcpy(&*(buffer+strlen(username)+strlen(" ")+LEN_SIZE+strlen(" ")+cipherlen+strlen(" ")+ \
     LEN_SIZE+strlen(" ")+pubkey_len+strlen(" ")+LEN_SIZE+strlen(" ")), cert_byte, cert_len); // cert.
+
+    memcpy(&*(buffer+msg_len-1), "\0", 1);
+
+    if(&*(buffer+msg_len-1) == NULL) printf("\n\nCorrect\n\n");
 
     //printf("%s\n", buffer);
     printf("I'm sending to the client the response.\n");
@@ -281,14 +286,13 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails\n", 0);    
     if (strcmp(username, (char*) bufferSupp1) != 0) exit_with_failure("Wrong username\n", 0);
     
-    printf("Debug1\n");
     // Decrypt and verify signature
     signature = (unsigned char*) malloc(sizeof(unsigned char)*EVP_PKEY_size(pub_rsa_client));
     decrypt_AES_128_CBC(&signature, &signature_len, bufferSupp2, signature_len, iv, K);
-    printf("Debug1\n");
+    
     ret = verify_signature(msg_to_sign, msg_to_sign_len, signature, signature_len, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
-    printf("Debug1\n");
+    
     
     free(signature);
     free(buffer);

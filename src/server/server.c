@@ -417,6 +417,11 @@ int main(int argc, char* argv[])
             }
         }
     }
+    
     close(listenerTCP);
+    
+    free(session_key1);
+    free(session_key2);
+    
     return 0;
 }
