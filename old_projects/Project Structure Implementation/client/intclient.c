@@ -62,11 +62,13 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     // HERE USE DECRYPTION TO UNDERSTAND WHAT YOU RECEIVE
 
     // END COMMUNICATION
+    
+    //HANDLE INFORMATION RECEIVED FROM SERVER AND DISPLAY IN A BETTER FORMAT
     char* point = NULL;
     char* token;
     i = 0;
     token = strtok_r(buffer, " ", &point);
-    
+
     printf("REQUEST %s FROM SERVER:\n", token);
 
     while(token = strtok_r(NULL, " ", &point)) {
