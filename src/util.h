@@ -24,21 +24,15 @@
 #define COM_LEN 16
 #define MAX_LEN_FILENAME 20
 #define MAX_LEN_USERNAME 20
-#define COMM_NUMB 8
+#define COMM_NUMB 10
 #define PORT_SIZE 6
 #define CHUNK_SIZE 512
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
-<<<<<<< HEAD:old_projects/Project Structure Implementation/util.h
-#define MAIN_FOLDER_SERVER "/home/marc/Documents/database"  // When you test the software on your pc change this variable
-#define MAIN_FOLDER_CLIENT "/home/marc/Documents/download"  // When you test the software on your pc change this variable
-#define INFO_FOLDER_SERVER "/home/marc/Documents/database/info" // When you test the software on your pc change this variable
-=======
 #define MEX_TYPE_LEN 8
-#define MAIN_FOLDER_SERVER "/home/marc/Documents/Group5_Applied_Cryptography/database"  // When you test the software on your pc change this variable
-#define MAIN_FOLDER_CLIENT "/home/marc/Documents/Group5_Applied_Cryptography/download"  // When you test the software on your pc change this variable
-#define INFO_FOLDER_SERVER "/home/marc/Documents/Group5_Applied_Cryptography/database/info" // When you test the software on your pc change this variable
->>>>>>> main:src/util.h
+#define MAIN_FOLDER_SERVER "../../database/"  
+#define MAIN_FOLDER_CLIENT "../../download/"  
+#define INFO_FOLDER_SERVER "../../database/info/"
 
 #define LOGIN "login"
 #define LOGOUT "logout"
@@ -91,6 +85,9 @@
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
 
 int username_sanitization(const char* username);
+int input_sanitization_commands(const char* input);
+void rec_buffer_sanitization(char *received_buff, char *buff1[]);
+//int file_name_sanitization(const char* file_name, const char* root_dir);
 void exit_with_failure(char* err, int perror_enable);
 size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim);
 unsigned char* pubkey_to_byte(EVP_PKEY* pub_key, int* pub_key_len);

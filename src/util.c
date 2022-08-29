@@ -1,11 +1,51 @@
 #include "util.h"
 
-static char username_allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-"};
+static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-"};
+static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
 int username_sanitization(const char* username) {
-    if(strspn(username, username_allowed_chars) < strlen(username)) return 0;
+    if(strspn(username, allowed_chars) < strlen(username)) return 0;
     return 1;
 }
+
+int input_sanitization_commands(const char* input) {
+
+    int i;
+    for (i = 0; i < COMM_NUMB; i++) {
+        if (strncmp(commands[i], input, COM_LEN) == 0) return i + 1;
+    }
+    return 0;
+}
+
+void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
+    int j, i;
+    i = 0;
+    char *token;
+    token = strtok(received_buff, " ");
+    while (token != NULL) {
+        buffer_sanitized[i] = token;
+        token = strtok(NULL, " ");
+        i++;
+    }
+
+    //for(j = 1; j < i; j++) {
+        
+    //}
+
+    //SANIFICATION: username it is checked in the if block server side.
+}
+
+/**
+int file_name_sanitization(const char* file_name, const char* root_dir) {
+
+    char buf[BUF_LEN];
+
+    if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
+    char *canon_file_name = realpath(file_name, buf);
+    if(!canon_file_name) return 0;
+    if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;
+    return 1;
+}*/
 
 void exit_with_failure(char* err, int perror_enable) {
     if (perror_enable) 

@@ -179,25 +179,7 @@ int main(int argc, char* argv[])
                     EXIT = 10;
                     WRONG COMMAND = 0;*/
 
-<<<<<<< HEAD:old_projects/Project Structure Implementation/client/client.c
                     s = input_sanitization_commands(command1);
-=======
-                    //s = input_sanitization_commands(command1);
-                    
-                    //This part will be deleted when the sanitization part is over
-                    if (strcmp(command1, LOGIN) == 0) s = 1;
-                    else if (strcmp(command1, LOGOUT) == 0) s = 2;
-                    else if (strcmp(command1, LIST) == 0) s = 3;
-                    else if (strcmp(command1, RENAME) == 0) s = 4;
-                    else if (strcmp(command1, DELETE) == 0) s = 5;
-                    else if (strcmp(command1, DOWNLOAD) == 0) s = 6;
-                    else if (strcmp(command1, UPLOAD) == 0) s = 7;
-                    else if (strcmp(command1, SHARE) == 0) s = 8;
-                    else if (strcmp(command1, HELP) == 0) s = 9; 
-                    else if (strcmp(command1, EXIT) == 0) s = 10; 
-                    else s = 0;
-
->>>>>>> main:src/client/client.c
                     switch(s)
                     {
                         case 1: //*********** LOGIN **************
