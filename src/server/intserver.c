@@ -430,7 +430,7 @@ int deleteServer(int sd, char* rec_mex)
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3
-    chdir("/home/marc/Documents/database");;
+    chdir(MAIN_FOLDER_SERVER);;
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
@@ -546,6 +546,9 @@ int downloadServer(int sd, char* rec_mex)
             exit(1);
         }
     }
+
+
+    
     memset(buffer, 0, strlen(buffer));
     ret = recv(sd, buffer, BUF_LEN, 0);
     if (ret == -1)
@@ -570,7 +573,7 @@ int downloadServer(int sd, char* rec_mex)
 
 int uploadServer(int sd, char* rec_mex)
 {
-    int ret, nchunk, i;
+    int ret, nchunk, i, j, k, r, position;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
@@ -626,14 +629,15 @@ int uploadServer(int sd, char* rec_mex)
         if (ret = -1) printf("Had some problem with the send operation...\n\n");
         return -1;
     }
+
+
     f1 = fopen(filename, "w");
     printf("Starting upload of the chunks...\n\n");
     for (i = 0; i < nchunk; i++)
     {
-        memset(buffer, 0, strlen(buffer));
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
+
+        printf("We are recieiving chunk number %i...\n\n", i); 
+        memset(buffer, 0, strlen(buffer)); 
         ret = recv(sd, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
@@ -642,17 +646,37 @@ int uploadServer(int sd, char* rec_mex)
         }
         printf("I'm receiving %s\n\n", buffer);
 
-        // DECRYPT THE MESSAGE
+    
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2);
+        k = strlen(bufferSupp1);
+        r = strlen(bufferSupp2); 
+        position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2; 
 
-        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: upload_chunk filename payload
+        for( j= 0; j < CHUNK_SIZE; j++) {
+            bufferSupp3[j] = buffer[position + j]; 
+        }
+
+        printf("The payload received is %s\n\n", bufferSupp3); 
+
+        printf("Now we append %s to the file \n\n", bufferSupp3); 
+
+        for(j=0; j < CHUNK_SIZE; j++) {
+            fprintf(f1, "%c", bufferSupp3[j]); 
+        }
+
+         memset(bufferSupp1, 0, strlen(bufferSupp1));
+         memset(bufferSupp2, 0, strlen(bufferSupp2));
+         memset(bufferSupp3, 0, strlen(bufferSupp3));
+        
+         // we receive: upload_chunk filename payload
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
-        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
+        //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
     }
     fclose(f1);
     memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
     sprintf(buffer, "%s %s %s", UPLOAD_FINISHED, username, filename);
     ret = send(sd, buffer, strlen(buffer), 0);
     if (ret == -1)

@@ -597,7 +597,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
     char payload[CHUNK_SIZE+1];
     struct stat st;
-    int i, sock, nchunk, ret;
+    int i, j, nchunk, ret, start_payload, sock;
     FILE* fd;
 
     sock = createSocket();
@@ -610,6 +610,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     }
     if ((fd = fopen(filename, "r")) == NULL)
     {
+        //printf("The inserted filename is %s", filename);
         printf("The file doesn't exist\n\n");
         return -1;
     }
@@ -664,29 +665,33 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     // We should add another check about the fact that the file exists or not
     for (i = 0; i < nchunk; i++)
     {
-        memset(buffer, 0, strlen(buffer));
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
         memset(payload, 0, strlen(payload));
-
-        ret = fread(payload, CHUNK_SIZE, 1, fd);
-        if (ret == -1)
+        for (j = 0; j < CHUNK_SIZE; j++)
         {
-            printf("Problem during the reading of the file to upload... \n\n");
-            return -1;
+            if (fgets(payload+j, 2, fd) == NULL)
+            {
+                payload[j] = '\0';
+                printf("File over!");
+                break;
+            }
         }
-        sprintf(buffer, "%s %s %s", UPLOAD_CHUNK, filename, payload); //Format of the message sent is: type_mex n_chunk
-        printf("I'm sending %s\n\n", buffer);
-        // ENCRYPT BUFFER
+        sprintf(bufferSupp1, "%s %s ", DOWNLOAD_CHUNK, filename); //Format of the message sent is: type_mex filename payload
+        start_payload = MEX_TYPE_LEN + strlen(filename) + 2;
+        for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+        printf("We are sending %s\n\n", bufferSupp1);
 
-        ret = send(sock, buffer, strlen(buffer), 0);
+        //ENCRYPT THE MESSAGE SENT
+
+        ret = send(sock, bufferSupp1, BUF_LEN, 0);
         if (ret == -1)
         {
-            printf("Problem during the send operation... \n\n");
-            return -1;
+            printf("Send operation gone bad\n");
+            // Change this later to manage properly the session
+            exit(1);
         }
     }
+
+
     printf("Upload operation over... Waiting end communication from the server... \n\n");
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
