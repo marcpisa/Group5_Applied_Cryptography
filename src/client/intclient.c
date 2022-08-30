@@ -465,7 +465,7 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
 int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {
-    int sock, ret, nchunk, i, j, k, r;
+    int sock, ret, nchunk, i, j, k, r, rest;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
@@ -522,9 +522,16 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         // Change this later to manage properly the session
         exit(1);
     }
-    printf("I'm receiving %s", buffer);
-    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2); // bufferSupp3 = number_of_chunk
+
+     memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(bufferSupp2, 0, strlen(bufferSupp2));
+    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
     nchunk = atoi(bufferSupp2);
+    rest = atoi(bufferSupp3);
+
+
+
     if (nchunk == 0)
     {
         printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
@@ -554,24 +561,49 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         printf("In bufferSupp1 we have %s and the size of the field is %i, the bufferSupp2 contains %s and the size is %i\n\n", bufferSupp1, k, bufferSupp2, r);
         position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
         printf("The position of the buffer where we start to take the payload is %i\n\n", position);
-        for (j = 0; j < CHUNK_SIZE; j++)
-        {
-            bufferSupp3[j] = buffer[position+j];
-        }
+
+if (i == nchunk-1)
+	{
+	     for (j = 0; j < rest; j++)
+             {
+                 bufferSupp3[j] = buffer[position+j];
+             }
+	}
+	else
+	{
+	     for (j = 0; j < CHUNK_SIZE; j++)
+             {
+                 bufferSupp3[j] = buffer[position+j];
+             }
+	}
+        
 
         printf("The payload received is %s\n\n", bufferSupp3);
         
         
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
         printf("Now we append %s to the file...\n\n", bufferSupp3);
-        for (j = 0; j < CHUNK_SIZE; j++)
-        {
-            fprintf(f1, "%c", bufferSupp3[j]);
-        }
+	if (i == nchunk-1)
+	{
+	      for (j = 0; j < rest; j++)
+              {
+                 fprintf(f1, "%c", bufferSupp3[j]);
+              }
+	}
+	else
+	{
+	      for (j = 0; j < CHUNK_SIZE; j++)
+              {
+                 fprintf(f1, "%c", bufferSupp3[j]);
+              }
+	}
         //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
+
+
+
     }
     fclose(f1);
     memset(buffer, 0, strlen(buffer));

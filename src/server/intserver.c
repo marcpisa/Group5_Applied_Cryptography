@@ -475,7 +475,7 @@ int downloadServer(int sd, char* rec_mex)
     char username[MAX_LEN_USERNAME];
     char filename[MAX_LEN_FILENAME];
     struct stat st;
-    int i, j, nchunk, ret, start_payload;
+    int i, j, nchunk, ret, start_payload, rest;
     FILE* fd;
 
     memset(filename, 0, strlen(filename));
@@ -501,6 +501,7 @@ int downloadServer(int sd, char* rec_mex)
     stat(filename, &st);
     printf("The size of the file is %ld\n\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
+    rest = st.st_size - (nchunk-1)*CHUNK_SIZE; 
     printf("The number of chunk is %i\n\n", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
@@ -518,17 +519,32 @@ int downloadServer(int sd, char* rec_mex)
         exit(1);
     }
 
-    printf("I'm starting to send chunks\n");
+printf("I'm starting to send chunks\n");
     for (i = 0; i < nchunk; i++)
     {
         memset(payload, 0, strlen(payload));
-        for (j = 0; j < CHUNK_SIZE; j++)
+        if (i == nchunk-1)
         {
-            if (fgets(payload+j, 2, fd) == NULL)
+            for (j = 0; j < rest; j++)
             {
-                payload[j] = '\0';
-                printf("File over!");
-                break;
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (j = 0; j < CHUNK_SIZE; j++)
+            {
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
             }
         }
         sprintf(bufferSupp1, "%s %s ", DOWNLOAD_CHUNK, filename); //Format of the message sent is: type_mex filename payload
@@ -546,8 +562,6 @@ int downloadServer(int sd, char* rec_mex)
             exit(1);
         }
     }
-
-
     
     memset(buffer, 0, strlen(buffer));
     ret = recv(sd, buffer, BUF_LEN, 0);
