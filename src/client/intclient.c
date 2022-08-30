@@ -522,16 +522,13 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         // Change this later to manage properly the session
         exit(1);
     }
-
-     memset(bufferSupp1, 0, strlen(bufferSupp1));
+    printf("I'm receiving %s", buffer);
+    memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
     nchunk = atoi(bufferSupp2);
     rest = atoi(bufferSupp3);
-
-
-
     if (nchunk == 0)
     {
         printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
@@ -561,8 +558,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         printf("In bufferSupp1 we have %s and the size of the field is %i, the bufferSupp2 contains %s and the size is %i\n\n", bufferSupp1, k, bufferSupp2, r);
         position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
         printf("The position of the buffer where we start to take the payload is %i\n\n", position);
-
-if (i == nchunk-1)
+	if (i == nchunk-1)
 	{
 	     for (j = 0; j < rest; j++)
              {
@@ -601,9 +597,6 @@ if (i == nchunk-1)
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp3, 0, strlen(bufferSupp3));
-
-
-
     }
     fclose(f1);
     memset(buffer, 0, strlen(buffer));
@@ -619,6 +612,7 @@ if (i == nchunk-1)
     printf("Download completed!\n\n");
     return 1;
 }
+
 
 int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {

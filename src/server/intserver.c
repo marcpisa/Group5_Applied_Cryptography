@@ -463,7 +463,6 @@ int deleteServer(int sd, char* rec_mex)
     return 1;
 }
 
-
 int downloadServer(int sd, char* rec_mex)
 {
     // We received a message with this format: download_request username filenameù
@@ -501,13 +500,14 @@ int downloadServer(int sd, char* rec_mex)
     stat(filename, &st);
     printf("The size of the file is %ld\n\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
-    rest = st.st_size - (nchunk-1)*CHUNK_SIZE; 
+    rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
+
     printf("The number of chunk is %i\n\n", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
+    sprintf(bufferSupp1, "%s %i %i", DOWNLOAD_ACCEPTED, nchunk, rest); //Format of the message sent is: type_mex n_chunk
     printf("I'm sending %s\n\n", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
     
@@ -519,7 +519,7 @@ int downloadServer(int sd, char* rec_mex)
         exit(1);
     }
 
-printf("I'm starting to send chunks\n");
+    printf("I'm starting to send chunks\n");
     for (i = 0; i < nchunk; i++)
     {
         memset(payload, 0, strlen(payload));
@@ -562,7 +562,6 @@ printf("I'm starting to send chunks\n");
             exit(1);
         }
     }
-    
     memset(buffer, 0, strlen(buffer));
     ret = recv(sd, buffer, BUF_LEN, 0);
     if (ret == -1)
