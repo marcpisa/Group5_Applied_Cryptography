@@ -430,7 +430,7 @@ int deleteServer(int sd, char* rec_mex)
     memset(bufferSupp3, 0, strlen(bufferSupp3));
     sscanf(rec_mex, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
     //SANITIZE AND CHECK THE CORRECTNESS OF THE FILENAMES ON BUFFERSUPP3
-    chdir("/home/marc/Documents/database");;
+    chdir(MAIN_FOLDER_SERVER);;
     ret = chdir(bufferSupp2);
     if (ret == -1)
     {
@@ -463,7 +463,6 @@ int deleteServer(int sd, char* rec_mex)
     return 1;
 }
 
-
 int downloadServer(int sd, char* rec_mex)
 {
     // We received a message with this format: download_request username filenameù
@@ -475,7 +474,7 @@ int downloadServer(int sd, char* rec_mex)
     char username[MAX_LEN_USERNAME];
     char filename[MAX_LEN_FILENAME];
     struct stat st;
-    int i, j, nchunk, ret, start_payload;
+    int i, j, nchunk, ret, start_payload, rest;
     FILE* fd;
 
     memset(filename, 0, strlen(filename));
@@ -501,15 +500,16 @@ int downloadServer(int sd, char* rec_mex)
     stat(filename, &st);
     printf("The size of the file is %ld\n\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
+    rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
+
     printf("The number of chunk is %i\n\n", nchunk);    
 
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    sprintf(bufferSupp1, "%s %d", DOWNLOAD_ACCEPTED, nchunk); //Format of the message sent is: type_mex n_chunk
+    sprintf(bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); //Format of the message sent is: type_mex n_chunk
     printf("I'm sending %s\n\n", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
-    
     ret = send(sd, bufferSupp1, BUF_LEN, 0);
     if (ret == -1)
     {
@@ -522,18 +522,35 @@ int downloadServer(int sd, char* rec_mex)
     for (i = 0; i < nchunk; i++)
     {
         memset(payload, 0, strlen(payload));
-        for (j = 0; j < CHUNK_SIZE; j++)
+        if (i == nchunk-1)
         {
-            if (fgets(payload+j, 2, fd) == NULL)
+            for (j = 0; j < rest; j++)
             {
-                payload[j] = '\0';
-                printf("File over!");
-                break;
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (j = 0; j < CHUNK_SIZE; j++)
+            {
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
             }
         }
         sprintf(bufferSupp1, "%s %s ", DOWNLOAD_CHUNK, filename); //Format of the message sent is: type_mex filename payload
         start_payload = MEX_TYPE_LEN + strlen(filename) + 2;
-        for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+	if (i == nchunk-1) for (j = 0; j < rest; j++) bufferSupp1[start_payload+j] = payload[j];
+	else for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+        
         printf("We are sending %s\n\n", bufferSupp1);
 
         //ENCRYPT THE MESSAGE SENT
@@ -565,12 +582,13 @@ int downloadServer(int sd, char* rec_mex)
     }
     printf("We have completed successfully the donwload operation!\n\n");
     return 1;
+   
 }
 
 
 int uploadServer(int sd, char* rec_mex)
 {
-    int ret, nchunk, i;
+    int ret, nchunk, i, j, k, r, position, rest;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
@@ -580,9 +598,11 @@ int uploadServer(int sd, char* rec_mex)
     char username[MAX_LEN_USERNAME];
 
     printf("I received %s\n\n", rec_mex);
-    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, username, filename, bufferSupp2);
-    nchunk = atoi(bufferSupp2);
+    sscanf(rec_mex, "%s %s %s %s %s", bufferSupp1, username, filename, bufferSupp2, bufferSupp3);
     printf("The number of chunk of the file is %i", nchunk);
+
+    rest = atoi(bufferSupp3);
+    nchunk = atoi(bufferSupp2);
 
     // SANITIZATION OF THE USERNAME AND THE FILENAME
 
@@ -626,41 +646,83 @@ int uploadServer(int sd, char* rec_mex)
         if (ret = -1) printf("Had some problem with the send operation...\n\n");
         return -1;
     }
-    f1 = fopen(filename, "w");
-    printf("Starting upload of the chunks...\n\n");
+
+
+   f1 = fopen(filename, "w");
     for (i = 0; i < nchunk; i++)
     {
+        printf("We are receiving the chunk number %i...\n\n", i);
         memset(buffer, 0, strlen(buffer));
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        // I'm receveing a message with this format: download_chunk n_chunk payload
         ret = recv(sd, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
-            printf("We had some problem with the recv function...\n\n");
-            return -1;
+            printf("Receive operation gone bad\n");
+            // Change this later to manage properly the session
+            exit(1);
         }
-        printf("I'm receiving %s\n\n", buffer);
+        //sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
+        sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2);
+        k = strlen(bufferSupp1);
+        r = strlen(bufferSupp2);
+        printf("In bufferSupp1 we have %s and the size of the field is %i, the bufferSupp2 contains %s and the size is %i\n\n", bufferSupp1, k, bufferSupp2, r);
+        position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
+        printf("The position of the buffer where we start to take the payload is %i\n\n", position);
+	if (i == nchunk-1)
+	{
+	     for (j = 0; j < rest; j++)
+             {
+                 bufferSupp3[j] = buffer[position+j];
+             }
+	}
+	else
+	{
+	     for (j = 0; j < CHUNK_SIZE; j++)
+             {
+                 bufferSupp3[j] = buffer[position+j];
+             }
+	}
+        
 
-        // DECRYPT THE MESSAGE
-
-        sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: upload_chunk filename payload
+        printf("The payload received is %s\n\n", bufferSupp3);
+        
+        
         // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
-        fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
+        printf("Now we append %s to the file...\n\n", bufferSupp3);
+	if (i == nchunk-1)
+	{
+	      for (j = 0; j < rest; j++)
+              {
+                 fprintf(f1, "%c", bufferSupp3[j]);
+              }
+	}
+	else
+	{
+	      for (j = 0; j < CHUNK_SIZE; j++)
+              {
+                 fprintf(f1, "%c", bufferSupp3[j]);
+              }
+	}
+        //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
+        memset(bufferSupp1, 0, strlen(bufferSupp1));
+        memset(bufferSupp2, 0, strlen(bufferSupp2));
+        memset(bufferSupp3, 0, strlen(bufferSupp3));
     }
     fclose(f1);
     memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
-    sprintf(buffer, "%s %s %s", UPLOAD_FINISHED, username, filename);
-    ret = send(sd, buffer, strlen(buffer), 0);
+    sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
+    printf("I'm sending %s\n\n", buffer);
+    ret = send(sd, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
-        printf("Something bad happened with the send function...\n\n");
-        return -1;
+        printf("Send operation gone bad\n");
+        // Change this later to manage properly the session
+        exit(1);
     }
-    printf("Upload operation accomplished!\n\n");
+    printf("Download completed!\n\n");
     return 1;
 }
 
