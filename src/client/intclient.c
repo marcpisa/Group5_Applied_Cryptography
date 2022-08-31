@@ -624,7 +624,7 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
     char payload[CHUNK_SIZE+1];
     struct stat st;
-    int i, j, nchunk, ret, start_payload, sock;
+    int i, j, nchunk, ret, start_payload, sock, rest;
     FILE* fd;
 
     sock = createSocket();
@@ -690,21 +690,39 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     fd = fopen(filename, "r");
     printf("I'm starting the upload operation...\n\n");
     // We should add another check about the fact that the file exists or not
+    printf("I'm starting to send chunks\n");
     for (i = 0; i < nchunk; i++)
     {
         memset(payload, 0, strlen(payload));
-        for (j = 0; j < CHUNK_SIZE; j++)
+        if (i == nchunk-1)
         {
-            if (fgets(payload+j, 2, fd) == NULL)
+            for (j = 0; j < rest; j++)
             {
-                payload[j] = '\0';
-                printf("File over!");
-                break;
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (j = 0; j < CHUNK_SIZE; j++)
+            {
+                if (fgets(payload+j, 2, fd) == NULL)
+                {
+                    payload[j] = '\0';
+                    printf("File over!");
+                    break;
+                }
             }
         }
         sprintf(bufferSupp1, "%s %s ", DOWNLOAD_CHUNK, filename); //Format of the message sent is: type_mex filename payload
         start_payload = MEX_TYPE_LEN + strlen(filename) + 2;
-        for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+	if (i == nchunk-1) for (j = 0; j < rest; j++) bufferSupp1[start_payload+j] = payload[j];
+	else for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+        
         printf("We are sending %s\n\n", bufferSupp1);
 
         //ENCRYPT THE MESSAGE SENT
@@ -717,28 +735,24 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
             exit(1);
         }
     }
-
-
-    printf("Upload operation over... Waiting end communication from the server... \n\n");
     memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
-
-    ret = recv(sock, buffer, BUF_LEN,0);
+    ret = recv(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
-        printf("Problem during the send operation... \n\n");
-        return -1;
+        printf("Send operation gone bad!\n\n");
+        exit(1);
     }
-    
+    printf("I'm receiving %s\n\n", buffer);
+
+    // DECRYPT THE BUFFER
+
     sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
-    if (!(strcmp(bufferSupp1, UPLOAD_FINISHED)==0) || !(strcmp(bufferSupp2, username)==0) || !(strcmp(bufferSupp3, filename)==0))
+    if (!(strcmp(bufferSupp1, DOWNLOAD_FINISHED)==0) || !(strcmp(bufferSupp2, username)==0) || !(strcmp(bufferSupp3, filename)==0))
     {
-        printf("Error in the last message sent: message of end upload\n\n");
+        printf("Error in the last message sent: message of end download\n\n");
         return -1;
     }
-    printf("We have completed successfully the upload operation!\n\n");
+    printf("We have completed successfully the donwload operation!\n\n");
     return 1;
 }
 
