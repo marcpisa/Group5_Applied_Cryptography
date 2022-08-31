@@ -651,11 +651,12 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
         stat(filename, &st);
         nchunk = (st.st_size/CHUNK_SIZE)+1;
+        rest = st.st_size - (nchunk-1)*CHUNK_SIZE; 
 
         memset(buffer, 0, strlen(buffer));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
-        sprintf(buffer, "%s %s %s %i", UPLOAD_REQUEST, username, filename, nchunk);
+        sprintf(buffer, "%s %s %s %i %d", UPLOAD_REQUEST, username, filename, nchunk, rest);
 
         // ENCRYPT THE BUFFER
         printf("I'm sending %s\n\n", buffer);

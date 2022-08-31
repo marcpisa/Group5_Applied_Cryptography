@@ -598,9 +598,11 @@ int uploadServer(int sd, char* rec_mex)
     char username[MAX_LEN_USERNAME];
 
     printf("I received %s\n\n", rec_mex);
-    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, username, filename, bufferSupp2);
-    nchunk = atoi(bufferSupp2);
+    sscanf(rec_mex, "%s %s %s %s %s", bufferSupp1, username, filename, bufferSupp2, bufferSupp3);
     printf("The number of chunk of the file is %i", nchunk);
+
+    rest = atoi(bufferSupp3);
+    nchunk = atoi(bufferSupp2);
 
     // SANITIZATION OF THE USERNAME AND THE FILENAME
 
