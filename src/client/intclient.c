@@ -526,16 +526,17 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
+    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // bufferSupp3 = number_of_chunk
     nchunk = atoi(bufferSupp2);
     rest = atoi(bufferSupp3);
+    printf("The number of chunk is %i", nchunk); 
     if (nchunk == 0)
     {
         printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
         return 1;
     }
 
-    f1 = fopen(filename, "w");
+  f1 = fopen(filename, "w");
     for (i = 0; i < nchunk; i++)
     {
         printf("We are receiving the chunk number %i...\n\n", i);

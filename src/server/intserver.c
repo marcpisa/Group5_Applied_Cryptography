@@ -507,11 +507,10 @@ int downloadServer(int sd, char* rec_mex)
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-    sprintf(bufferSupp1, "%s %i %i", DOWNLOAD_ACCEPTED, nchunk, rest); //Format of the message sent is: type_mex n_chunk
+    sprintf(bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); //Format of the message sent is: type_mex n_chunk
     printf("I'm sending %s\n\n", bufferSupp1);
     //ENCRYPT THE MESSAGE SENT
-    
-    ret = send(sd, bufferSupp1, BUF_LEN, 0);
+     ret = send(sd, bufferSupp1, BUF_LEN, 0);
     if (ret == -1)
     {
         printf("Send operation gone bad\n");
@@ -549,7 +548,9 @@ int downloadServer(int sd, char* rec_mex)
         }
         sprintf(bufferSupp1, "%s %s ", DOWNLOAD_CHUNK, filename); //Format of the message sent is: type_mex filename payload
         start_payload = MEX_TYPE_LEN + strlen(filename) + 2;
-        for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+	if (i == nchunk-1) for (j = 0; j < rest; j++) bufferSupp1[start_payload+j] = payload[j];
+	else for (j = 0; j < CHUNK_SIZE; j++) bufferSupp1[start_payload+j] = payload[j];
+        
         printf("We are sending %s\n\n", bufferSupp1);
 
         //ENCRYPT THE MESSAGE SENT
@@ -581,6 +582,7 @@ int downloadServer(int sd, char* rec_mex)
     }
     printf("We have completed successfully the donwload operation!\n\n");
     return 1;
+   
 }
 
 
