@@ -28,6 +28,7 @@
 #define CHUNK_SIZE 512
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
+#define MEX_TYPE_LEN 8
 #define MAIN_FOLDER_SERVER "../../database"  // When you test the software on your pc change this variable
 #define MAIN_FOLDER_CLIENT "../../download"  // When you test the software on your pc change this variable
 #define INFO_FOLDER_SERVER "../../database/info" // When you test the software on your pc change this variable
