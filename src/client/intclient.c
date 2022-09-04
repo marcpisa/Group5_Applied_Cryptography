@@ -303,9 +303,117 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     return 1;
 }
 
-int LogoutClient()
+int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv_addr)
 {
+    int sock;
+    int digest_len;
+    int ret;
+    int temp_nonce;
+    unsigned int msg_len;
+    unsigned int msg_to_hash_len;
 
+    size_t offset;
+
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    sock = createSocket();
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
+
+    // Message length of the first message (request + nonce + hash)
+    msg_len = strlen(LOGOUT_REQUEST)+strlen(" ")+LEN_SIZE+strlen(" ")+HASH_LEN;
+
+    // Generating the hash of the request and the nonce
+    msg_to_hash_len = strlen(LOGOUT_REQUEST)+strlen(" ")+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    if (!msg_to_hash) exit_with_failure("Malloc buffer failed", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST));  // logout req
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)), " ", strlen(" "));
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+strlen(" ")), temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, digest_len);    
+    if (digest_len != HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    // Compose the message
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    memcpy(buffer, msg_to_hash, msg_to_hash_len);  // logout req + nonce
+    memcpy(&*(buffer+msg_to_hash_len), " ", strlen(" "));
+    memcpy(&*(buffer+msg_to_hash_len+strlen(" ")), digest, HASH_LEN); // hash
+
+    printf("I'm sending to the server the logout message.\n");
+    ret = send(sock, buffer, msg_len, 0); 
+    if (ret == -1) exit_with_failure("Send failed", 1);
+    *nonce = *nonce+1; // message sent, nonce increased for the answer
+
+    free(temp);
+    free(buffer);
+    free(msg_to_hash);
+    free(digest);
+
+
+
+    // Check the response (logoutSucceed + nonce + hash)
+    msg_len = strlen(LOGOUT_ACCEPTED)+strlen(" ")+LEN_SIZE+strlen(" ")+HASH_LEN;
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+    ret = recv(sock, buffer, msg_len, 0);
+    if (ret == -1) exit_with_failure("Receive failed", 1);
+    printf("Received the response of the server.\n");
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    // Parse the server response
+    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*strlen(LOGOUT_ACCEPTED));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+
+    offset = str_ssplit(buffer, DELIM);
+    memcpy(bufferSupp1, buffer, strlen(LOGOUT_ACCEPTED)); // logout accepted
+    offset += strlen(" ");
+
+    memcpy(temp, &*(buffer+offset), LEN_SIZE); // nonce
+    offset += LEN_SIZE+strlen(" ");
+    temp_nonce = atoi(temp);
+
+    memcpy(bufferSupp2, &*(buffer+offset), HASH_LEN); // hash
+
+    // Check logout accepted
+    if(!strcmp(LOGOUT_ACCEPTED, bufferSupp1)) exit_with_failure("The field is not logout_accepted, error.", 0);
+
+    // Check nonce
+    if (temp_nonce != *nonce) exit_with_failure("Nonce is incorrect, error.", 0);
+
+    // Check hash correctness
+    msg_to_hash_len = strlen(LOGOUT_ACCEPTED)+strlen(" ")+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    if (!msg_to_hash) exit_with_failure("Malloc buffer failed", 1);
+    
+    memcpy(msg_to_hash, LOGOUT_ACCEPTED, strlen(LOGOUT_ACCEPTED));
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_ACCEPTED)), " ", strlen(" "));
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_ACCEPTED)+strlen(" ")), temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, digest_len);   
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+
+    free(msg_to_hash);
+    free(digest);
+    free(temp);
+    free(buffer);
+    free(bufferSupp1);
+    free(bufferSupp2);
+       
+    return ret;
 }
 
 int listClient(char* username, struct sockaddr_in srv_addr)

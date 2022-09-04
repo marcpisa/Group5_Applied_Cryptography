@@ -424,3 +424,27 @@ EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store)
 
     return pub_rsa_key_serv;
 }
+
+
+unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, int* out_len)
+{
+    HMAC_CTX* hmac_ctx;
+    int ret;
+    unsigned char* digest;
+
+    digest = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!digest) exit_with_failure("Malloc digest failed", 1);
+
+    hmac_ctx = HMAC_CTX_new();
+    if (!hmac_ctx) exit_with_failure("HMAC_CTX_new failed", 1);
+    HMAC_Init_ex(hmac_ctx, key, keylen, EVP_sha256(), NULL);
+    if (ret != 1) exit_with_failure("HMAC_Init_ex failed", 1);
+    HMAC_Update(hmac_ctx, msg, msg_len);
+    if (ret != 1) exit_with_failure("HMAC_Update failed", 1);
+    HMAC_Final(hmac_ctx, digest, &out_len);
+    if (ret != 1) exit_with_failure("HMAC_Final failed", 1);
+
+    HMAC_CTX_free(hmac_ctx);
+
+    return digest;
+}

@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
     FILE* fd1;
 
     // Others
-    
+    int nonce = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED??
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
@@ -234,7 +234,16 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            // Stuff to do
+
+                            ret = logoutClient(&nonce, session_key2, srv_addr);
+                            
+                            if (ret != -1)
+                            {
+                                printf("Logout succeeded.\n");
+                                connected = 0;
+                                // clean some variables like session keys
+                            }
+                            else printf("Logout failed.\n");
                         
                             break;
 
