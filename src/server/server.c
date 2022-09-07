@@ -2,7 +2,7 @@
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
-    
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED??
     int exit_flag = 0;
 
     // Socket management variables
@@ -192,6 +192,15 @@ int main(int argc, char* argv[])
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
+                            ret = logoutServer(i, buffer, &nonce, );
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client logout request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a logout request and all was good!\n\n");
+
+
                             // Do stuff
 
                             printf("End of logout request management!\n\n");

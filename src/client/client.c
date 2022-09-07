@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
     FILE* fd1;
 
     // Others
-    int nonce = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED??
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = logoutClient(&nonce, session_key2, srv_addr);
+                            ret = logoutClient(&nonce_cs, session_key2, srv_addr);
                             
                             if (ret != -1)
                             {
@@ -277,12 +277,14 @@ int main(int argc, char* argv[])
                             break;
 
                         case 5: //*********** DELETE **********
-                            /*if (connected == 0)
+                            
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            ret = deleteClient(username,command2, srv_addr);
+                            }
+
+                            ret = deleteClient(username, command2, srv_addr);
                             if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
