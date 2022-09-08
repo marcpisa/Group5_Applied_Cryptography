@@ -2,7 +2,7 @@
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED??
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     int exit_flag = 0;
 
     // Socket management variables
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
                             close(listenerTCP);
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
-
+                            
                             ret = loginServer(i, buffer, session_key1, session_key2);
                             if (ret == -1)
                             {
@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
-                            ret = logoutServer(i, buffer, &nonce, );
+                            ret = logoutServer(i, buffer, &nonce_cs, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client logout request...\n\n");

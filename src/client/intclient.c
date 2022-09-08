@@ -81,7 +81,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-    /* Compose the message and send it to the server */
+    // Compose the message and send it to the server
     memcpy(buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST));  // login req
     memcpy(&*(buffer+strlen(LOGIN_REQUEST)), " ", BLANK_SPACE);
     memcpy(&*(buffer+strlen(LOGIN_REQUEST)+BLANK_SPACE), username, strlen(username)); // username
@@ -91,8 +91,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
     memcpy(&*(buffer+msg_len-1), "\0", 1);
 
-    /* 
-    for(int i = 0; i < msg_len; i++) { printf("%c", *(buffer+i)); }
+    /*
+    for(unsigned int i = 0; i < msg_len; i++) { printf("%c", *(buffer+i)); }
     printf("\n\n");    
     */
     //printf("%d\n%d\n%d\n", pubkey_len, iv_len, signature_len);
@@ -106,7 +106,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
 
     /* ---- Obtain and parse response server (DH pubkey, signature, len. cert. and cert.) ----*/
-    msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+MAX_CERT_LEN;
+    msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+MAX_CERT_LEN+1;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     ret = recv(sock, buffer, msg_len, 0);
@@ -121,10 +121,8 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
     // Parse the server response
-    offset = str_ssplit(buffer, DELIM);
     memcpy(bufferSupp1, buffer, pubkey_len); // g^b
-    if (pubkey_len != offset) exit_with_failure("Error DH pubkey len.", 0);
-    offset += BLANK_SPACE;
+    offset = pubkey_len+BLANK_SPACE;
 
     memcpy(bufferSupp2, &*(buffer+offset), SIGN_LEN); // dig.sig.
     offset += SIGN_LEN+BLANK_SPACE;
@@ -132,12 +130,13 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     memcpy(temp, &*(buffer+offset), LEN_SIZE); // len cert
     offset += LEN_SIZE+BLANK_SPACE;
     cert_len = atoi(temp);
+    if (cert_len <= 0 || (msg_len-offset) < (unsigned int) cert_len) exit_with_failure("Incorrect certificate length", 0);
+
 
     // The certificate is greater than 1024
     cert_buffer = (unsigned char*) malloc((cert_len+1)*sizeof(unsigned char));
     if (!cert_buffer) exit_with_failure("cert_buffer malloc failed", 1);
     memcpy(cert_buffer, &*(buffer+offset), cert_len); // cert
-
 
     // Obtain the public key, derive the established key
     peer_pubkey = pubkey_to_PKEY(bufferSupp1, pubkey_len);
@@ -179,16 +178,15 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
 
     /* ---- Generate last message for the server (digital signature) ---- */
-    // Generate digital signature
-    signature = sign_msg(path_rsa_key, exp_digsig, expected_len, &signature_len);
-    
     msg_len = SIGN_LEN+1;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
+    // Generate digital signature
+    signature = sign_msg(path_rsa_key, exp_digsig, expected_len, &signature_len);
+    
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
-
     memcpy(&*(buffer+msg_len-1), "\0", 1);
 
     //printf("%s\n", buffer);
@@ -209,23 +207,16 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv_addr)
 {
     int sock;
-    int digest_len;
+    unsigned int digest_len;
     int ret;
-    int temp_nonce;
     unsigned int msg_len;
     unsigned int msg_to_hash_len;
 
-    size_t offset;
-
-    unsigned char* iv;    
-    int iv_len;
-
     char* temp;
     unsigned char* buffer;
-    unsigned char* bufferSupp1;
-    unsigned char* bufferSupp2;
     unsigned char* msg_to_hash;
     unsigned char* digest;
+    unsigned char* iv;    
 
     sock = createSocket();
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
@@ -236,13 +227,15 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     RAND_poll(); // Seed OpenSSL PRNG
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-    iv_len = IV_LEN;
 
-    // Message length of the first message (request + nonce + hash)
+
+
+
+    /* ---- Create the first message (request + hash + iv) ---- */
     msg_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
     // Generating the hash of the request and the nonce
-    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE+1;
+    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc buffer failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
@@ -256,10 +249,8 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
     temp, LEN_SIZE); // nonce
 
-    memcpy(&*(buffer+msg_len-1), "\0", 1);
-
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != HASH_LEN) exit_with_failure("Wrong digest len", 0);
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
     // Compose the message
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
@@ -275,7 +266,7 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     printf("I'm sending to the server the logout message.\n");
     ret = send(sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer
+    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
     free(temp);
     free(buffer);
@@ -857,7 +848,7 @@ int shareClient(char* username, char* filename, char* peername, struct sockaddr_
 
 int shareReceivedClient(int sd, char* rec_mex)
 {
-    int ret, i;
+    int ret;
     char* p;
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
@@ -922,4 +913,6 @@ int shareReceivedClient(int sd, char* rec_mex)
         else printf("Given a bad input. Retry!\n\n");
         fflush(stdin);
     }
+
+    return -1;
 }

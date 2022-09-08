@@ -108,4 +108,4 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa);
 void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2);
 EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store);
-unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, int* out_len);
+unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, unsigned int* out_len);

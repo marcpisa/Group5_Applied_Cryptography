@@ -25,8 +25,6 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* temp;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
-    unsigned char* bufferSupp3;
-    unsigned char* bufferSupp4;
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "cert.pem";
     char* path_rsa_key = "rsa_prvkey.pem";
@@ -34,19 +32,13 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     int ret;
     int msg_len;
     char username [MAX_LEN_USERNAME];
-    int offset, old_offset;
+    size_t offset, old_offset;
     size_t K_len;
 
     // Certificate
     unsigned char* cert_byte;
     int cert_len = 0;
     EVP_PKEY* pub_rsa_client;
-
-    // Symmetric encryption
-    unsigned char* ciphertext;
-    unsigned char* iv;
-    unsigned int iv_len;
-    int cipherlen;
 
     // Digital Signature variables
     unsigned char* signature;
@@ -62,8 +54,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     unsigned char* K;
     
     int pubkey_len = 0;
-    unsigned int pubkey_len_rec;
-    int len_username;
+    unsigned int len_username;
 
     /*********************
      * END VARIABLES
@@ -81,21 +72,26 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &dh_pubkey, &pubkey_len);
 
-    
+
+
+
     /* ---- Parse the first message (login request message + username + DH pubkey) ---- */
     bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*MAX_LEN_USERNAME);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    //memset(bufferSupp1, 0, MAX_LEN_USERNAME);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*pubkey_len);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    offset = str_ssplit((unsigned char*) rec_mex, DELIM);
+    offset = str_ssplit((unsigned char*) rec_mex, DELIM); // login request already parsed
+    if (offset != (unsigned int) strlen(LOGIN_REQUEST)) exit_with_failure("Wrong login req. length", 0);
     old_offset = offset+BLANK_SPACE;
 
     offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
-    memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
     len_username = offset;
+    memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
+    memcpy(&*(bufferSupp1+offset), "\0", 1);
+
+    printf("\n%s\n", (char*) bufferSupp1);
     old_offset += offset+BLANK_SPACE;
 
     memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len); // dh pubkey
@@ -134,7 +130,6 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     free(bufferSupp1);
     free(bufferSupp2);
-    free(temp);
     free(path_cert_client_rsa);
     EVP_PKEY_free(my_prvkey);
     EVP_PKEY_free(peer_pubkey);
@@ -230,54 +225,54 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 }
 
 
-int logoutClient(int sd, char* rec_mex, int* nonce, unsigned char* session_key2)
+int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key2)
 {
-    int digest_len;
+    unsigned int digest_len;
     int ret;
-    int temp_nonce;
-    unsigned int msg_len;
     unsigned int msg_to_hash_len;
 
     size_t offset;
 
     char* temp;
-    unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
     unsigned char* msg_to_hash;
     unsigned char* digest; 
 
 
-    // Parse the first client message (request + nonce + hash)
+    /* ---- Parse the first client message (request + hash + iv) ---- */
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);   
     bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*strlen(LOGOUT_REQUEST));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);   
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);   
+    if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
 
-    offset = str_ssplit(rec_mex, DELIM);
-    memcpy(bufferSupp1, rec_mex, strlen(LOGOUT_REQUEST)); // logout request
+    offset = str_ssplit((unsigned char*) rec_mex, DELIM);
+    memcpy(bufferSupp1, rec_mex, strlen(LOGOUT_REQUEST)); // logout req.
+    if (offset != (unsigned int)strlen(LOGOUT_REQUEST)) exit_with_failure("Incorrect logout req. length", 0);
     offset += BLANK_SPACE;
 
-    memcpy(temp, &*(rec_mex+offset), LEN_SIZE); // nonce
-    offset += LEN_SIZE+BLANK_SPACE;
-    temp_nonce = atoi(temp);
+    memcpy(bufferSupp2, &*((unsigned char*) rec_mex+offset), HASH_LEN); // hash
+    offset += HASH_LEN+BLANK_SPACE;
+    
+    memcpy(bufferSupp3, &*((unsigned char*) rec_mex+offset), IV_LEN); // iv
 
-    memcpy(bufferSupp2, &*(rec_mex+offset), HASH_LEN); // hash
-
-    // Check nonce
-    if (temp_nonce != *nonce) exit_with_failure("Nonce is incorrect, error.", 0);
 
     // Check hash correctness
-    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     
-    memcpy(msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST));
+    memcpy(msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST)); // logout req.
     memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE), bufferSupp3, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
     sprintf(temp, "%d", *nonce);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE), temp, LEN_SIZE); // nonce
+    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
@@ -286,31 +281,12 @@ int logoutClient(int sd, char* rec_mex, int* nonce, unsigned char* session_key2)
 
     free(bufferSupp1);
     free(bufferSupp2);
+    free(bufferSupp3);
     free(temp);
     free(digest);
     free(msg_to_hash);
 
-
-
-
-    // Prepare the response
-    msg_len = strlen(LOGOUT_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+HASH_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-
-    // Calculate the hash
-    msg_to_hash_len = strlen(LOGOUT_ACCEPTED)+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-
-
-
-
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
-    
-
-    // Compose the message
-    sprintf(temp, "%d", *nonce);
-
-
+    return 1;
 
 }
 
@@ -607,7 +583,7 @@ int uploadServer(int sd, char* rec_mex)
 
     printf("I received %s\n\n", rec_mex);
     sscanf(rec_mex, "%s %s %s %s %s", bufferSupp1, username, filename, bufferSupp2, bufferSupp3);
-    printf("The number of chunk of the file is %i", nchunk);
+    printf("The number of chunk of the file is %i", nchunk); // ??
 
     rest = atoi(bufferSupp3);
     nchunk = atoi(bufferSupp2);
@@ -651,7 +627,7 @@ int uploadServer(int sd, char* rec_mex)
         sprintf(buffer, "%s %s %s", UPLOAD_DENIED, username, filename);
         printf("I'm sending %s\n\n", buffer);
         ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret = -1) printf("Had some problem with the send operation...\n\n");
+        if (ret == -1) printf("Had some problem with the send operation...\n\n");
         return -1;
     }
 
@@ -892,4 +868,6 @@ int shareServer(int sd, char* rec_mex)
         }
         return 1;
     }
+
+    return -1;
 }
