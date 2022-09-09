@@ -65,7 +65,7 @@ size_t str_ssplit(unsigned char* a_str, const unsigned char a_delim)
     unsigned char* tmp = a_str;
 
     // Count how many elements there are before delim
-    while (*tmp)
+    while (*tmp != '\0')
     {
         if (a_delim == *tmp)
         {
@@ -134,8 +134,9 @@ EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     int ret;
     EVP_PKEY* dh_pubkey = NULL;
-
-    FILE* file_pubkey_pem = fopen(path_pubkey, "w");
+    FILE* file_pubkey_pem;
+    
+    file_pubkey_pem = fopen(path_pubkey, "w");
     if (!file_pubkey_pem) exit_with_failure("Fopen (save_read_PUBKEY) failed", 1);
     
     ret = PEM_write_PUBKEY(file_pubkey_pem, my_prvkey);
@@ -266,7 +267,9 @@ unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len,
 int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned char* msg_to_ver, int len_msg_ver, EVP_PKEY* pub_rsa_key)
 {
     int ret;
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX* ctx;
+    
+    ctx = EVP_MD_CTX_new();
     if(!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
     
     ret = EVP_VerifyInit(ctx, EVP_sha256());
@@ -280,7 +283,6 @@ int verify_signature(unsigned char* exp_digsig, int len_exp_digsig, unsigned cha
     if (ret != 1) return 0;
     return 1;
 }
-
 
 unsigned char* read_cert(char* path_cert, int* cert_len)
 {
@@ -378,7 +380,7 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 
     ctx = EVP_PKEY_CTX_new(dh_params, NULL);
     if(!ctx) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
-    
+
     ret = EVP_PKEY_keygen_init(ctx);
     if (ret != 1) exit_with_failure("keygen_init failed", 1);
     ret = EVP_PKEY_keygen(ctx, my_prvkey);
@@ -386,6 +388,7 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 
     // Save DH key in PEM format and retrieve the public key
     *dh_pubkey = save_read_PUBKEY(path_pubkey, *my_prvkey);
+
     //if (!dh_pubkey) exit_with_failure("save_read_PUBKEY failed", 0);
     pubkey_byte = pubkey_to_byte(*dh_pubkey, pubkey_len);
     if (!pubkey_byte) exit_with_failure("pubkey_to_byte failed", 0);
@@ -436,8 +439,8 @@ void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key
 
     EVP_MD_CTX_free(ctx);
 
-    memcpy(session_key1, digest, 16); // 16 byte = 128 bit
-    memcpy(session_key2, &*(digest+16), 16);
+    memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(*session_key2, &*(digest+16), 16);
     
     free(digest);
 }
@@ -460,4 +463,28 @@ EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store)
     X509_STORE_CTX_free(ctx);
 
     return pub_rsa_key_serv;
+}
+
+
+unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, unsigned int* out_len)
+{
+    HMAC_CTX* hmac_ctx;
+    int ret;
+    unsigned char* digest;
+
+    digest = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!digest) exit_with_failure("Malloc digest failed", 1);
+
+    hmac_ctx = HMAC_CTX_new();
+    if (!hmac_ctx) exit_with_failure("HMAC_CTX_new failed", 1);
+    ret = HMAC_Init_ex(hmac_ctx, key, keylen, EVP_sha256(), NULL);
+    if (ret != 1) exit_with_failure("HMAC_Init_ex failed", 1);
+    ret = HMAC_Update(hmac_ctx, msg, msg_len);
+    if (ret != 1) exit_with_failure("HMAC_Update failed", 1);
+    ret = HMAC_Final(hmac_ctx, digest, out_len);
+    if (ret != 1) exit_with_failure("HMAC_Final failed", 1);
+
+    HMAC_CTX_free(hmac_ctx);
+
+    return digest;
 }

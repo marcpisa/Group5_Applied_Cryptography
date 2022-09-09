@@ -6,6 +6,7 @@ int main(int argc, char* argv[])
     // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
+    int sock;
     int new_sd, listenerTCP, ret, fdmax, pid, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
@@ -22,7 +23,7 @@ int main(int argc, char* argv[])
     FILE* fd1;
 
     // Others
-    
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
@@ -32,6 +33,7 @@ int main(int argc, char* argv[])
     // Cryptographic operation
     unsigned char* session_key1;
     unsigned char* session_key2;
+    
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(!session_key1 || !session_key2)
@@ -69,13 +71,16 @@ int main(int argc, char* argv[])
     // CA store configuration
     ca_store = X509_STORE_new();
     bio_cert = BIO_new_file(path_cert_serv, "rb");
-    if (bio_cert == NULL) exit_with_failure("BIO_new_file failed", 1);
+    if (!bio_cert) exit_with_failure("BIO_new_file failed", 1);
 
     PEM_read_bio_X509(bio_cert, &cert_serv, NULL, NULL);
-    if (cert_serv == NULL) exit_with_failure("PEM_read_bio_X509 failed", 1);
+    if (!cert_serv) exit_with_failure("PEM_read_bio_X509 failed", 1);
     ret = X509_STORE_add_cert(ca_store, cert_serv);
     if (ret != 1) exit_with_failure("X509_STORE_add_cert failed", 1);
 
+    X509_free(cert_serv);
+    BIO_free(bio_cert);
+    
     // WE NEED TO SET ALSO THE CRL?????????????
 
 
@@ -134,11 +139,10 @@ int main(int argc, char* argv[])
     FD_SET(listenerTCP, &master);
     if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
     else fdmax = fileno(stdin);
-
+    
     while(!exit_flag)
     {
         read_fds = master;
-        
         select(fdmax+1, &read_fds, NULL, NULL, 0);
         for (int i = 0; i <= fdmax; i++)
         {
@@ -152,6 +156,7 @@ int main(int argc, char* argv[])
                     // a response to the server.
                     addrlen = sizeof(srv_addr2);
                     new_sd = accept(listenerTCP, (struct sockaddr*)&srv_addr2, &addrlen);
+                    
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
                 }
@@ -160,6 +165,8 @@ int main(int argc, char* argv[])
                     //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
                     strcpy(command1, ""); strcpy(command2, ""); strcpy(command3, "");
                     fgets(buffer, 3*COM_LEN+3, stdin); //We should fix this later
+                    fflush(stdin);
+
                     sscanf(buffer, "%s %s %s", command1, command2, command3);
                     if (strcmp(command1, "") == 0)
                     {
@@ -188,17 +195,19 @@ int main(int argc, char* argv[])
                                 printf("Connection already established. Login impossible operation!\n\n");
                                 break;
                             }
-
+                    
                             ret = loginClient(session_key1, session_key2, username, srv_addr, ca_store);
                             // TO ADD the return -1 cases
                             if (ret == -1) 
                             {
-                                printf("Login failed.\n\n"); 
-                                exit(-1);
+                                // Notify error to server
+                                // TODO 
+                                printf("Login failed.\n\n");
                             }
                             else 
                             {
-                                printf("Login succedded.\n");
+                                printf("Login succedded.\n\n");
+                                connected = 1;
                             }
                         
                             break;
@@ -210,7 +219,16 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            // Stuff to do
+
+                            ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                            
+                            if (ret != -1)
+                            {
+                                printf("Logout succeeded.\n\n");
+                                connected = 0;
+                                // clean some variables like session keys
+                            }
+                            else printf("Logout failed.\n\n");
                         
                             break;
 
@@ -244,12 +262,14 @@ int main(int argc, char* argv[])
                             break;
 
                         case 5: //*********** DELETE **********
-                            /*if (connected == 0)
+                            
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            ret = deleteClient(username,command2, srv_addr);
+                            }
+
+                            ret = deleteClient(username, command2, srv_addr);
                             if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
@@ -302,22 +322,49 @@ int main(int argc, char* argv[])
                             break;
                         
                         case 9: //************HELP***************//
-                               if (connected == 0 || connected == 1) 
-                               { 
+                            printf(GRN "This is the manual with the following commands:\n\n"); 
                                     printf(GRN "This is the manual with the following commands:\n\n"); 
+                            printf(GRN "This is the manual with the following commands:\n\n"); 
+                                    printf(GRN "This is the manual with the following commands:\n\n"); 
+                            printf(GRN "This is the manual with the following commands:\n\n"); 
+                            printf("Login: 'login' \n"); 
                                     printf("Login: 'login' \n"); 
+                            printf("Login: 'login' \n"); 
+                                    printf("Login: 'login' \n"); 
+                            printf("Login: 'login' \n"); 
+                            printf("Logout: 'logout' \n"); 
                                     printf("Logout: 'logout' \n"); 
-                                    printf("List all files: 'list'\n");
+                            printf("Logout: 'logout' \n"); 
+                                    printf("Logout: 'logout' \n"); 
+                            printf("Logout: 'logout' \n"); 
+                            printf("List all files: 'list'\n");
+                            printf("Rename files: 'rename old_filename new_filename'\n"); 
                                     printf("Rename files: 'rename old_filename new_filename'\n"); 
+                            printf("Rename files: 'rename old_filename new_filename'\n"); 
+                                    printf("Rename files: 'rename old_filename new_filename'\n"); 
+                            printf("Rename files: 'rename old_filename new_filename'\n"); 
+                            printf("Delete file: 'delete filename'\n"); 
                                     printf("Delete file: 'delete filename'\n"); 
+                            printf("Delete file: 'delete filename'\n"); 
+                                    printf("Delete file: 'delete filename'\n"); 
+                            printf("Delete file: 'delete filename'\n"); 
+                            printf("Download file: 'download filename'\n"); 
                                     printf("Download file: 'download filename'\n"); 
+                            printf("Download file: 'download filename'\n"); 
+                                    printf("Download file: 'download filename'\n"); 
+                            printf("Download file: 'download filename'\n"); 
+                            printf("Upload file: 'upload file_location'\n"); 
                                     printf("Upload file: 'upload file_location'\n"); 
+                            printf("Upload file: 'upload file_location'\n"); 
+                                    printf("Upload file: 'upload file_location'\n"); 
+                            printf("Upload file: 'upload file_location'\n"); 
+                            printf("Share file with other user: 'share filename username'\n"); 
                                     printf("Share file with other user: 'share filename username'\n"); 
-                                    printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
-                                    break; 
-                               } 
-
-                               break; 
+                            printf("Share file with other user: 'share filename username'\n"); 
+                                    printf("Share file with other user: 'share filename username'\n"); 
+                            printf("Share file with other user: 'share filename username'\n"); 
+                            printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
+                            break; 
 
                         case 10:
                                 if(connected == 1)
@@ -372,9 +419,12 @@ int main(int argc, char* argv[])
             }
         }
     }
+
     close(listenerTCP);
+    
     X509_STORE_free(ca_store);
-    //free(session_key1);
-    //free(session_key2);
+    free(session_key1);
+    free(session_key2);
+    
     return 0;
 }

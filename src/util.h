@@ -15,6 +15,8 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
+#include <openssl/hmac.h>
+#include <openssl/crypto.h>
 //#include <conio.h>
 
 
@@ -51,43 +53,47 @@
 #define HELP "help"
 #define EXIT "exit"
 
-#define LOGIN_REQUEST "logi_req"
-#define LOGOUT_REQUEST "logo_req"
-#define LIST_REQUEST "list_req"
-#define LIST_RESPONSE "list_res"
-#define RENAME_REQUEST "renm_req"
-#define RENAME_ACCEPTED "renm_acc"
-#define RENAME_DENIED "renm_den"
-#define DELETE_REQUEST "dele_req"
-#define DELETE_ACCEPTED "dele_acc"
-#define DELETE_DENIED "dele_den"
-#define DOWNLOAD_REQUEST "down_req"
-#define DOWNLOAD_ACCEPTED "down_acc"
-#define DOWNLOAD_DENIED "down_den"
-#define DOWNLOAD_CHUNK "down_cnk"
-#define DOWNLOAD_FINISHED "down_fin"
-#define UPLOAD_REQUEST "upld_req"
-#define UPLOAD_ACCEPTED "upld_acc"
-#define UPLOAD_DENIED "upld_den"
-#define UPLOAD_CHUNK "upld_cnk"
-#define UPLOAD_FINISHED "upld_fin"
-#define SHARE_REQUEST "shre_req"
-#define SHARE_ACCEPTED "shre_acc"
-#define SHARE_PERMISSION "shre_per"
-#define SHARE_DENIED "shre_den"
+#define LOGIN_REQUEST       "logi_req"
+#define LOGOUT_REQUEST      "logo_req"
+#define LOGOUT_ACCEPTED     "logo_acc"
+#define LIST_REQUEST        "list_req"
+#define LIST_RESPONSE       "list_res"
+#define RENAME_REQUEST      "renm_req"
+#define RENAME_ACCEPTED     "renm_acc"
+#define RENAME_DENIED       "renm_den"
+#define DELETE_REQUEST      "dele_req"
+#define DELETE_ACCEPTED     "dele_acc"
+#define DELETE_DENIED       "dele_den"
+#define DOWNLOAD_REQUEST    "down_req"
+#define DOWNLOAD_ACCEPTED   "down_acc"
+#define DOWNLOAD_DENIED     "down_den"
+#define DOWNLOAD_CHUNK      "down_cnk"
+#define DOWNLOAD_FINISHED   "down_fin"
+#define UPLOAD_REQUEST      "upld_req"
+#define UPLOAD_ACCEPTED     "upld_acc"
+#define UPLOAD_DENIED       "upld_den"
+#define UPLOAD_CHUNK        "upld_cnk"
+#define UPLOAD_FINISHED     "upld_fin"
+#define SHARE_REQUEST       "shre_req"
+#define SHARE_ACCEPTED      "shre_acc"
+#define SHARE_PERMISSION    "shre_per"
+#define SHARE_DENIED        "shre_den"
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
 #define RESET "\x1B[0m"
 
 #define MAX_LEN_USERNAME 25
-#define MAX_LEN_REQUEST 20
-#define LEN_SIZE 4
+#define MAX_LEN_REQUEST 15
+#define LEN_SIZE 5
+#define MAX_CERT_LEN 2*BUF_LEN
 
 #define DELIM ' '
 
 #define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
 #define HASH_LEN EVP_MD_size(EVP_sha256())
+#define SIGN_LEN 256
+#define BLANK_SPACE 1
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
 
 int username_sanitization(const char* username);
@@ -112,5 +118,4 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa);
 void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2);
 EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store);
-
-int pass_cb(char *buf, int size, int rwflag, void *u);
+unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, unsigned int* out_len);
