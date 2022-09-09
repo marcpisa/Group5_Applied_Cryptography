@@ -362,7 +362,7 @@ int listClient(char* username, struct sockaddr_in srv_addr)
         exit(1);
     }
     memset(buffer, 0, strlen(buffer));
-    printf("List request message sent\n");
+    printf("List request message sent\n\n");
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1)
     {
@@ -374,8 +374,13 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     // HERE USE DECRYPTION TO UNDERSTAND WHAT YOU RECEIVE
 
     // END COMMUNICATION
-
-    printf("%s\n", buffer);
+    
+    char *token;
+    token = strtok(buffer, " ");
+    while (token != NULL) {
+        printf("%s\n", token);
+        token = strtok(NULL, " ");
+    }
     return 1;
 }
 

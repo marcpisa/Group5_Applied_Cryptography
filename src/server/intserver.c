@@ -293,27 +293,32 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key2)
 
 int listServer(int sd, char* rec_mex)
 {
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN+10]; // I'm creating a buffer a little longer to have the capacity to contain buffSupp1. We could fix the problem later, putting the end_string character at the end of the list
+    //char bufferSupp1[BUF_LEN];
+
+    char *buffer_mex_field[2]; //buffer_mex_field[0] ---> contains the request type, buffer_mex_field[1] ---> contains the username
+    char buffer_response[BUF_LEN+10]; // I'm creating a buffer a little longer to have the capacity to contain buffSupp1. We could fix the problem later, putting the end_string character at the end of the list
     DIR* d;
     struct dirent *files;
     int ret;
     printf("I received a message from a client saying: %s\n\n", rec_mex);
-    // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
 
-    memset(bufferSupp1, 0, BUF_LEN);
-    memset(bufferSupp2, 0, BUF_LEN);
-    sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
-    printf("The username is %s, the length of the username is %li\n\n", bufferSupp2, strlen(bufferSupp2));
+    //memset(bufferSupp1, 0, BUF_LEN);
+    //memset(bufferSupp2, 0, BUF_LEN);
+
+    rec_buffer_sanitization(rec_mex, buffer_mex_field);
+
+    //sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
+    
+    printf("The username is %s, the length of the username is %li\n\n", buffer_mex_field[1], strlen(buffer_mex_field[1]));
 
     if (chdir(MAIN_FOLDER_SERVER) == -1)
 	{
-		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
+        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
 	}
 
-    ret = chdir(bufferSupp2);
+    ret = chdir(buffer_mex_field[1]);
     if (ret == -1)
     {
         printf("Error: username doesn't exists...\n");
@@ -322,23 +327,26 @@ int listServer(int sd, char* rec_mex)
 
     // WE ARE ASSUMING THAT WE DON'T NEED MORE THAN ONE MESSAGE TO LIST THE FILES
     d = opendir(".");
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
+    memset(buffer_response, 0, strlen(buffer_response));
+    strcat(buffer_response, LIST_RESPONSE);
+    strcat(buffer_response, " ");
     if(d)
     {
         while((files = readdir(d)) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
         {
-            strcat(bufferSupp1, files->d_name);
-            strcat(bufferSupp1, "/");
+            strcat(buffer_response, files->d_name);
+            strcat(buffer_response, " ");
         }
     }
     
 
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    sprintf(bufferSupp2, "%s %s", LIST_RESPONSE, bufferSupp1);
-    printf("I'm sendinf %s to the client...\n\n", bufferSupp2);
+    //memset(bufferSupp2, 0, strlen(bufferSupp2));
+    //sprintf(bufferSupp2, "%s %s", LIST_RESPONSE, bufferSupp1);
+
+    printf("I'm sendinf %s to the client...\n\n", buffer_response);
     // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
-    ret = send(sd, bufferSupp2, strlen(bufferSupp2), 0);
+    ret = send(sd, buffer_response, strlen(buffer_response), 0);
     if (ret == -1)
     {
         printf("Send operation gone bad\n");
@@ -351,7 +359,7 @@ int listServer(int sd, char* rec_mex)
 
 int renameServer(int sd, char* rec_mex)
 {
-    char bufferSupp1[BUF_LEN];
+    char bufferSupp1[0][BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char bufferSupp4[BUF_LEN];
@@ -376,7 +384,6 @@ int renameServer(int sd, char* rec_mex)
     }
 
     // CHECK IF THE FILE EXISTS, otherwise send a message of error to the client
-
     ret = rename(bufferSupp3, bufferSupp4);
     if (ret == -1) 
     {
