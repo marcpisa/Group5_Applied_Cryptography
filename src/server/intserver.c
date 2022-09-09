@@ -78,7 +78,6 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     /* ---- Parse the first message (login request message + username + DH pubkey) ---- */
     bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*MAX_LEN_USERNAME);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    //memset(bufferSupp1, 0, MAX_LEN_USERNAME);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*pubkey_len);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
@@ -87,11 +86,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     old_offset = offset+BLANK_SPACE;
 
     offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
-    len_username = offset;
     memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
     memcpy(&*(bufferSupp1+offset), "\0", 1);
-
-    printf("\n%s\n", (char*) bufferSupp1);
+    len_username = offset;
     old_offset += offset+BLANK_SPACE;
 
     memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len); // dh pubkey
@@ -104,6 +101,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     // Sanitize and check username
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
     
+
+    // SERVER SHOULD CHECK IF THE USER IS ALREADY ONLINE
+
     ret = chdir(MAIN_FOLDER_SERVER);
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
     ret = chdir((char*) bufferSupp1);
@@ -129,7 +129,6 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     printf("First message is correct. Preparing the response...\n");
 
     free(bufferSupp1);
-    free(bufferSupp2);
     free(path_cert_client_rsa);
     EVP_PKEY_free(my_prvkey);
     EVP_PKEY_free(peer_pubkey);
@@ -150,7 +149,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     ret = chdir("../../src");
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
     signature = sign_msg(path_rsa_key, msg_to_sign, msg_to_sign_len, &signature_len);
-
+ 
     // Serialize the certificate
     cert_byte = read_cert(path_cert_rsa, &cert_len);
 
@@ -188,6 +187,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     ret = send(sd, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed: ", 1);
 
+    free(bufferSupp2);
     free(temp);
     free(buffer);
     free(pubkey_byte);
@@ -200,17 +200,18 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
     /* Parse the client message and verify the fields */
-    msg_len = SIGN_LEN+1;
+    msg_len = SIGN_LEN;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*SIGN_LEN);
+    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*(SIGN_LEN+1));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
     ret = recv(sd, buffer, msg_len, 0);
     if (ret == -1) exit_with_failure("Receive failed: ", 1);
  
     memcpy(bufferSupp1, buffer, SIGN_LEN); // username
-   
+    memcpy(&*(bufferSupp1+SIGN_LEN), "\0", 1);
+
     // Verify signature
     ret = verify_signature(msg_to_sign, msg_to_sign_len, bufferSupp1, SIGN_LEN, pub_rsa_client);
     if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);

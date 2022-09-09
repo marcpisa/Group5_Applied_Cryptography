@@ -85,7 +85,7 @@
 
 #define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
 #define HASH_LEN EVP_MD_size(EVP_sha256())
-#define SIGN_LEN 512
+#define SIGN_LEN 256
 #define BLANK_SPACE 1
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
 

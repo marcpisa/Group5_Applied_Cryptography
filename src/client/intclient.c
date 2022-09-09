@@ -130,6 +130,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     memcpy(temp, &*(buffer+offset), LEN_SIZE); // len cert
     offset += LEN_SIZE+BLANK_SPACE;
     cert_len = atoi(temp);
+    printf("Cert:%ld %d\n", msg_len-offset, cert_len);
     if (cert_len <= 0 || (msg_len-offset) < (unsigned int) cert_len) exit_with_failure("Incorrect certificate length", 0);
 
 
@@ -178,16 +179,15 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
 
     /* ---- Generate last message for the server (digital signature) ---- */
-    msg_len = SIGN_LEN+1;
+    msg_len = SIGN_LEN;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     // Generate digital signature
     signature = sign_msg(path_rsa_key, exp_digsig, expected_len, &signature_len);
-    
+
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
-    memcpy(&*(buffer+msg_len-1), "\0", 1);
 
     //printf("%s\n", buffer);
     printf("I'm sending to the server the last message.\n");

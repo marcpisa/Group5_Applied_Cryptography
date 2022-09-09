@@ -216,12 +216,11 @@ int main(int argc, char* argv[])
                             {
                                 // Notify error to server
                                 // TODO 
-
-                                exit_with_failure("Login failed.\n\n", 0);
+                                printf("Login failed.\n\n");
                             }
                             else 
                             {
-                                printf("Login succedded.\n");
+                                printf("Login succedded.\n\n");
                                 connected = 1;
                             }
                         
@@ -239,11 +238,11 @@ int main(int argc, char* argv[])
                             
                             if (ret != -1)
                             {
-                                printf("Logout succeeded.\n");
+                                printf("Logout succeeded.\n\n");
                                 connected = 0;
                                 // clean some variables like session keys
                             }
-                            else printf("Logout failed.\n");
+                            else printf("Logout failed.\n\n");
                         
                             break;
 
