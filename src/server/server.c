@@ -1,9 +1,10 @@
 #include "intserver.h"
-
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
-    
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    int exit_flag = 0;
+
     // Socket management variables
     int ret, pid, listenerTCP, i, fdmax, new_sd;
     uint32_t addr_app;
@@ -13,18 +14,19 @@ int main(int argc, char* argv[])
     struct sockaddr_in srv_addr, cl_addr;
     
     // Buffers
-    char buffer[4*BUF_LEN];
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char command1[BUF_LEN];
+    char received_buffer[4*BUF_LEN];
+    char remote_comm[BUF_LEN];
+    char username[BUF_LEN];
+    char filename[BUF_LEN];
+    char local_comm[BUF_LEN];
 
     // Timeout varible for the select function
     struct timeval tv;
 
     // Cryptographic operation
     unsigned char* session_key1;
-    unsigned char* session_key2;
+    unsigned char* session_key2;    
+    
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(session_key1 == NULL || session_key2 == NULL)
@@ -84,7 +86,8 @@ int main(int argc, char* argv[])
     if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
     else fdmax = fileno(stdin);
     printf("I'm using the select function to attend for more than one event...\n\n");
-    while(1)
+    
+    while(!exit_flag)
     {
         //printf("Another turn of select has been done. It means that the software is behaving correctly..\n\n");
         read_fds = master;
@@ -108,12 +111,14 @@ int main(int argc, char* argv[])
                 else if (i == fileno(stdin))
                 {
                     //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
-                    strcpy(command1, "");
-                    fgets(buffer, COM_LEN, stdin);
-                    sscanf(buffer, "%s", command1);
-                    if (strcmp(command1, "exit") == 0)
+                    //sanitization not necessary because the command is checked in next if blocks.
+                    strcpy(local_comm, "");
+                    fgets(received_buffer, COM_LEN, stdin);
+                    sscanf(received_buffer, "%s", local_comm);
+                    if (strcmp(local_comm, "exit") == 0)
                     {
                         printf("Done!\n\n");
+                        exit_flag = 1;
                         close(listenerTCP);
                         continue;
                     }
@@ -121,9 +126,9 @@ int main(int argc, char* argv[])
                 }
                 else //Manager for the accepted communications
                 {
-                    memset(buffer, 0, 4*BUF_LEN); // ???
+                    memset(received_buffer, 0, 4*BUF_LEN); // ???
                     //printf("Now the buffer contains %s\n\n", buffer);
-                    ret = recv(i, buffer, 4*BUF_LEN, 0);
+                    ret = recv(i, received_buffer, 4*BUF_LEN, 0);
                     if (ret < 0)
                     {
                         perror("Errore during recv operation: ");
@@ -131,11 +136,10 @@ int main(int argc, char* argv[])
                         exit(-1);
                     }
                     // We check the first keyword to understand what the Client wants us to do
-                    memset(bufferSupp1, 0, BUF_LEN);
-                    memcpy(bufferSupp1, buffer, str_ssplit((unsigned char*) buffer, DELIM));
-                    
+                    memset(remote_comm, 0, BUF_LEN);
+                    memcpy(remote_comm, received_buffer, str_ssplit((unsigned char*) received_buffer, DELIM));
                     // ************ LOGIN REQUEST MANAGER ***********
-                    if (strcmp(bufferSupp1, LOGIN_REQUEST) == 0)
+                    if (strcmp(remote_comm, LOGIN_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -153,7 +157,7 @@ int main(int argc, char* argv[])
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, buffer, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -170,7 +174,7 @@ int main(int argc, char* argv[])
                     }
 
                      //************ LOGOUT REQUEST MANAGER ************
-                    else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
+                    else if (strcmp(remote_comm, LOGOUT_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -188,6 +192,15 @@ int main(int argc, char* argv[])
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
+                            ret = logoutServer(i, received_buffer, &nonce_cs, session_key2);
+                            if (ret == -1)
+                            {
+                                printf("Something bad happened during the management of the client logout request...\n\n");
+                                exit(1);
+                            }
+                            else printf("I managed a logout request and all was good!\n\n");
+
+
                             // Do stuff
 
                             printf("End of logout request management!\n\n");
@@ -198,7 +211,7 @@ int main(int argc, char* argv[])
 
 
                     // ************* LIST REQUEST MANAGER ***************
-                    else if (strcmp(bufferSupp1, LIST_REQUEST) == 0)
+                    else if (strcmp(remote_comm, LIST_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -216,7 +229,7 @@ int main(int argc, char* argv[])
                             printf("\nA list request hasasdjhadasjkdhjaskdjkasdhs came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
-                            ret = listServer(i, buffer);
+                            ret = listServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -234,7 +247,7 @@ int main(int argc, char* argv[])
 
 
                     //*************** RENAME REQUEST MANAGER *****************
-                    else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
+                    else if (strcmp(remote_comm, RENAME_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -252,7 +265,7 @@ int main(int argc, char* argv[])
                             printf("\nA rename request has came up...\n\n");
                             // RENAME MANAGER: SERVER SIDE
                             
-                            ret = renameServer(i, buffer);
+                            ret = renameServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client rename request...\n\n");
@@ -267,7 +280,7 @@ int main(int argc, char* argv[])
 
 
                     // **************** DELETE REQUEST MANAGER ******************
-                    else if (strcmp(bufferSupp1, DELETE_REQUEST) == 0)
+                    else if (strcmp(remote_comm, DELETE_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -285,7 +298,7 @@ int main(int argc, char* argv[])
                             printf("\nA delete request has came up...\n\n");
                             // DELETE MANAGER: SERVER SIDE
                             
-                            ret = deleteServer(i, buffer);
+                            ret = deleteServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client delete request...\n\n");
@@ -301,7 +314,7 @@ int main(int argc, char* argv[])
 
 
                     // *************** DOWNLOAD REQUEST MANAGER ****************
-                    else if (strcmp(bufferSupp1, DOWNLOAD_REQUEST) == 0)
+                    else if (strcmp(remote_comm, DOWNLOAD_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -316,11 +329,11 @@ int main(int argc, char* argv[])
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA download request has came up from %s and the filename is %s...\n\n", bufferSupp2, bufferSupp3);
+                            printf("\nA download request has came up from %s and the filename is %s...\n\n", username, filename);
 
                             // DOWNLOAD MANAGER: SERVER SIDE
                             
-                            ret = downloadServer(i, buffer);
+                            ret = downloadServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client download request...\n\n");
@@ -336,7 +349,7 @@ int main(int argc, char* argv[])
 
 
                     // *************** UPLOAD REQUEST MANAGER ***************
-                    else if (strcmp(bufferSupp1, UPLOAD_REQUEST) == 0)
+                    else if (strcmp(remote_comm, UPLOAD_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -354,7 +367,7 @@ int main(int argc, char* argv[])
                             printf("\nAn upload request has came up...\n\n");
                             // UPLOAD MANAGER: SERVER SIDE
                             
-                            ret = uploadServer(i, buffer);
+                            ret = uploadServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client upload request...\n\n");
@@ -370,7 +383,7 @@ int main(int argc, char* argv[])
 
 
                     // **************** SHARE REQUEST MANAGER ****************
-                    else if (strcmp(bufferSupp1, SHARE_REQUEST) == 0)
+                    else if (strcmp(remote_comm, SHARE_REQUEST) == 0)
                     {
                         // Using fork function we are choosing a multiprocess approach
                         // for the management of requests from clients and to avoid
@@ -388,7 +401,7 @@ int main(int argc, char* argv[])
                             printf("\nA share request has came up...\n\n");
                             // SHARE MANAGER: SERVER SIDE
                             
-                            ret = shareServer(i, buffer);
+                            ret = shareServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client share request...\n\n");
@@ -404,13 +417,18 @@ int main(int argc, char* argv[])
 
                     else printf("Unknown type of request by the Client...\n");
                     // Here we can also send a message to the client saying that we didn't understand what it wants
-                    memset(buffer, 0, 4*BUF_LEN);
+                    memset(received_buffer, 0, 4*BUF_LEN);
                     close(i);
                     FD_CLR(i, &master);
                 }
             }
         }
     }
+    
     close(listenerTCP);
+    
+    free(session_key1);
+    free(session_key2);
+    
     return 0;
 }
