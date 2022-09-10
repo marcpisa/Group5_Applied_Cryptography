@@ -237,7 +237,7 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     // Generating the hash of the request and the nonce
     msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-    if (!msg_to_hash) exit_with_failure("Malloc buffer failed", 1);
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
@@ -384,24 +384,127 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int renameClient(char* username,char* filename, char* new_filename, struct sockaddr_in srv_addr)
+int renameClient(char* username, char* filename, char* new_filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {
-    int sock, ret;
-    char buffer[BUF_LEN];
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    sock = createSocket();
+    unsigned char* iv;
 
+    unsigned char* msg_to_encr;
+    unsigned char* encr_msg;
+    unsigned int msg_to_encr_len;
+    int encr_len;
+    
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+    unsigned int digest_len;
+    int msg_to_hash_len;
+    
+
+
+    int sock, ret;
+    int msg_len;
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    
+    sock = createSocket();
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
     {
         printf("\nConnection Failed \n");
         exit(1);
     }
 
+    // Generate the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    //Add: show message when filename is to long to user --> check server side though. 
 
-    // SANITIZE FILENAME AND NEW_FILENAME (VERY IMPORTANT)
+    // M1: 
+    // M2a: renamedenied, len encr. , encr(reason), hash(renamedenied, encr, iv, nonce), iv
+    // M2b: renamesucceed, hash(renamesucceed, iv, nonce), iv
+
+
+
+    /* ---- Create the first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
+    // Encrypt the two names
+    msg_to_encr_len = strlen(filename)+BLANK_SPACE+strlen(new_filename);
+    msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
+    if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
+
+    memcpy(msg_to_encr, filename, strlen(filename));
+    memcpy(&*(msg_to_encr+strlen(filename)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_encr+strlen(filename)+BLANK_SPACE), new_filename, strlen(new_filename));
+
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
+
+    // Create the hash
+    msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST));  // rename req
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE), encr_msg, encr_len); // encr
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), \
+    iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", \
+    BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    // Compose the message
+    msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
+    BLANK_SPACE+IV_LEN;
+
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    memcpy(buffer, RENAME_REQUEST, strlen(RENAME_REQUEST));  // rename req
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)), " ", BLANK_SPACE);
+    sprintf(temp, "%d", encr_len);
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE), temp, LEN_SIZE); // len encr
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
+    encr_msg, encr_len); // encr
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
+    digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
+     " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
+    BLANK_SPACE), iv, IV_LEN);// iv
+
+//....................
+
+    printf("I'm sending to the server the logout message.\n");
+    ret = send(sock, buffer, msg_len, 0); 
+    if (ret == -1) exit_with_failure("Send failed", 1);
+    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
+
+    free(temp);
+    free(buffer);
+    free(msg_to_hash);
+    free(digest);
+    free(iv);
+
+
+
+    // ......................
+    // Generate new IV
+
+
+
 
     // SET RENAME REQUEST BUFFER
     memset(buffer, 0, strlen(buffer));

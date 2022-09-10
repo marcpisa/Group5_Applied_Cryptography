@@ -35,7 +35,6 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
     //SANIFICATION: username it is checked in the if block server side.
 }
 
-/**
 int file_name_sanitization(const char* file_name, const char* root_dir) {
 
     char buf[BUF_LEN];
@@ -45,7 +44,7 @@ int file_name_sanitization(const char* file_name, const char* root_dir) {
     if(!canon_file_name) return 0;
     if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;
     return 1;
-}*/
+}
 
 void exit_with_failure(char* err, int perror_enable) {
     if (perror_enable) 
