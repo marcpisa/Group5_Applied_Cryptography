@@ -529,7 +529,7 @@ int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
         return -1;
     }
 
-    ret = delete(filename);
+    ret = remove(filename);
     if (ret == -1) {
         operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED);
 
