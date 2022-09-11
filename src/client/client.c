@@ -269,8 +269,8 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = deleteClient(username, command2, srv_addr);
-                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
+                            ret = deleteClient(username, command2, session_key1, session_key2, &nonce_cs, srv_addr);
+                            if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
 
                             break;
 

@@ -35,7 +35,6 @@
 #define MAIN_FOLDER_SERVER "../../database"  // When you test the software on your pc change this variable
 #define MAIN_FOLDER_CLIENT "../../download"  // When you test the software on your pc change this variable
 #define INFO_FOLDER_SERVER "../../database/info" // When you test the software on your pc change this variable
->>>>>>> main
 
 #define LOGIN "login"
 #define LOGOUT "logout"
