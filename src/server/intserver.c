@@ -20,6 +20,8 @@ int createSocket()
 
 int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned char* session_key2)
 {
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    
     unsigned char* buffer;
     unsigned char* msg_to_sign;
     char* temp;
@@ -55,6 +57,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     int pubkey_len = 0;
     unsigned int len_username;
+
+    char funcBuff[BUF_LEN];
+    char funcSupp1[BUF_LEN];
 
     /*********************
      * END VARIABLES
@@ -229,35 +234,41 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     printf("I managed a login request and all was good!\n\n");
     
-    //printf("Now the buffer contains %s\n\n", buffer);
+    //printf("Now the buffer contains %s\n\n", funcBuff);
     while (1)
     {
-        memset(buffer, 0, BUF_LEN);
-        ret = recv(sd, buffer, BUF_LEN, 0);
+        memset(funcBuff, 0, BUF_LEN);
+        ret = recv(sd, funcBuff, BUF_LEN, 0);
         if (ret < 0)
         {
             perror("Error during recv operation: ");
             exit(-1);
         }
         // We check the first keyword to understand what the Client wants us to do
-        memset(bufferSupp1, 0, BUF_LEN);
-        memcpy(bufferSupp1, buffer, str_ssplit((unsigned char*) buffer, DELIM));
+        memset(funcSupp1, 0, BUF_LEN);
+        memcpy(funcSupp1, funcBuff, str_ssplit((unsigned char*) funcBuff, DELIM));
 
 
         // ************ LOGIN REQUEST MANAGER ***********
-        if (strcmp(bufferSupp1, LOGIN_REQUEST) == 0)
+        if (strcmp(funcSupp1, LOGIN_REQUEST) == 0)
         {
             printf("\nWe received a login request but this client is already logged... Something bad happened...\n\n");
         }
 
 
         //************ LOGOUT REQUEST MANAGER ************
-        else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
+        else if (strcmp(funcSupp1, LOGOUT_REQUEST) == 0)
         {
             printf("\nA logout request has came up...\n\n");
             // LOGOUT MANAGER: SERVER SIDE
                             
-            // Do stuff
+            ret = logoutServer(sd, funcBuff, &nonce_cs, session_key2);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client logout request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a logout request and all was good!\n\n");
 
             printf("End of logout request management!\n\n");
             close(sd);
@@ -266,12 +277,12 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
         // ************* LIST REQUEST MANAGER ***************
-        else if (strcmp(bufferSupp1, LIST_REQUEST) == 0)
+        else if (strcmp(funcSupp1, LIST_REQUEST) == 0)
         {
             printf("\nA list request has came up...\n\n");
             // LIST MANAGER: SERVER SIDE
                             
-            ret = listServer(sd, buffer);
+            ret = listServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -282,12 +293,12 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
         //*************** RENAME REQUEST MANAGER *****************
-        else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
+        else if (strcmp(funcSupp1, RENAME_REQUEST) == 0)
         {
             printf("\nA rename request has came up...\n\n");
             // RENAME MANAGER: SERVER SIDE
                             
-            ret = renameServer(sd, buffer);
+            ret = renameServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client rename request...\n\n");
@@ -298,12 +309,12 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
         // **************** DELETE REQUEST MANAGER ******************
-        else if (strcmp(bufferSupp1, DELETE_REQUEST) == 0)
+        else if (strcmp(funcSupp1, DELETE_REQUEST) == 0)
         {
             printf("\nA delete request has came up...\n\n");
             // DELETE MANAGER: SERVER SIDE
                             
-            ret = deleteServer(sd, buffer);
+            ret = deleteServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client delete request...\n\n");
@@ -314,13 +325,13 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
         
         // *************** DOWNLOAD REQUEST MANAGER ****************
-        else if (strcmp(bufferSupp1, DOWNLOAD_REQUEST) == 0)
+        else if (strcmp(funcSupp1, DOWNLOAD_REQUEST) == 0)
         {
             printf("\nA download request has came up...\n\n");
 
             // DOWNLOAD MANAGER: SERVER SIDE
                             
-            ret = downloadServer(sd, buffer);
+            ret = downloadServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client download request...\n\n");
@@ -331,12 +342,12 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
         // *************** UPLOAD REQUEST MANAGER ***************
-        else if (strcmp(bufferSupp1, UPLOAD_REQUEST) == 0)
+        else if (strcmp(funcSupp1, UPLOAD_REQUEST) == 0)
         {
             printf("\nAn upload request has came up...\n\n");
             // UPLOAD MANAGER: SERVER SIDE
                             
-            ret = uploadServer(sd, buffer);
+            ret = uploadServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client upload request...\n\n");
@@ -347,12 +358,12 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
         // **************** SHARE REQUEST MANAGER ****************
-        else if (strcmp(bufferSupp1, SHARE_REQUEST) == 0)
+        else if (strcmp(funcSupp1, SHARE_REQUEST) == 0)
         {
             printf("\nA share request has came up...\n\n");
             // SHARE MANAGER: SERVER SIDE
                             
-            ret = shareServer(sd, buffer);
+            ret = shareServer(sd, funcBuff);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client share request...\n\n");
@@ -502,7 +513,7 @@ int listServer(int sd, char* rec_mex)
 
 int renameServer(int sd, char* rec_mex)
 {
-    char bufferSupp1[0][BUF_LEN];
+    char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
     char bufferSupp4[BUF_LEN];

@@ -97,7 +97,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     */
     //printf("%d\n%d\n%d\n", pubkey_len, iv_len, signature_len);
     printf("I'm sending to the server the first message.\n");
-    ret = send(sock, buffer, msg_len, 0);
+    ret = send(*sock, buffer, msg_len, 0);
     if (ret == -1) exit_with_failure("Send failed", 1);
 
     free(buffer);
@@ -109,7 +109,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+MAX_CERT_LEN+1;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    ret = recv(sock, buffer, msg_len, 0);
+    ret = recv(*sock, buffer, msg_len, 0);
     if (ret == -1) exit_with_failure("Receive failed", 1);
     printf("Received the response of the server.\n");
 
@@ -169,7 +169,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     free(buffer);
     free(bufferSupp1);
     free(bufferSupp2);
-    free(pubkey_byte);
+    free(pubkey_byte); // Is this necessary?
     free(cert_buffer);
     X509_free(serv_cert);
     EVP_PKEY_free(pub_rsa_key_serv);
@@ -191,7 +191,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     //printf("%s\n", buffer);
     printf("I'm sending to the server the last message.\n");
-    ret = send(sock, buffer, msg_len, 0); 
+    ret = send(*sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
 
     free(path_pubkey);
@@ -442,7 +442,6 @@ int deleteClient(int sock, char* username, char* filename)
 {        
     int ret;
     char buffer[BUF_LEN];
-    sock = createSocket();
     
     // SET DELETE REQUEST BUFFER
     memset(buffer, 0, BUF_LEN);
