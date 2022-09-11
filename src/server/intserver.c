@@ -357,15 +357,89 @@ int listServer(int sd, char* rec_mex)
 }
 
 
-int renameServer(int sd, char* rec_mex)
+int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
-    char bufferSupp1[0][BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char bufferSupp4[BUF_LEN];
     int ret;
+    size_t offset;
+    char* iv;
 
-    // REMEMBER TO SANITIZE PROPERLY THE BUFFER (VERY IMPORTANT)
+    int encr_len;
+
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+
+
+
+
+    // Seed for the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    //ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    //if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+
+    /* ---- Parse first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
+    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    
+    
+    offset = strlen(RENAME_REQUEST)+BLANK_SPACE;
+    memcpy(temp, &*(buffer+offset), LEN_SIZE); // len. encr.
+    offset += LEN_SIZE+BLANK_SPACE;
+    encr_len = atoi(temp);
+
+    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+
+    memcpy(bufferSupp1, &*(buffer+offset), encr_len); // encr
+    offset += encr_len+BLANK_SPACE;
+
+    memcpy(bufferSupp2, &*(buffer+offset), HASH_LEN); // hash
+    offset += HASH_LEN+BLANK_SPACE;
+    
+    memcpy(iv, &*(buffer+offset), IV_LEN); // iv
+    
+    // Check hash
+    msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST)); // rename req.
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE), bufferSupp1, encr_len); // encr.  
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    // If hash correct, decrypt
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    if (ret == -1) exit_with_failure("Wrong rename request hash");
+
+    ...
+
+    // Sanitize the filenames
+
+
+    // Execute the rename if possible
+
+
+
+    // Sanitize the filenames after the hash
 
     // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
 
