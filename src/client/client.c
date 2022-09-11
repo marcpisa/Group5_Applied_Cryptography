@@ -227,6 +227,13 @@ int main(int argc, char* argv[])
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
                                 // clean some variables like session keys
+                                
+                                // CONFIGURATION OF THE SERVER INFO
+                                memset(&srv_addr, 0, sizeof(srv_addr));
+	                            srv_addr.sin_family = AF_INET; // IPv4
+	                            port = SERVER_PORT;
+	                            srv_addr.sin_port = htons(port); // port to connect to
+	                            inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
                             }
                             else printf("Logout failed.\n\n");
                         

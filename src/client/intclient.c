@@ -44,7 +44,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     EVP_PKEY* pub_rsa_key_serv;
     int cert_len;
 
-    int sock, ret;
+    int ret;
     char* temp;
     unsigned char* buffer;
     unsigned char* cert_buffer;
@@ -55,8 +55,8 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
      ********************/
 
     // Creation of socket
-    sock = createSocket();
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
+    *sock = createSocket();
+    if (connect(*sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("asfasfiled", 1);
 
     // Compose the path for the current user
     path_pubkey = (char*) malloc(sizeof(char)*(15+strlen(username)+14+1));
