@@ -222,6 +222,149 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     free(K);
     EVP_PKEY_free(pub_rsa_client);
 
+    
+    
+    // FUNCTIONAL PART
+    // Now that we have the cryptographic elements to have a secure communication with the client we are able to receive function messages
+    
+    printf("I managed a login request and all was good!\n\n");
+    
+    //printf("Now the buffer contains %s\n\n", buffer);
+    while (1)
+    {
+        memset(buffer, 0, BUF_LEN);
+        ret = recv(sd, buffer, BUF_LEN, 0);
+        if (ret < 0)
+        {
+            perror("Error during recv operation: ");
+            exit(-1);
+        }
+        // We check the first keyword to understand what the Client wants us to do
+        memset(bufferSupp1, 0, BUF_LEN);
+        memcpy(bufferSupp1, buffer, str_ssplit((unsigned char*) buffer, DELIM));
+
+
+        // ************ LOGIN REQUEST MANAGER ***********
+        if (strcmp(bufferSupp1, LOGIN_REQUEST) == 0)
+        {
+            printf("\nWe received a login request but this client is already logged... Something bad happened...\n\n");
+        }
+
+
+        //************ LOGOUT REQUEST MANAGER ************
+        else if (strcmp(bufferSupp1, LOGOUT_REQUEST) == 0)
+        {
+            printf("\nA logout request has came up...\n\n");
+            // LOGOUT MANAGER: SERVER SIDE
+                            
+            // Do stuff
+
+            printf("End of logout request management!\n\n");
+            close(sd);
+            exit(0);
+        }
+
+
+        // ************* LIST REQUEST MANAGER ***************
+        else if (strcmp(bufferSupp1, LIST_REQUEST) == 0)
+        {
+            printf("\nA list request has came up...\n\n");
+            // LIST MANAGER: SERVER SIDE
+                            
+            ret = listServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client list request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a list request and all was good!\n\n");
+        }
+
+
+        //*************** RENAME REQUEST MANAGER *****************
+        else if (strcmp(bufferSupp1, RENAME_REQUEST) == 0)
+        {
+            printf("\nA rename request has came up...\n\n");
+            // RENAME MANAGER: SERVER SIDE
+                            
+            ret = renameServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client rename request...\n\n");
+                exit(1);
+            }
+            else printf("End of rename request management!\n\n");
+        }
+
+
+        // **************** DELETE REQUEST MANAGER ******************
+        else if (strcmp(bufferSupp1, DELETE_REQUEST) == 0)
+        {
+            printf("\nA delete request has came up...\n\n");
+            // DELETE MANAGER: SERVER SIDE
+                            
+            ret = deleteServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client delete request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a delete request and all was good!\n\n");
+        }
+
+        
+        // *************** DOWNLOAD REQUEST MANAGER ****************
+        else if (strcmp(bufferSupp1, DOWNLOAD_REQUEST) == 0)
+        {
+            printf("\nA download request has came up...\n\n");
+
+            // DOWNLOAD MANAGER: SERVER SIDE
+                            
+            ret = downloadServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client download request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a download request and all was good!\n\n");
+        }
+
+
+        // *************** UPLOAD REQUEST MANAGER ***************
+        else if (strcmp(bufferSupp1, UPLOAD_REQUEST) == 0)
+        {
+            printf("\nAn upload request has came up...\n\n");
+            // UPLOAD MANAGER: SERVER SIDE
+                            
+            ret = uploadServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client upload request...\n\n");
+                exit(1);
+            }
+            else printf("I managed an upload request and all was good!\n\n");
+        }
+
+
+        // **************** SHARE REQUEST MANAGER ****************
+        else if (strcmp(bufferSupp1, SHARE_REQUEST) == 0)
+        {
+            printf("\nA share request has came up...\n\n");
+            // SHARE MANAGER: SERVER SIDE
+                            
+            ret = shareServer(sd, buffer);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client share request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a share request and all was good!\n\n");
+        }
+
+        else printf("Unknown type of request by the Client...\n");  
+    }
+    close(sd);
+
     return 1;
 }
 

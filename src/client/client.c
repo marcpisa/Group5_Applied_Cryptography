@@ -6,7 +6,7 @@ int main(int argc, char* argv[])
     // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
-    int sock;
+    int connectedSock;
     int new_sd, listenerTCP, ret, fdmax, pid, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
@@ -196,7 +196,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
                     
-                            ret = loginClient(session_key1, session_key2, username, srv_addr, ca_store);
+                            ret = loginClient(&connectedSock, session_key1, session_key2, username, srv_addr, ca_store);
                             // TO ADD the return -1 cases
                             if (ret == -1) 
                             {
@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                            ret = logoutClient(connectedSock, &nonce_cs, session_key2);
                             
                             if (ret != -1)
                             {
@@ -234,26 +234,24 @@ int main(int argc, char* argv[])
 
                         case 3: //************ LIST *************
                         
-                            // Stuff to do
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
+                            }
 
-                            ret = listClient(username, srv_addr);
+                            ret = listClient(connectedSock, username);
                             if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
                         
                         case 4: //*********** RENAME ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            //printf("Command3 is %s\n", command3);
-                            ret = renameClient(username, command2, command3, srv_addr);
+                            }
+                            ret = renameClient(connectedSock, username, command2, command3);
                             if (ret == -1)
                             {
                                 printf("Error during the rename operation request!\n\n");
@@ -268,19 +266,18 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-
-                            ret = deleteClient(username, command2, srv_addr);
+                            ret = deleteClient(connectedSock, username, command2);
                             if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
 
                             break;
 
                         case 6: //*********** DOWNLOAD ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
+                            }
+                            ret = downloadClient(connectedSock, username, command2); // format of the input given to the input stream: download filename
                             if (ret == -1)
                             {
                                 printf("Error during the download operation request!\n\n");
@@ -290,12 +287,12 @@ int main(int argc, char* argv[])
                             break;
 
                         case 7: //*********** UPLOAD *************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            ret = uploadClient(username, command2, srv_addr);
+                            }
+                            ret = uploadClient(connectedSock, username, command2);
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
@@ -305,14 +302,13 @@ int main(int argc, char* argv[])
                             break;
 
                         case 8: //********** SHARE ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            */
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");

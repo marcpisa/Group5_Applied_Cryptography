@@ -15,7 +15,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) {
+int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) {
     /*********************
      * VARIABLES
      ********************/
@@ -200,13 +200,12 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     free(signature);
     free(exp_digsig);
     free(K);
-    
+ 
     return 1;
 }
 
-int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv_addr)
+int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 {
-    int sock;
     unsigned int digest_len;
     int ret;
     unsigned int msg_len;
@@ -218,8 +217,8 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     unsigned char* digest;
     unsigned char* iv;    
 
-    sock = createSocket();
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
+    /*sock = createSocket();
+    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);*/
 
     // Generate the IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
@@ -333,18 +332,11 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     return 1;
 }
 
-int listClient(char* username, struct sockaddr_in srv_addr)
+int listClient(int sock, char* username)
 {
     
-    int sock, ret;
+    int ret;
     char buffer[BUF_LEN];
-    sock = createSocket();
-
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-    {
-        printf("\nConnection Failed \n");
-        exit(1);
-    }
 
     
     // SET LIST REQUEST BUFFER
@@ -384,20 +376,12 @@ int listClient(char* username, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int renameClient(char* username,char* filename, char* new_filename, struct sockaddr_in srv_addr)
+int renameClient(int sock, char* username,char* filename, char* new_filename)
 {
-    int sock, ret;
+    int ret;
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
-    sock = createSocket();
-
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-    {
-        printf("\nConnection Failed \n");
-        exit(1);
-    }
-
 
     //Add: show message when filename is to long to user --> check server side though. 
 
@@ -454,18 +438,11 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
 
 
 
-int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
+int deleteClient(int sock, char* username, char* filename)
 {        
-    int sock, ret;
+    int ret;
     char buffer[BUF_LEN];
     sock = createSocket();
-
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-    {
-        printf("\nConnection Failed \n");
-        exit(1);
-    }
-
     
     // SET DELETE REQUEST BUFFER
     memset(buffer, 0, BUF_LEN);
@@ -498,9 +475,9 @@ int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
     return 1;
 }
 
-int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
+int downloadClient(int sock, char* username, char* filename)
 {
-    int sock, ret, nchunk, i, j, k, r, rest;
+    int ret, nchunk, i, j, k, r, rest;
     char buffer[BUF_LEN];
     FILE* f1;
     char bufferSupp1[BUF_LEN];
@@ -508,8 +485,6 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
 
     int position;
-
-    sock = createSocket();
 
     if (chdir(MAIN_FOLDER_CLIENT) == -1)
 	{
@@ -522,12 +497,6 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
         fclose(f1);
         printf("Filename already exists. Download request over...\n\n");
         return -1;
-    }
-
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-    {
-        printf("\nConnection Failed \n");
-        exit(1);
     }
 
     // SANITIZE FILENAME(VERY IMPORTANT)
@@ -650,7 +619,7 @@ int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 }
 
 
-int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
+int uploadClient(int sock, char* username, char* filename)
 {
     // We received a message with this format: download_request username filenameù
     char buffer[BUF_LEN];
@@ -659,10 +628,8 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     char bufferSupp3[BUF_LEN];
     char payload[CHUNK_SIZE+1];
     struct stat st;
-    int i, j, nchunk, ret, start_payload, sock, rest;
+    int i, j, nchunk, ret, start_payload, rest;
     FILE* fd;
-
-    sock = createSocket();
 
     // SANIFICATION FILENAME
     if (chdir(MAIN_FOLDER_CLIENT) == -1)
@@ -678,12 +645,6 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
     }
     else
     {
-        if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-        {
-            printf("\nConnection Failed \n");
-            exit(1);
-        }
-
         stat(filename, &st);
         nchunk = (st.st_size/CHUNK_SIZE)+1;
         rest = st.st_size - (nchunk-1)*CHUNK_SIZE; 
@@ -794,26 +755,18 @@ int uploadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 
 
 
-int shareClient(char* username, char* filename, char* peername, struct sockaddr_in srv_addr)
+int shareClient(int sock, char* username, char* filename, char* peername)
 {
     char buffer[BUF_LEN];
     char bufferSupp1[BUF_LEN];
     char bufferSupp2[BUF_LEN];
     char bufferSupp3[BUF_LEN];
-    int sock, ret;
-
-    sock = createSocket();
+    int ret;
 
     memset(buffer, 0, strlen(buffer));
     memset(bufferSupp1, 0, strlen(bufferSupp1));
     memset(bufferSupp2, 0, strlen(bufferSupp2));
     memset(bufferSupp3, 0, strlen(bufferSupp3));
-
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
-    {
-        printf("\nConnection Failed \n");
-        exit(1);
-    }
 
     sprintf(buffer, "%s %s %s %s", SHARE_REQUEST, username, peername, filename);
     printf("I'm sending %s to the server\n\n", buffer);
