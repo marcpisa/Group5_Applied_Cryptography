@@ -267,13 +267,9 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-
+                            // Handle rename request
                             ret = renameClient(username, command2, command3, session_key1, session_key2, &nonce_cs, srv_addr);
-                            if (ret == -1)
-                            {
-                                printf("Error during the rename operation request!\n\n");
-                                exit(1);
-                            }
+                            if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
                         case 5: //*********** DELETE **********
