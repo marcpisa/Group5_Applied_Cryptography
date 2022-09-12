@@ -570,3 +570,67 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     free(digest);
     free(buffer);
 }
+
+void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce)
+{
+    int ret;
+    int msg_len;
+
+    unsigned int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    unsigned char* buffer;
+    char* iv;
+    char* temp;
+
+    // Seed for the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    // Increment nonce for new message
+    *nonce = *nonce + 1;
+
+    // Calculate the hash
+    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
+
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 0);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, req_accepted, strlen(req_accepted)); // accepted req.
+    memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
+
+
+    // Compose and send the message
+    msg_len = strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
+    if (!buffer) exit_with_failure("Malloc buffer failed", 0);
+
+    memcpy(buffer, req_accepted, strlen(req_accepted)); // req. accepted
+    memcpy(&*(buffer+strlen(req_accepted)), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE), digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
+   
+    ret = send(sock, buffer, msg_len, 0);
+    if (ret == -1) exit_with_failure("Send failed", 0);
+
+    free(iv);
+    free(msg_to_hash);
+    free(temp);
+    free(digest);
+    free(buffer);
+}

@@ -336,6 +336,7 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
 int listClient(char* username, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {
     unsigned char* iv;
+    unsigned int index;
     int num_file = -1;
     int encr_len;
     unsigned char* list;
@@ -371,7 +372,7 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         exit(1);
     }
 
-    // Generate the IV
+    // Generate the IV128
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
@@ -429,15 +430,16 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
 
     /* ---- Parse the response (num_file, len. encr., encr. list, hash(num_file, encr. list, iv, nonce), iv) ---- */
     counter = 0;
+    index = 0;
     while (num_file != 0) 
     {
-        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE*2)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
+        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         ret = recv(sock, buffer, msg_len,0);
         if (ret == -1) exit_with_failure("Receive failed", 0);
-        printf("Received the server's response.\n");
+        printf("Received first chunk of filenames.\n");
         *nonce = *nonce+1;
 
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
@@ -496,48 +498,59 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         if (num_file < 0 || num_file >= CHUNK_SIZE) exit_with_failure("Incorrect num_file", 0);
 
         // Fill list array
-        counter += num_file;
         if (counter == 0 && num_file != 0)
         {
+            counter += num_file;
             *file_list = (char**) malloc(counter*sizeof(char*));
-            counter = 1;
+            if (!(*file_list)) exit_with_failure("Malloc file_list failed", 1);
+
+            token = strtok(buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
+            while (token != NULL) {
+                // Create space for the filename
+                *(file_list+index) = (char*) malloc(strlen(token)*sizeof(char)); 
+                if (!(*(file_list+index))) exit_with_failure("Malloc file_list+index failed", 1);
+
+                memcpy(*(file_list+index), token, strlen(token));
+
+                //printf("%s\n", token);
+                index += 1;
+                token = strtok(NULL, " ");
+            }
         }
         else if (num_file != 0)
         {
-            *file_list = (char**) malloc(counter*sizeof(char*));
+            counter += num_file;
+            // Extend the file list reallocating memory
+            ret = realloc(*file_list, counter*sizeof(char*));
+            if (ret == -1) exit_with_failure("Realloc failed", 1);
+
+            token = strtok(buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
+            while (token != NULL) {
+                // Create space for the filename
+                *(file_list+index) = (char*) malloc(strlen(token)*sizeof(char)); 
+                if (!(*(file_list+index))) exit_with_failure("Malloc file_list+index failed", 1);
+
+                memcpy(*(file_list+index), token, strlen(token));
+
+                //printf("%s\n", token);
+                index += 1;
+                token = strtok(NULL, " ");
+            }
         }
         else // num_file == 0
         {
-
+            printf("The client receives the complete file's list (%d filenames).\n\n", index);
         }
 
-        token = strtok(buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
-        while (token != NULL) {
-            printf("%s\n", token);
-            token = strtok(NULL, " ");
-        }
+        free(temp);
+        free(buffer);
+        free(bufferSupp1);
+        free(bufferSupp2);
+        free(msg_to_hash);
+        free(digest);
+        free(plaintext);       
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
     return 1;
 }
 

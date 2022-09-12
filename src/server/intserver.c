@@ -291,68 +291,147 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key2)
 
 }
 
-int listServer(int sd, char* rec_mex)
+int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
-    //char bufferSupp1[BUF_LEN];
-
-    char *buffer_mex_field[2]; //buffer_mex_field[0] ---> contains the request type, buffer_mex_field[1] ---> contains the username
-    char buffer_response[BUF_LEN+10]; // I'm creating a buffer a little longer to have the capacity to contain buffSupp1. We could fix the problem later, putting the end_string character at the end of the list
     DIR* d;
     struct dirent *files;
-    int ret;
-    printf("I received a message from a client saying: %s\n\n", rec_mex);
 
-    // HERE WE NEED TO DECRYPT AND CHECK IF THE MESSAGE IS OKAY
+    unsigned char* iv;
+    unsigned int index;
+    int num_file = -1;
+    int encr_len;
+    unsigned char* list;
 
-    //memset(bufferSupp1, 0, BUF_LEN);
-    //memset(bufferSupp2, 0, BUF_LEN);
-
-    rec_buffer_sanitization(rec_mex, buffer_mex_field);
-
-    //sscanf(rec_mex, "%s %s", bufferSupp1, bufferSupp2); //in bufferSupp2 we have the username
+    unsigned char* msg_to_encr;
+    unsigned char* encr_msg;
+    unsigned char* plaintext;
+    unsigned int msg_to_encr_len;
+    int encr_len;
+    unsigned int plain_len;
     
-    printf("The username is %s, the length of the username is %li\n\n", buffer_mex_field[1], strlen(buffer_mex_field[1]));
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+    unsigned int digest_len;
+    int msg_to_hash_len;
+    
+    size_t offset;
+    size_t old_offset;
 
-    if (chdir(MAIN_FOLDER_SERVER) == -1)
-	{
-        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-	}
+    int ret, counter;
+    int msg_len;
+    char* temp;
+    char *token;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+    
 
-    ret = chdir(buffer_mex_field[1]);
-    if (ret == -1)
+    // Generate the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    // ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    // if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+
+
+
+    /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
+    *nonce = *nonce+1;
+
+    bufferSupp1 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+
+    // Parsing
+    old_offset = strlen(LIST_REQUEST)+BLANK_SPACE;
+    memcpy(bufferSupp1, &*(rec_mex+old_offset), HASH_LEN); // hash
+    old_offset += HASH_LEN+BLANK_SPACE;
+    memcpy(iv, &*(rec_mex+old_offset), IV_LEN); // iv
+
+    // Compare the hash
+    msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST));  // list req
+    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+    
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp1, HASH_LEN);
+    
+    free(iv);
+    free(bufferSupp1);
+    free(msg_to_hash);
+    free(digest);
+    
+    if (ret == -1) // If the hash comparison failed
     {
-        printf("Error: username doesn't exists...\n");
-        exit(1);
+        operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, *nonce);
+        return 1;
     }
 
-    // WE ARE ASSUMING THAT WE DON'T NEED MORE THAN ONE MESSAGE TO LIST THE FILES
-    d = opendir(".");
-    memset(buffer_response, 0, strlen(buffer_response));
-    strcat(buffer_response, LIST_RESPONSE);
-    strcat(buffer_response, " ");
-    if(d)
-    {
-        while((files = readdir(d)) != NULL) //the folder we are checking has the same name of the username. So we take the list from that name
+
+
+
+    /* ---- Prepare the list of filenames (num_file, len. encr., encr. list, hash(num_file, encr. list, iv, nonce), iv) ---- */
+    while (num_file != 0) {
+        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
+        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+        // Build the filenames' list
+        bufferSupp1 = (unsigned char*) malloc((CHUNK_SIZE+1)*sizeof(unsigned char));
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+        d = opendir(".");
+        counter = 0;
+        if(d)
         {
-            strcat(buffer_response, files->d_name);
-            strcat(buffer_response, " ");
+            while((files = readdir(d)) != NULL &&) //the folder we are checking has the same name of the username. So we take the list from that name
+            {
+                strcat(buffer_response, files->d_name);
+                strcat(buffer_response, " ");
+            }
         }
+
+        // Encrypt the list
+
+
+        // Prepare the hash
+
+
+        // Build the message
+
+
+
+
+        printf("I'm sending to the client the filename's list\n");
+        ret = send(sd, buffer, msg_len, 0); 
+        if (ret == -1) exit_with_failure("Send failed", 1);
+
+        // free(...);
+    // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
+            
+
+
+        /* ---- Check if the client succeed or failed ---- */
+
+        ///....
     }
-    
 
-    //memset(bufferSupp2, 0, strlen(bufferSupp2));
-    //sprintf(bufferSupp2, "%s %s", LIST_RESPONSE, bufferSupp1);
 
-    printf("I'm sendinf %s to the client...\n\n", buffer_response);
-    // HERE WE SHOULD REMEMBER TO ENCRYPT THE BUFFER PROPERLY
 
-    ret = send(sd, buffer_response, strlen(buffer_response), 0);
-    if (ret == -1)
-    {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
-    }
+
     return 1;
 }
 
