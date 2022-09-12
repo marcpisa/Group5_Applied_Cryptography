@@ -269,6 +269,9 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
+                            // Check length and filename sanitization
+                            // ...
+
                             ret = deleteClient(username, command2, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
 

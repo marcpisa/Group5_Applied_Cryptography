@@ -453,7 +453,7 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
 }
 
 
-
+// TO TEST
 int deleteClient(char* username, char* filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {        
  
@@ -483,11 +483,8 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     
     
     
-    
-    
+    // Creation of socket
     sock = createSocket();
-
-
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
     {
         printf("\nConnection Failed \n");
@@ -502,16 +499,16 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN); 
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0); 
 
-    msg_to_encr_len = strlen(filename)+BLANK_SPACE; 
-    msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
-    if(!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed\n", 1); 
 
-    memcpy(msg_to_encr, filename, strlen(filename)); 
-    memcpy(&*(msg_to_encr + strlen(filename)), " ", BLANK_SPACE); 
 
-    encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1); 
 
-    // Create Hash 
+    /* ---- Send delete request (req., len. encr., encr. filename, hash(req, encr, iv, nonce), iv) ---- */
+    *nonce = *nonce+1;
+
+    // END OF STRING CHARACTER???
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, filename, strlen(filename), iv, session_key1); 
+
+    // Create hash 
     msg_to_hash_len = strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
@@ -519,8 +516,7 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-
-    memcpy(msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST));  // Delete req
+    memcpy(msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST));  // delete req
     memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE), encr_msg, encr_len); // encr
     memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
@@ -532,15 +528,14 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     temp, LEN_SIZE); // nonce
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
+    // Compose the message
     msg_len = strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
     BLANK_SPACE+IV_LEN;   
-
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1); 
 
-    memcpy(buffer, DELETE_REQUEST, strlen(DELETE_REQUEST));  // Delete req
+    memcpy(buffer, DELETE_REQUEST, strlen(DELETE_REQUEST));  // delete req
     memcpy(&*(buffer+strlen(DELETE_REQUEST)), " ", BLANK_SPACE);
     sprintf(temp, "%d", encr_len);
     memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE), temp, LEN_SIZE); // len encr
@@ -558,149 +553,39 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     printf("I'm sending to the server the delete request.\n");
     ret = send(sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
+    
     
     free(temp);
     free(buffer);
     free(msg_to_hash);
     free(digest);
-    free(msg_to_encr);
     free(encr_msg);
     free(iv);
 
 
-    printf("Delete request message sent\n");
 
 
     // Here we receive the reply of the server
-
-    msg_len = strlen(DELETE_DENIED)+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    msg_len = strlen(DELETE_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, msg_len,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
+    *nonce = *nonce+1;
 
     bufferSupp1 = (unsigned char*) malloc(strlen(DELETE_DENIED)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(DELETE_DENIED));
 
-    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
-    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-
     if (strcmp(bufferSupp1, DELETE_DENIED) == 0)
     {
-        // M2a: deletedenied, len encr. , encr(reason), hash(deletedenied, encr, iv, nonce), iv
-        temp = (char*) malloc(LEN_SIZE*sizeof(char));
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-        // Parse the message
-        offset = strlen(DELETE_DENIED)+BLANK_SPACE;
-        memcpy(temp, &*(buffer+offset), LEN_SIZE); // len. encr.
-        offset += LEN_SIZE+BLANK_SPACE;
-        
-        encr_len = atoi(temp);
-        bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*encr_len);
-        if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
-
-        memcpy(bufferSupp3, &*(buffer+offset), encr_len); // encr.
-        offset += encr_len+BLANK_SPACE; 
-
-        memcpy(bufferSupp2, &*(buffer+offset), HASH_LEN); // hash
-        offset += HASH_LEN+BLANK_SPACE;
-
-        memcpy(iv, &*(buffer+offset), IV_LEN); // iv
-
-        // Check hash
-        msg_to_hash_len = strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
-        msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-        if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-
-        temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-        sprintf(temp, "%d", *nonce);
-        memcpy(msg_to_hash, DELETE_DENIED, strlen(DELETE_DENIED));  // rename den
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE), bufferSupp3, encr_len); // encr
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-        temp, LEN_SIZE); // nonce
-
-        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-        if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
-
-        ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        if (ret == -1)
-        {
-            printf("Wrong rename failed hash\n\n");
-            ret = -1;
-        }
-        else
-        {
-            // Decrypt the reason (bufferSupp3)
-            decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp3, encr_len, iv, session_key1);
-            reason = (char*) malloc(plain_len*sizeof(char));
-            if (!reason) exit_with_failure("Malloc reason failed", 1);
-
-            printf("The rename request has been denied: %s\n\n", reason);
-            
-            free(plaintext);
-            free(reason);
-
-            ret = 1;
-        }
-
-        free(digest);
-        free(temp);
-        free(msg_to_hash);
-        free(bufferSupp3); }
-
+        ret = check_reqden_msg(bufferSupp1, buffer, *nonce, session_key1, session_key2);
+    }
     else if (strcmp(bufferSupp1, DELETE_ACCEPTED) == 0)
     {        
-        // M2b: deletesucceed, hash(deletesucceed, iv, nonce), iv
-        // Parse the message
-        memcpy(bufferSupp2, &*(buffer+strlen(DELETE_ACCEPTED)+BLANK_SPACE), HASH_LEN); // hash
-        memcpy(iv, &*(buffer+strlen(DELETE_ACCEPTED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv    
-        
-        // Check hash
-        msg_to_hash_len = strlen(DELETE_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
-        msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-        if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-
-        temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-        sprintf(temp, "%d", *nonce);
-        memcpy(msg_to_hash, DELETE_ACCEPTED, strlen(DELETE_ACCEPTED));  // delete acc
-        memcpy(&*(msg_to_hash+strlen(DELETE_ACCEPTED)), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+strlen(DELETE_ACCEPTED)+BLANK_SPACE), iv, IV_LEN); // iv
-        memcpy(&*(msg_to_hash+strlen(DELETE_ACCEPTED)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+strlen(DELETE_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
-
-        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-        if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
-
-        ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        if (ret == -1)
-        {
-            printf("Wrong rename succeed hash\n\n");
-            ret = -1;
-        }
-        else
-        {
-            printf("The rename request has been accepted!\n\n");
-            ret = 1;
-        }
-
-        free(digest);
-        free(temp);
-        free(msg_to_hash);
+        ret = check_reqacc_msg(bufferSupp1, buffer, *nonce, session_key2);
     }
     else
     {
@@ -711,8 +596,6 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
 
     free(buffer);
     free(bufferSupp1);
-    free(bufferSupp2);
-    free(iv);
 
     return ret;
 }
