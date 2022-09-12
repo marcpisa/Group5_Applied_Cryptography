@@ -453,50 +453,153 @@ int renameClient(char* username,char* filename, char* new_filename, struct socka
 }
 
 
-
-int deleteClient(char* username, char* filename, struct sockaddr_in srv_addr)
+// TO TEST
+int deleteClient(char* username, char* filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {        
-    int sock, ret;
-    char buffer[BUF_LEN];
-    sock = createSocket();
+ 
+    unsigned char* iv; 
+    unsigned char* msg_to_encr; 
+    unsigned char* encr_msg; 
+    unsigned char* plaintext; 
+    unsigned int plain_len; 
+    unsigned int msg_to_encr_len; 
+    int encr_len; 
+    char* reason; 
 
+    unsigned char* msg_to_hash; 
+    unsigned char* digest; 
+    unsigned int digest_len; 
+    int msg_to_hash_len; 
+    
+    size_t offset; 
+    
+    int sock, ret;
+    int msg_len; 
+    char* temp; 
+    unsigned char* buffer;   
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+    
+    
+    
+    // Creation of socket
+    sock = createSocket();
     if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) 
     {
         printf("\nConnection Failed \n");
         exit(1);
     }
 
+    // Generate the IV 
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN); 
+    if (!iv) exit_with_failure("Malloc iv failed", 1); 
+    ret = RAND_poll(); 
+    if (ret != 1) exit_with_failure("Rand_poll failed\n", 0); 
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN); 
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0); 
+
+
+
+
+    /* ---- Send delete request (req., len. encr., encr. filename, hash(req, encr, iv, nonce), iv) ---- */
+    *nonce = *nonce+1;
+
+    // END OF STRING CHARACTER???
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, filename, strlen(filename), iv, session_key1); 
+
+    // Create hash 
+    msg_to_hash_len = strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST));  // delete req
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE), encr_msg, encr_len); // encr
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), \
+    iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", \
+    BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+
+    // Compose the message
+    msg_len = strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
+    BLANK_SPACE+IV_LEN;   
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1); 
+
+    memcpy(buffer, DELETE_REQUEST, strlen(DELETE_REQUEST));  // delete req
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)), " ", BLANK_SPACE);
+    sprintf(temp, "%d", encr_len);
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE), temp, LEN_SIZE); // len encr
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
+    encr_msg, encr_len); // encr
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
+    digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
+     " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
+    BLANK_SPACE), iv, IV_LEN);// iv
+
+    printf("I'm sending to the server the delete request.\n");
+    ret = send(sock, buffer, msg_len, 0); 
+    if (ret == -1) exit_with_failure("Send failed", 1);
     
-    // SET DELETE REQUEST BUFFER
-    memset(buffer, 0, BUF_LEN);
-    sprintf(buffer, "%s %s %s", DELETE_REQUEST, username, filename);
-    buffer[BUF_LEN-1] = '\0';
+    
+    free(temp);
+    free(buffer);
+    free(msg_to_hash);
+    free(digest);
+    free(encr_msg);
+    free(iv);
 
-    // HERE ADD CRYPTOGRAPHIC FUNCTION TO SET PROPERLY THE BUFFER
-    ret = send(sock, buffer, BUF_LEN, 0);
-    if (ret == -1)
+
+
+
+    // Here we receive the reply of the server
+    msg_len = strlen(DELETE_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    ret = recv(sock, buffer, msg_len,0);
+    if (ret == -1) exit_with_failure("Receive failed", 0);
+    printf("Received the server's response.\n");
+    *nonce = *nonce+1;
+
+    bufferSupp1 = (unsigned char*) malloc(strlen(DELETE_DENIED)*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, buffer, strlen(DELETE_DENIED));
+
+    if (strcmp(bufferSupp1, DELETE_DENIED) == 0)
     {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
+        ret = check_reqden_msg(bufferSupp1, buffer, *nonce, session_key1, session_key2);
     }
-    printf("Delete request message sent\n");
-    memset(buffer, 0, strlen(buffer));
-    ret = recv(sock, buffer, BUF_LEN,0);
-    if (ret == -1)
+    else if (strcmp(bufferSupp1, DELETE_ACCEPTED) == 0)
+    {        
+        ret = check_reqacc_msg(bufferSupp1, buffer, *nonce, session_key2);
+    }
+    else
     {
-        printf("Receive operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
+        printf("We don't know what the server said...\n\n");
+        ret = -1;
     }
 
-    // HERE USE DECRYPTION TO UNDERSTAND WHAT YOU RECEIVE
 
-    // END COMMUNICATION
+    free(buffer);
+    free(bufferSupp1);
 
-    printf("%s\n", buffer);
-    return 1;
+    return ret;
 }
+
 
 int downloadClient(char* username, char* filename, struct sockaddr_in srv_addr)
 {

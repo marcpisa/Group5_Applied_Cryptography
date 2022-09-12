@@ -32,15 +32,9 @@
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MEX_TYPE_LEN 8
-<<<<<<< HEAD
-#define MAIN_FOLDER_SERVER "../../database/"  
-#define MAIN_FOLDER_CLIENT "../../download/"  
-#define INFO_FOLDER_SERVER "../../database/info/"
-=======
 #define MAIN_FOLDER_SERVER "../../database"  // When you test the software on your pc change this variable
 #define MAIN_FOLDER_CLIENT "../../download"  // When you test the software on your pc change this variable
 #define INFO_FOLDER_SERVER "../../database/info" // When you test the software on your pc change this variable
->>>>>>> main
 
 #define LOGIN "login"
 #define LOGOUT "logout"
@@ -119,3 +113,5 @@ EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa);
 void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2);
 EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store);
 unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, int msg_len, unsigned int* out_len);
+int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
+int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce, unsigned char* session_key2);

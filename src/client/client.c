@@ -269,8 +269,11 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = deleteClient(username, command2, srv_addr);
-                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
+                            // Check length and filename sanitization
+                            // ...
+
+                            ret = deleteClient(username, command2, session_key1, session_key2, &nonce_cs, srv_addr);
+                            if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
 
                             break;
 
@@ -323,45 +326,13 @@ int main(int argc, char* argv[])
                         
                         case 9: //************HELP***************//
                             printf(GRN "This is the manual with the following commands:\n\n"); 
-                                    printf(GRN "This is the manual with the following commands:\n\n"); 
-                            printf(GRN "This is the manual with the following commands:\n\n"); 
-                                    printf(GRN "This is the manual with the following commands:\n\n"); 
-                            printf(GRN "This is the manual with the following commands:\n\n"); 
                             printf("Login: 'login' \n"); 
-                                    printf("Login: 'login' \n"); 
-                            printf("Login: 'login' \n"); 
-                                    printf("Login: 'login' \n"); 
-                            printf("Login: 'login' \n"); 
-                            printf("Logout: 'logout' \n"); 
-                                    printf("Logout: 'logout' \n"); 
-                            printf("Logout: 'logout' \n"); 
-                                    printf("Logout: 'logout' \n"); 
                             printf("Logout: 'logout' \n"); 
                             printf("List all files: 'list'\n");
-                            printf("Rename files: 'rename old_filename new_filename'\n"); 
-                                    printf("Rename files: 'rename old_filename new_filename'\n"); 
-                            printf("Rename files: 'rename old_filename new_filename'\n"); 
-                                    printf("Rename files: 'rename old_filename new_filename'\n"); 
-                            printf("Rename files: 'rename old_filename new_filename'\n"); 
-                            printf("Delete file: 'delete filename'\n"); 
-                                    printf("Delete file: 'delete filename'\n"); 
-                            printf("Delete file: 'delete filename'\n"); 
-                                    printf("Delete file: 'delete filename'\n"); 
+                            printf("Rename files: 'rename old_filename new_filename'\n");  
                             printf("Delete file: 'delete filename'\n"); 
                             printf("Download file: 'download filename'\n"); 
-                                    printf("Download file: 'download filename'\n"); 
-                            printf("Download file: 'download filename'\n"); 
-                                    printf("Download file: 'download filename'\n"); 
-                            printf("Download file: 'download filename'\n"); 
                             printf("Upload file: 'upload file_location'\n"); 
-                                    printf("Upload file: 'upload file_location'\n"); 
-                            printf("Upload file: 'upload file_location'\n"); 
-                                    printf("Upload file: 'upload file_location'\n"); 
-                            printf("Upload file: 'upload file_location'\n"); 
-                            printf("Share file with other user: 'share filename username'\n"); 
-                                    printf("Share file with other user: 'share filename username'\n"); 
-                            printf("Share file with other user: 'share filename username'\n"); 
-                                    printf("Share file with other user: 'share filename username'\n"); 
                             printf("Share file with other user: 'share filename username'\n"); 
                             printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
                             break; 
