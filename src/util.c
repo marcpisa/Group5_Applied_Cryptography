@@ -35,7 +35,6 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
     //SANIFICATION: username it is checked in the if block server side.
 }
 
-/**
 int file_name_sanitization(const char* file_name, const char* root_dir) {
 
     char buf[BUF_LEN];
@@ -45,7 +44,7 @@ int file_name_sanitization(const char* file_name, const char* root_dir) {
     if(!canon_file_name) return 0;
     if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;
     return 1;
-}*/
+}
 
 void exit_with_failure(char* err, int perror_enable) {
     if (perror_enable) 
@@ -489,6 +488,125 @@ unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, i
     return digest;
 }
 
+void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key, int* nonce)
+{
+    int ret;
+
+    int msg_len;
+    unsigned int encr_len;
+    unsigned char* ciphertext; 
+
+    unsigned int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    unsigned char* buffer;
+    char* iv;
+    char* temp;
+
+    // Seed for the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    // Increment nonce for new message
+    *nonce = *nonce + 1;
+
+    // Encrypt the reason
+    encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key);
+
+    // Calculate the hash
+    msg_to_hash_len = strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
+
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 0);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, req_denied, strlen(req_denied)); // denied req.
+    memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), ciphertext, encr_len); // encr.  
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
+
+
+    // Compose and send the message
+    msg_len = strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+ \
+    HASH_LEN+BLANK_SPACE+IV_LEN;
+    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
+    if (!buffer) exit_with_failure("Malloc buffer failed", 0);
+
+    memcpy(buffer, req_denied, strlen(req_denied)); // req. denied
+    memcpy(&*(buffer+strlen(req_denied)), " ", BLANK_SPACE);
+    sprintf(temp, "%d", encr_len);
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE), temp, LEN_SIZE); // len. encr.
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), ciphertext, encr_len); // encr. reason
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
+    digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
+    " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
+    BLANK_SPACE), iv, IV_LEN); // iv
+    
+    ret = send(sock, buffer, msg_len, 0);
+    if (ret == -1) exit_with_failure("Send failed", 0);
+
+    free(iv);
+    free(ciphertext);
+    free(msg_to_hash);
+    free(temp);
+    free(digest);
+    free(buffer);
+}
+
+void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce)
+{
+    int ret;
+    int msg_len;
+
+    unsigned int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    unsigned char* buffer;
+    char* iv;
+    char* temp;
+
+    // Seed for the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    // Increment nonce for new message
+    *nonce = *nonce + 1;
+
+    // Calculate the hash
+    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
+
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 0);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, req_accepted, strlen(req_accepted)); // accepted req.
+
 int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     unsigned char* bufferSupp1;
@@ -642,6 +760,29 @@ int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
 
+    digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
+
+
+    // Compose and send the message
+    msg_len = strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
+    if (!buffer) exit_with_failure("Malloc buffer failed", 0);
+
+    memcpy(buffer, req_accepted, strlen(req_accepted)); // req. accepted
+    memcpy(&*(buffer+strlen(req_accepted)), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE), digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
+   
+    ret = send(sock, buffer, msg_len, 0);
+    if (ret == -1) exit_with_failure("Send failed", 0);
+
+    free(iv);
+    free(msg_to_hash);
+    free(temp);
+    free(digest);
+    free(buffer);
+
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
     if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
@@ -663,4 +804,5 @@ int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce
     free(bufferSupp2);
 
     return ret;
+
 }

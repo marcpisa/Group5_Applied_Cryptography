@@ -247,18 +247,29 @@ int main(int argc, char* argv[])
                             break;
                         
                         case 4: //*********** RENAME ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
-                            //printf("Command3 is %s\n", command3);
-                            ret = renameClient(username, command2, command3, srv_addr);
-                            if (ret == -1)
-                            {
-                                printf("Error during the rename operation request!\n\n");
-                                exit(1);
                             }
+                            
+                            // Sanitization and check length filename and new_filename
+                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3 > MAX_LEN_FILENAME)) 
+                            {
+                                printf("Filename or new_filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
+                                break;
+                            } 
+                            ret = filename_sanitization (command2, "/");
+                            ret += filename_sanitization (command3, "/");
+                            if (ret <= 1) 
+                            {
+                                printf("Filename sanitization failed.\n\n", MAX_LEN_FILENAME);
+                                break;
+                            }
+
+                            // Handle rename request
+                            ret = renameClient(username, command2, command3, session_key1, session_key2, &nonce_cs, srv_addr);
+                            if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
                         case 5: //*********** DELETE **********
