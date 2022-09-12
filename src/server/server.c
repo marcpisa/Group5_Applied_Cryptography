@@ -298,7 +298,7 @@ int main(int argc, char* argv[])
                             printf("\nA delete request has came up...\n\n");
                             // DELETE MANAGER: SERVER SIDE
                             
-                            ret = deleteServer(i, received_buffer);
+                            ret = deleteServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client delete request...\n\n");

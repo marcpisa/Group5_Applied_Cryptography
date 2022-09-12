@@ -606,6 +606,155 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
 
     sprintf(temp, "%d", *nonce);
     memcpy(msg_to_hash, req_accepted, strlen(req_accepted)); // accepted req.
+
+int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+{
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+
+    unsigned char* msg_to_hash;
+    unsigned int msg_to_hash_len;
+
+    unsigned char* digest;
+    unsigned int digest_len;
+
+    unsigned char* plaintext;
+    unsigned int plain_len;
+    int encr_len;
+
+    char* temp;
+    char* reason;
+
+    size_t offset;
+    int ret;
+    unsigned char* iv;
+
+
+    // Allocate the dynamic arrays
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+
+
+    // Parse the message
+    offset = strlen(DELETE_DENIED)+BLANK_SPACE;
+    memcpy(temp, &*(msg+offset), LEN_SIZE); // len. encr.
+    offset += LEN_SIZE+BLANK_SPACE;
+        
+    encr_len = atoi(temp);
+    bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*encr_len);
+    if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+
+    memcpy(bufferSupp3, &*(msg+offset), encr_len); // encr.
+    offset += encr_len+BLANK_SPACE; 
+
+    memcpy(bufferSupp2, &*(msg+offset), HASH_LEN); // hash
+    offset += HASH_LEN+BLANK_SPACE;
+
+    memcpy(iv, &*(msg+offset), IV_LEN); // iv
+
+    // Check hash
+    msg_to_hash_len = strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, DELETE_DENIED, strlen(DELETE_DENIED));  // delete den
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE), bufferSupp3, encr_len); // encr
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    if (ret == -1)
+    {
+        printf("Wrong hash\n\n");
+        ret = -1;
+    }
+    else
+    {
+        // Decrypt the reason (bufferSupp3)
+        decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp3, encr_len, iv, session_key1);
+        reason = (char*) malloc(plain_len*sizeof(char));
+        if (!reason) exit_with_failure("Malloc reason failed", 1);
+
+        printf("The request has been denied: %s\n\n", reason);
+            
+        free(plaintext);
+        free(reason);
+
+        ret = 1;
+    }
+
+    free(digest);
+    free(temp);
+    free(iv);
+    free(msg_to_hash);
+    free(bufferSupp2);
+    free(bufferSupp3); 
+
+    return ret;
+}
+
+int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce, unsigned char* session_key2)
+{
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+
+    unsigned char* msg_to_hash;
+    unsigned int msg_to_hash_len;
+
+    unsigned char* digest;
+    unsigned int digest_len;
+
+    unsigned char* plaintext;
+    unsigned int plain_len;
+    int encr_len;
+
+    char* temp;
+    char* reason;
+
+    size_t offset;
+    int ret;
+    unsigned char* iv;
+
+
+    // Allocate the dynamic arrays
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+
+        
+    // Parse the message
+    offset = strlen(req_accepted)+BLANK_SPACE;
+    memcpy(bufferSupp2, &*(msg+offset), HASH_LEN); // hash
+    offset += HASH_LEN+BLANK_SPACE;
+    memcpy(iv, &*(msg+offset), IV_LEN); // iv    
+        
+    // Check hash
+    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, req_accepted, strlen(req_accepted));  // req acc
     memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
@@ -633,4 +782,27 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
     free(temp);
     free(digest);
     free(buffer);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    if (ret == -1)
+    {
+        printf("Wrong hash\n\n");
+        ret = -1;
+    }
+    else
+    {
+        printf("The request has been accepted!\n\n");
+        ret = 1;
+    }
+
+    free(digest);
+    free(temp);
+    free(msg_to_hash);
+    free(bufferSupp2);
+
+    return ret;
+
 }
