@@ -298,16 +298,17 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
 
     unsigned char* iv;
     unsigned int index;
-    int num_file = -1;
+    int num_file;
+    int len_filename;
     int encr_len;
     unsigned char* list;
 
     unsigned char* msg_to_encr;
     unsigned char* encr_msg;
-    unsigned char* plaintext;
+    unsigned char* ciphertext;
     unsigned int msg_to_encr_len;
     int encr_len;
-    unsigned int plain_len;
+    unsigned int cipher_len;
     
     unsigned char* msg_to_hash;
     unsigned char* digest;
@@ -365,8 +366,7 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
     memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
     temp, LEN_SIZE); // nonce
     
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     ret = CRYPTO_memcmp(digest, bufferSupp1, HASH_LEN);
     
@@ -377,7 +377,7 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
     
     if (ret == -1) // If the hash comparison failed
     {
-        operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, *nonce);
+        operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, session_key2, *nonce);
         return 1;
     }
 
@@ -385,52 +385,150 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
 
 
     /* ---- Prepare the list of filenames (num_file, len. encr., encr. list, hash(num_file, encr. list, iv, nonce), iv) ---- */
-    while (num_file != 0) {
-        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-        if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-
+    offset = 0;
+    len_filename = 0;
+    num_file = 0;
+    while (num_file != -1) {
         // Build the filenames' list
         bufferSupp1 = (unsigned char*) malloc((CHUNK_SIZE+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         d = opendir(".");
-        counter = 0;
+        
+        // If this is the second list of filenames, reset the pointer to the prev. position
+        for (int i = 0; i < num_file; i++) files = readdir(d);
+
+        num_file = 0;
         if(d)
         {
-            while((files = readdir(d)) != NULL &&) //the folder we are checking has the same name of the username. So we take the list from that name
+            while((files = readdir(d)) != NULL)
             {
-                strcat(buffer_response, files->d_name);
-                strcat(buffer_response, " ");
+                len_filename = strlen(files->d_name);
+                // The filename fits the list length
+                if ((offset+len_filename+1) <= CHUNK_SIZE)
+                {
+                    memcpy(&*(bufferSupp1+offset), files->d_name, len_filename);
+                    offset += len_filename;
+                    memcpy(&*(bufferSupp1+offset), " ", BLANK_SPACE);
+                    offset += BLANK_SPACE;
+                    num_file += 1;
+                }
+                // List is full
+                else if (offset != 0)
+                {
+                    // End string character at the end
+                    memcpy(&*(bufferSupp1+offset-1), "\0", 1);
+                }
+                // No filenames
+                else 
+                {
+                    // End string character as the only text
+                    memcpy(&*(bufferSupp1+offset), "\0", 1);
+                }
             }
         }
 
         // Encrypt the list
-
+        ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+        if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+        encrypt_AES_128_CBC(&ciphertext, &cipher_len, bufferSupp1, offset, iv, session_key1);
+        if (cipher_len > (CHUNK_SIZE+BLOCK_SIZE)) exit_with_failure("Wrong ciphertext length, more than CHUNK+BLOCK size", 0);
 
         // Prepare the hash
+        msg_to_hash_len = LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+        msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+        if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+        temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+        if (!temp) exit_with_failure("Malloc temp failed", 1);
 
+        sprintf(temp, "%d", num_file);
+        memcpy(msg_to_hash, temp, LEN_SIZE);  // num. file
+        memcpy(&*(msg_to_hash+LEN_SIZE), " ", BLANK_SPACE);
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE), ciphertext, cipher_len); // encr. list
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len), " ", BLANK_SPACE);
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE), \
+        iv, IV_LEN); // iv
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN), \
+        " ", BLANK_SPACE);
+        sprintf(temp, "%d", *nonce);
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+ \
+        BLANK_SPACE), temp, LEN_SIZE); // nonce
+
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);  
 
         // Build the message
+        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
+        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-
+        sprintf(temp, "%d", num_file);
+        memcpy(buffer, temp, LEN_SIZE); // num. file
+        memcpy(&*(buffer+LEN_SIZE), " ", BLANK_SPACE);
+        sprintf(temp, "%d", cipher_len);
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE), temp, LEN_SIZE); // len. encr.
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
+        ciphertext, cipher_len); // encr. list
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
+        cipher_len), " ", BLANK_SPACE);
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
+        cipher_len+BLANK_SPACE), digest, HASH_LEN); // hash
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
+        cipher_len+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
+        cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
 
 
         printf("I'm sending to the client the filename's list\n");
         ret = send(sd, buffer, msg_len, 0); 
         if (ret == -1) exit_with_failure("Send failed", 1);
 
-        // free(...);
-    // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
-            
-
+        free(bufferSupp1);
+        free(buffer);
+        free(ciphertext);
+        free(digest);
+        free(msg_to_hash);
 
         /* ---- Check if the client succeed or failed ---- */
+        *nonce = *nonce+1;
 
-        ///....
+        msg_len = strlen(LIST_DENIED)+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+        ret = recv(sd, buffer, msg_len,0);
+        if (ret == -1) exit_with_failure("Receive failed", 0);
+        printf("Received the client outcome.\n");
+
+        bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+        memcpy(bufferSupp1, buffer, strlen(LIST_DENIED)); // denied or accepted same length
+
+        if (strcmp(bufferSupp1, LIST_DENIED) == 0)
+        {
+            ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
+            if (ret == -1) exit_with_failure("Error checking list denied message", 0);
+            else 
+            {
+                free(bufferSupp1);
+                free(buffer);
+
+                return 1;
+            }
+        }
+        else if (strcmp(bufferSupp1, LIST_ACCEPTED) == 0)
+        {
+            ret = check_reqacc_msg(LIST_ACCEPTED, buffer, *nonce, session_key2);
+            if (ret == -1) exit_with_failure("Error checking list accepted message", 0);
+            if (num_file == 0) num_file = -1;
+        }
+        else
+        {
+            printf("We don't know what the server said...\n\n");
+            free(bufferSupp1);
+            free(buffer);
+            return 1;
+        }
     }
-
-
-
 
     return 1;
 }
@@ -514,7 +612,7 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
     if (ret == -1) 
     {
-        operation_denied(sd, "Wrong rename request hash", RENAME_DENIED);
+        operation_denied(sd, "Wrong rename request hash", RENAME_DENIED, session_key1, session_key2, *nonce);
         
         free(bufferSupp1);
         free(bufferSupp2);        
@@ -542,7 +640,7 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 
     {
-        operation_denied(sd, "Filename too long", RENAME_DENIED);
+        operation_denied(sd, "Filename too long", RENAME_DENIED, session_key1, session_key2, *nonce);
         
         free(plaintext);
         return -1;
@@ -558,7 +656,7 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     len_newfn = (int)offset;
     if (len_newfn > MAX_LEN_FILENAME)
     {
-        operation_denied(sd, "New_filename too long", RENAME_DENIED);
+        operation_denied(sd, "New_filename too long", RENAME_DENIED, session_key1, session_key2, *nonce);
         
         free(plaintext);
         free(filename);
@@ -572,7 +670,7 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     ret = filename_sanitization (filename, "/");
     ret += filename_sanitization (new_filename, "/");
     if (ret <= 1) {
-        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED);
+        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, *nonce);
 
         
         free(plaintext);
@@ -582,16 +680,9 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     }
 
     // Execute the rename if possible, otherwise send failed message to client
-    /*chdir(MAIN_FOLDER_SERVER);
-    ret = chdir(bufferSupp2);
-    if (ret == -1)
-    {
-        printf("Error: username doesn't exists...\n");
-        exit(1);
-    }*/
     ret = rename(filename, new_filename);
     if (ret == -1) {
-        operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED);
+        operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED, session_key1, session_key2, *nonce);
 
         
         free(plaintext);
@@ -605,43 +696,8 @@ int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     free(new_filename);
 
 
-
-
-    // Send success message to client
-    *nonce = *nonce+1;
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN); // IV for hash randomness
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
-    msg_len = strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-
-    // Calculate the hash
-    msg_to_hash_len = strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
-
-    temp = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp) exit_with_failure("Malloc temp failed", 0);
-
-    sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, RENAME_ACCEPTED, strlen(RENAME_ACCEPTED)); // rename acc.
-    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE), iv, IV_LEN); // iv.  
-    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
-
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
-
-    // Compose the message
-    memcpy(buffer, RENAME_ACCEPTED, strlen(RENAME_ACCEPTED)); // rename acc.
-    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE), digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
-
-    ret = send(sd, buffer, msg_len, 0);
-    if (ret == -1) exit_with_failure("Send failed", 1);
+    // Send success message to the client
+    operation_succeed(sd, RENAME_ACCEPTED, session_key2, *nonce);
     
     return 1;
 }
@@ -720,7 +776,7 @@ int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 
     if (ret == -1) 
     {
-        operation_denied(sd, "Wrong delete request hash", DELETE_DENIED);
+        operation_denied(sd, "Wrong delete request hash", DELETE_DENIED, session_key1, session_key2, *nonce);
         
         free(bufferSupp1);
         free(bufferSupp2);        
@@ -745,7 +801,7 @@ int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 
     {
-        operation_denied(sd, "Filename too long", DELETE_DENIED);
+        operation_denied(sd, "Filename too long", DELETE_DENIED, session_key1, session_key2, *nonce);
         
         free(plaintext);
         return -1;
@@ -762,7 +818,7 @@ int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     ret += filename_sanitization (filename, "/");
 
     if (ret != 1) {
-        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED);
+        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, *nonce);
 
         
         free(plaintext);
@@ -772,7 +828,7 @@ int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 
     ret = remove(filename);
     if (ret == -1) {
-        operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED);
+        operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED, session_key1, session_key2, *nonce);
 
         
         free(plaintext);
