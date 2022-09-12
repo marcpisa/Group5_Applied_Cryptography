@@ -78,7 +78,8 @@
 
 #define MAX_LEN_USERNAME 25
 #define MAX_LEN_REQUEST 15
-#define LEN_SIZE 5
+#define LEN_SIZE 10
+#define REST_SIZE 3
 #define MAX_CERT_LEN 2*BUF_LEN
 
 #define DELIM ' '

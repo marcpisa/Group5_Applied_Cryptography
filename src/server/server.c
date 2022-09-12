@@ -2,7 +2,6 @@
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     int exit_flag = 0;
 
     // Socket management variables
