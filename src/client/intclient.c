@@ -333,12 +333,12 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     return 1;
 }
 
-// TO TEST
 int listClient(char* username, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {
     unsigned char* iv;
     unsigned int index;
-    int num_file = -1;
+    int num_file;
+    int tot_num_file;
     int encr_len;
     unsigned char* list;
 
@@ -357,7 +357,7 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
     size_t offset;
     size_t old_offset;
 
-    int sock, ret, counter;
+    int sock, ret;
     int msg_len;
     char* temp;
     char *token;
@@ -402,7 +402,7 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
     temp, LEN_SIZE); // nonce
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+    //if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
     // Compose the message
     msg_len = strlen(LIST_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
@@ -413,8 +413,8 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
     memcpy(buffer, LIST_REQUEST, strlen(LIST_REQUEST));  // list req
     memcpy(&*(buffer+strlen(LIST_REQUEST)), " ", BLANK_SPACE);
     memcpy(&*(buffer+strlen(LIST_REQUEST)+BLANK_SPACE), digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(LIST_REQUEST)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(LIST_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(buffer+strlen(LIST_REQUEST)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(LIST_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
 
     printf("I'm sending to the server the list message.\n");
     ret = send(sock, buffer, msg_len, 0); 
@@ -430,9 +430,10 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
 
 
     /* ---- Parse the response (num_file, len. encr., encr. list, hash(num_file, encr. list, iv, nonce), iv) ---- */
-    counter = 0;
+    tot_num_file = 0;
+    num_file = 0;
     index = 0;
-    while (num_file != 0) 
+    while (num_file != -1) 
     {
         msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
@@ -443,12 +444,46 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         printf("Received first chunk of filenames.\n");
         *nonce = *nonce+1;
 
+
+        // Check if something failed server-side
+        bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1); 
+
+        memcpy(bufferSupp1, buffer, strlen(LIST_DENIED));
+
+        if (strcmp(bufferSupp1, LIST_DENIED) == 0)
+        {
+            ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
+            if (ret == -1) exit_with_failure("Error checking list denied message", 0);
+            else 
+            {
+                free(bufferSupp1);
+                free(buffer);
+
+                return -1;
+            }
+
+        }
+        else 
+        {
+            printf("We don't know what the server said...\n\n");
+            free(bufferSupp1);
+            free(buffer);
+            return -1;
+        }
+
+        free(bufferSupp1);
+
+
+        // No operation denied, let's obtain the list
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
         bufferSupp1 = (unsigned char*) malloc(2*CHUNK_SIZE*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
 
         // Parsing
         memcpy(temp, buffer, LEN_SIZE); // num_file
@@ -466,7 +501,6 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         old_offset += HASH_LEN+BLANK_SPACE;
 
         memcpy(iv, &*(buffer+old_offset), IV_LEN); // iv
-        num_file = atoi(temp);
         
         // Check hash
         msg_to_hash_len = LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
@@ -484,13 +518,27 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         iv, IV_LEN); // iv
         memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
         sprintf(temp, "%d", *nonce);
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+        temp, LEN_SIZE); // nonce
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-        if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+        //if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        if (ret == -1) exit_with_failure("Wrong hash", 0);
+        if (ret == -1)
+        {
+            operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, *nonce);
+
+            free(buffer);
+            free(temp);
+            free(bufferSupp1);
+            free(bufferSupp2);
+            free(iv);
+            free(msg_to_hash);
+            free(digest);
+
+            return -1;
+        }
 
         // Decrypt list
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
@@ -499,10 +547,10 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         if (num_file < 0 || num_file >= CHUNK_SIZE) exit_with_failure("Incorrect num_file", 0);
 
         // Fill list array
-        if (counter == 0 && num_file != 0)
+        if (tot_num_file == 0 && num_file != 0)
         {
-            counter += num_file;
-            *file_list = (char**) malloc(counter*sizeof(char*));
+            tot_num_file += num_file;
+            *file_list = (char**) malloc(tot_num_file*sizeof(char*));
             if (!(*file_list)) exit_with_failure("Malloc file_list failed", 1);
 
             token = strtok(buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
@@ -520,10 +568,10 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         }
         else if (num_file != 0)
         {
-            counter += num_file;
+            tot_num_file += num_file;
             // Extend the file list reallocating memory
-            ret = realloc(*file_list, counter*sizeof(char*));
-            if (ret == -1) exit_with_failure("Realloc failed", 1);
+            ret = realloc(*file_list, tot_num_file*sizeof(char*));
+            if (!ret) exit_with_failure("Realloc failed", 1);
 
             token = strtok(buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
             while (token != NULL) {
@@ -540,8 +588,12 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
         }
         else // num_file == 0
         {
+            num_file = -1;
             printf("The client receives the complete file's list (%d filenames).\n\n", index);
         }
+
+        // Send success message
+        operation_succeed(sock, LIST_ACCEPTED, session_key2, *nonce);
 
         free(temp);
         free(buffer);
@@ -555,7 +607,6 @@ int listClient(char* username, char*** file_list, unsigned char* session_key1, u
     return 1;
 }
 
-// TO TEST
 int renameClient(char* username, char* filename, char* new_filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {
     char* reason;
@@ -602,6 +653,8 @@ int renameClient(char* username, char* filename, char* new_filename, unsigned ch
 
 
     /* ---- Create the first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
+    *nonce = *nonce+1;
+
     // Encrypt the two names
     msg_to_encr_len = strlen(filename)+BLANK_SPACE+strlen(new_filename);
     msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
@@ -633,12 +686,11 @@ int renameClient(char* username, char* filename, char* new_filename, unsigned ch
     temp, LEN_SIZE); // nonce
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+    // if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
     // Compose the message
     msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
     BLANK_SPACE+IV_LEN;
-
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
@@ -650,18 +702,17 @@ int renameClient(char* username, char* filename, char* new_filename, unsigned ch
     memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
     encr_msg, encr_len); // encr
     memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
-    digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
-     " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
-    BLANK_SPACE), iv, IV_LEN);// iv
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+ \
+    BLANK_SPACE), digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+ \
+    BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+ \
+    BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
 
 
     printf("I'm sending to the server the rename message.\n");
     ret = send(sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
     free(temp);
     free(buffer);
@@ -683,6 +734,7 @@ int renameClient(char* username, char* filename, char* new_filename, unsigned ch
     ret = recv(sock, buffer, msg_len,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
+    *nonce = *nonce+1;
 
     bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -710,11 +762,9 @@ int renameClient(char* username, char* filename, char* new_filename, unsigned ch
     return ret;
 }
 
-
-// TO TEST
 int deleteClient(char* username, char* filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
 {        
- 
+
     unsigned char* iv; 
     unsigned char* msg_to_encr; 
     unsigned char* encr_msg; 
@@ -806,7 +856,7 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
     memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
      " ", BLANK_SPACE);
     memcpy(&*(buffer+strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
-    BLANK_SPACE), iv, IV_LEN);// iv
+    BLANK_SPACE), iv, IV_LEN); // iv
 
     printf("I'm sending to the server the delete request.\n");
     ret = send(sock, buffer, msg_len, 0); 
@@ -850,7 +900,6 @@ int deleteClient(char* username, char* filename, unsigned char* session_key1, un
         printf("We don't know what the server said...\n\n");
         ret = -1;
     }
-
 
     free(buffer);
     free(bufferSupp1);

@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
     X509* cert_serv = NULL;;
     BIO* bio_cert;
     char* path_cert_serv = "../cert.pem";
+    char** file_list;
 
     // Cryptographic operation
     unsigned char* session_key1;
@@ -235,13 +236,13 @@ int main(int argc, char* argv[])
                         case 3: //************ LIST *************
                         
                             // Stuff to do
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
+                            }
 
-                            ret = listClient(username, srv_addr);
+                            ret = listClient(username, &file_list, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
@@ -281,7 +282,17 @@ int main(int argc, char* argv[])
                             }
 
                             // Check length and filename sanitization
-                            // ...
+                            if (strlen(command2) > MAX_LEN_FILENAME) 
+                            {
+                                printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
+                                break;
+                            } 
+                            ret = filename_sanitization (command2, "/");
+                            if (ret == -1) 
+                            {
+                                printf("Filename sanitization failed.\n\n", MAX_LEN_FILENAME);
+                                break;
+                            }
 
                             ret = deleteClient(username, command2, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
@@ -289,11 +300,12 @@ int main(int argc, char* argv[])
                             break;
 
                         case 6: //*********** DOWNLOAD ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
+                            }
+
                             ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
                             if (ret == -1)
                             {
@@ -304,11 +316,12 @@ int main(int argc, char* argv[])
                             break;
 
                         case 7: //*********** UPLOAD *************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
-                            }*/
+                            }
+
                             ret = uploadClient(username, command2, srv_addr);
                             if (ret == -1)
                             {
@@ -319,12 +332,12 @@ int main(int argc, char* argv[])
                             break;
 
                         case 8: //********** SHARE ************
-                            /*if (connected == 0)
+                            if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            */
+                            
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
                             ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
@@ -351,9 +364,14 @@ int main(int argc, char* argv[])
                         case 10:
                                 if(connected == 1)
                                 {
-                                    //logout
-                                    // if (ret == -1)
-                                    printf("Logging out...\n");
+                                    ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                            
+                                    if (ret != -1)
+                                    {
+                                        printf("Logging out...\n\n");
+                                        connected = 0;
+                                    }
+                                    else printf("Logout failed.\n\n");
                                 }
 
                                 printf("Exiting the program.\n");

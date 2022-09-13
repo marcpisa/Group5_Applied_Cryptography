@@ -19,6 +19,7 @@
 #include <openssl/crypto.h>
 //#include <conio.h>
 
+
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
 #define BUF_LEN 1024
@@ -31,6 +32,7 @@
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MEX_TYPE_LEN 8
+#define NUM_USER 4
 
 #define MAIN_FOLDER_SERVER "../../database/"
 #define MAIN_FOLDER_CLIENT "../../download/"
@@ -49,6 +51,7 @@
 
 #define LOGIN_REQUEST "logi_req"
 #define LOGOUT_REQUEST "logo_req"
+#define LOGOUT_DENIED "logo_den"
 #define LOGOUT_ACCEPTED "logo_acc"
 #define LIST_REQUEST "list_req"
 #define LIST_RESPONSE "list_res"

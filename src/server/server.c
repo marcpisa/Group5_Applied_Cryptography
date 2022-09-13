@@ -1,9 +1,14 @@
 #include "intserver.h"
+
 int main(int argc, char* argv[])
 {
     //*********** VARIABLES ************
     int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     int exit_flag = 0;
+    user_stat* user_list;
+    FILE* fp;
+    char* line;
+    int index = 0;
 
     // Socket management variables
     int ret, pid, listenerTCP, i, fdmax, new_sd;
@@ -29,11 +34,24 @@ int main(int argc, char* argv[])
     
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(session_key1 == NULL || session_key2 == NULL)
-    {
-        printf("Unable to allocate session keys...\n\n");
-        return -1;
+    if(session_key1 == NULL || session_key2 == NULL) exit_with_failure("Unable to allocate session keys", 1);
+
+    // Recover the user list
+    user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));
+    fp = fopen("../user_list.txt", 'r');
+    if (!fp) exit_with_failure("Open user_list.txt failed", 1);
+    line = (char*) malloc(MAX_LEN_USERNAME*sizeof(char));
+    if (!line) exit_with_failure("Malloc line failed", 1);
+
+    while (getline(&line, NULL, fp) != -1) {
+        memcpy((user_list+index)->username, line, strlen(line));
+        (user_list+index)->connected = 0;
+        index += 1;
     }
+
+    fclose(fp);
+    free(line);
+
 
     // ********** END VARIABLES *********
 
@@ -157,15 +175,13 @@ int main(int argc, char* argv[])
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, received_buffer, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer, &user_list, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
                                 exit(1);
                             }
                             else printf("I managed a login request and all was good!\n\n");
-
-                            //END COMMUNICATION
 
                             printf("End of login request management!\n\n");
                             close(i);
@@ -192,7 +208,7 @@ int main(int argc, char* argv[])
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
-                            ret = logoutServer(i, received_buffer, &nonce_cs, session_key2);
+                            ret = logoutServer(i, received_buffer, &user_list, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client logout request...\n\n");
@@ -229,7 +245,7 @@ int main(int argc, char* argv[])
                             printf("\nA list request hasasdjhadasjkdhjaskdjkasdhs came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
-                            ret = listServer(i, received_buffer);
+                            ret = listServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -265,7 +281,7 @@ int main(int argc, char* argv[])
                             printf("\nA rename request has came up...\n\n");
                             // RENAME MANAGER: SERVER SIDE
                             
-                            ret = renameServer(i, received_buffer);
+                            ret = renameServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client rename request...\n\n");
@@ -429,6 +445,7 @@ int main(int argc, char* argv[])
     
     free(session_key1);
     free(session_key2);
+    free(user_list);
     
     return 0;
 }

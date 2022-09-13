@@ -669,7 +669,7 @@ int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce,
 
 
     // Parse the message
-    offset = strlen(DELETE_DENIED)+BLANK_SPACE;
+    offset = strlen(req_denied)+BLANK_SPACE;
     memcpy(temp, &*(msg+offset), LEN_SIZE); // len. encr.
     offset += LEN_SIZE+BLANK_SPACE;
         
@@ -686,18 +686,18 @@ int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce,
     memcpy(iv, &*(msg+offset), IV_LEN); // iv
 
     // Check hash
-    msg_to_hash_len = strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
+    msg_to_hash_len = strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
     msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, DELETE_DENIED, strlen(DELETE_DENIED));  // delete den
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE), bufferSupp3, encr_len); // encr
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_DENIED)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    memcpy(msg_to_hash, req_denied, strlen(req_denied));  // delete den
+    memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), bufferSupp3, encr_len); // encr
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
     temp, LEN_SIZE); // nonce
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
