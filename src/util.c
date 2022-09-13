@@ -18,7 +18,7 @@ int input_sanitization_commands(const char* input) {
 }
 
 void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
-    int j, i;
+    int i;
     i = 0;
     char *token;
     token = strtok(received_buff, " ");
@@ -35,7 +35,7 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
     //SANIFICATION: username it is checked in the if block server side.
 }
 
-int file_name_sanitization(const char* file_name, const char* root_dir) {
+int filename_sanitization(const char* file_name, const char* root_dir) {
 
     char buf[BUF_LEN];
 
@@ -107,7 +107,7 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len)
     EVP_PKEY* pk = NULL;
     pk = PEM_read_bio_PUBKEY(mbio, NULL, NULL, NULL);
     
-    BIO_free(mbio);
+    BIO_free_all(mbio);
 
     return pk;
 }
@@ -310,7 +310,7 @@ unsigned char* read_cert(char* path_cert, int* cert_len)
     // Free
     //free(cert_byte);
     X509_free(server_cert);
-    BIO_free(bio);
+    BIO_free_all(bio);
 
     return result;
 
@@ -493,7 +493,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     int ret;
 
     int msg_len;
-    unsigned int encr_len;
+    int encr_len;
     unsigned char* ciphertext; 
 
     unsigned int msg_to_hash_len;
@@ -502,7 +502,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     unsigned char* digest;
 
     unsigned char* buffer;
-    char* iv;
+    unsigned char* iv;
     char* temp;
 
     // Seed for the IV
@@ -582,7 +582,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
     unsigned char* digest;
 
     unsigned char* buffer;
-    char* iv;
+    unsigned char* iv;
     char* temp;
 
     // Seed for the IV
@@ -635,9 +635,8 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
 
 
 
-int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
-    unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
 
@@ -690,7 +689,7 @@ int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce,
     msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
-    sprintf(temp, "%d", *nonce);
+    sprintf(temp, "%d", nonce);
     memcpy(msg_to_hash, req_denied, strlen(req_denied));  // delete den
     memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), bufferSupp3, encr_len); // encr
@@ -734,11 +733,9 @@ int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce,
     return ret;
 }
 
-int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce, unsigned char* key)
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* key)
 {
-    unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
-    unsigned char* bufferSupp3;
 
     unsigned char* msg_to_hash;
     unsigned int msg_to_hash_len;
@@ -746,14 +743,7 @@ int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce
     unsigned char* digest;
     unsigned int digest_len;
 
-    unsigned char* plaintext;
-    unsigned int plain_len;
-    int encr_len;
-
     char* temp;
-    char* reason;
-    unsigned char* buffer;
-    unsigned int msg_len;
 
     size_t offset;
     int ret;
@@ -783,7 +773,7 @@ int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf(temp, "%d", *nonce);
+    sprintf(temp, "%d", nonce);
     memcpy(msg_to_hash, req_accepted, strlen(req_accepted));  // req acc
     memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv

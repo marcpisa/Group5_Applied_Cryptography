@@ -6,7 +6,6 @@ int main(int argc, char* argv[])
     // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
-    int sock;
     int new_sd, listenerTCP, ret, fdmax, pid, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
@@ -18,9 +17,6 @@ int main(int argc, char* argv[])
     char command2[MAX_LEN_CMD];
     char command3[MAX_LEN_CMD];
     char username[MAX_LEN_USERNAME];
-
-    // Variables for file management
-    FILE* fd1;
 
     // Others
     int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
@@ -242,7 +238,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = listClient(username, &file_list, session_key1, session_key2, &nonce_cs, srv_addr);
+                            ret = listClient(&file_list, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
                         
                             break;
@@ -255,7 +251,7 @@ int main(int argc, char* argv[])
                             }
                             
                             // Sanitization and check length filename and new_filename
-                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3 > MAX_LEN_FILENAME)) 
+                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3) > MAX_LEN_FILENAME) 
                             {
                                 printf("Filename or new_filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
                                 break;
@@ -264,12 +260,12 @@ int main(int argc, char* argv[])
                             ret += filename_sanitization (command3, "/");
                             if (ret <= 1) 
                             {
-                                printf("Filename sanitization failed.\n\n", MAX_LEN_FILENAME);
+                                printf("Filename sanitization failed.\n\n");
                                 break;
                             }
 
                             // Handle rename request
-                            ret = renameClient(username, command2, command3, session_key1, session_key2, &nonce_cs, srv_addr);
+                            ret = renameClient(command2, command3, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
@@ -290,11 +286,11 @@ int main(int argc, char* argv[])
                             ret = filename_sanitization (command2, "/");
                             if (ret == -1) 
                             {
-                                printf("Filename sanitization failed.\n\n", MAX_LEN_FILENAME);
+                                printf("Filename sanitization failed.\n\n");
                                 break;
                             }
 
-                            ret = deleteClient(username, command2, session_key1, session_key2, &nonce_cs, srv_addr);
+                            ret = deleteClient(command2, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
 
                             break;
@@ -306,7 +302,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = downloadClient(username, command2, srv_addr); // format of the input given to the input stream: download filename
+                            ret = downloadClient(command2, srv_addr); // format of the input given to the input stream: download filename
                             if (ret == -1)
                             {
                                 printf("Error during the download operation request!\n\n");
@@ -322,7 +318,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = uploadClient(username, command2, srv_addr);
+                            ret = uploadClient(command2, srv_addr);
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
@@ -339,7 +335,7 @@ int main(int argc, char* argv[])
                             }
                             
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(username, command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            ret = shareClient(command2, command3, srv_addr); //command2 = filename, command3 = peername
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");

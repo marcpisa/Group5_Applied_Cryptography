@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -fsanitize=undefined -fsanitize=address -g -lcrypto -lmcheck
+CFLAGS=-Wall -Wextra -fsanitize=undefined -g -lcrypto -lmcheck
 
 serverPr: server.o intserver.o ../util.o
 	$(CC) -o serverPr ../util.o intserver.o server.o $(CFLAGS)

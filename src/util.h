@@ -17,6 +17,7 @@
 #include <openssl/x509.h>
 #include <openssl/hmac.h>
 #include <openssl/crypto.h>
+#include <openssl/rand.h>
 //#include <conio.h>
 
 
@@ -82,7 +83,6 @@
 #define GRN "\x1B[32m"
 #define RESET "\x1B[0m"
 
-#define MAX_LEN_USERNAME 25
 #define MAX_LEN_REQUEST 15
 #define LEN_SIZE 5
 #define MAX_CERT_LEN 2*BUF_LEN
@@ -98,7 +98,7 @@
 int username_sanitization(const char *username);
 int input_sanitization_commands(const char *input);
 void rec_buffer_sanitization(char *received_buff, char *buff1[]);
-int file_name_sanitization(const char *file_name, const char *root_dir);
+int filename_sanitization(const char *file_name, const char *root_dir);
 void exit_with_failure(char *err, int perror_enable);
 size_t str_ssplit(unsigned char *a_str, const unsigned char a_delim);
 unsigned char *pubkey_to_byte(EVP_PKEY *pub_key, int *pub_key_len);
@@ -120,5 +120,5 @@ EVP_PKEY *get_ver_server_pubkey(X509 *serv_cert, X509_STORE *ca_store);
 unsigned char *hmac_sha256(unsigned char *key, int keylen, unsigned char *msg, int msg_len, unsigned int *out_len);
 void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, int* nonce);
 void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce);
-int check_reqden_msg (unsigned char* req_denied, unsigned char* msg, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
-int check_reqacc_msg(unsigned char* req_accepted, unsigned char* msg, int* nonce, unsigned char* session_key2);
+int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2);
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* session_key2);

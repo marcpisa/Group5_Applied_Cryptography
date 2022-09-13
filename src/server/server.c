@@ -1,6 +1,6 @@
 #include "intserver.h"
 
-int main(int argc, char* argv[])
+int main()
 {
     //*********** VARIABLES ************
     int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 
     // Socket management variables
     int ret, pid, listenerTCP, i, fdmax, new_sd;
-    uint32_t addr_app;
+    //uint32_t addr_app;
     fd_set master;
     fd_set read_fds;
     socklen_t addrlen;
@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 
     // Recover the user list
     user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));
-    fp = fopen("../user_list.txt", 'r');
+    fp = fopen("../user_list.txt", "r");
     if (!fp) exit_with_failure("Open user_list.txt failed", 1);
     line = (char*) malloc(MAX_LEN_USERNAME*sizeof(char));
     if (!line) exit_with_failure("Malloc line failed", 1);
@@ -54,12 +54,6 @@ int main(int argc, char* argv[])
 
 
     // ********** END VARIABLES *********
-
-    if (argc != 1)
-    {
-        printf("Error during boot phase: number of arguments is wrong...\n\n");
-        exit(-1);
-    }
 
     printf("\n+++++++++++ FILE CLOUD SERVER +++++++++++\n");
 
@@ -149,7 +143,7 @@ int main(int argc, char* argv[])
                     ret = recv(i, received_buffer, 4*BUF_LEN, 0);
                     if (ret < 0)
                     {
-                        perror("Errore during recv operation: ");
+                        perror("Error during recv operation: ");
                         close(listenerTCP);
                         exit(-1);
                     }
