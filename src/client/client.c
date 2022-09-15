@@ -239,7 +239,7 @@ int main(int argc, char* argv[])
                             }
 
                             ret = listClient(&file_list, session_key1, session_key2, &nonce_cs, srv_addr);
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
                         
                             break;
                         

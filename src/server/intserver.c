@@ -18,7 +18,7 @@ int createSocket()
     return sock;
 }
 
-int loginServer(int sd, char* rec_mex, user_stat** user_list, unsigned char* session_key1, unsigned char* session_key2)
+int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, unsigned char* session_key1, unsigned char* session_key2)
 {
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -31,7 +31,6 @@ int loginServer(int sd, char* rec_mex, user_stat** user_list, unsigned char* ses
     char* path_cert_client_rsa;
     int ret;
     int msg_len;
-    char username [MAX_LEN_USERNAME];
     size_t offset, old_offset;
     size_t K_len;
 
@@ -99,17 +98,26 @@ int loginServer(int sd, char* rec_mex, user_stat** user_list, unsigned char* ses
     //printf("\n\n"); 
 
     // Sanitize and check username
+    if (len_username > MAX_LEN_USERNAME) exit_with_failure("Username too long", 0);
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
     
-
-    // SERVER SHOULD CHECK IF THE USER IS ALREADY ONLINE
+    // Server checks if the user is already online
+    for(int i = 0; i < NUM_USER; i++)
+    {
+        if (strcmp((*user_list+i)->username, username) == 0)
+        {
+            if ((*user_list+i)->connected == 1)
+            {
+                exit_with_failure("User already online", 0);
+            }
+        }
+    }
 
     ret = chdir(MAIN_FOLDER_SERVER);
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
     ret = chdir((char*) bufferSupp1);
     if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
   
-    memset(username, 0, MAX_LEN_USERNAME);
     memcpy(username, bufferSupp1, len_username);
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
@@ -148,7 +156,7 @@ int loginServer(int sd, char* rec_mex, user_stat** user_list, unsigned char* ses
     
     ret = chdir("../../src");
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
-    signature = sign_msg(path_rsa_key, msg_to_sign, msg_to_sign_len, &signature_len);
+    signature = sign_msg(path_rsa_key, msg_to_sign, msg_to_sign_len, &signature_len, 1);
  
     // Serialize the certificate
     cert_byte = read_cert(path_cert_rsa, &cert_len);
@@ -316,10 +324,11 @@ int logoutServer(int sd, char* rec_mex, user_stat** user_list, int* nonce, unsig
 
 }
 
-int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     DIR* d;
     struct dirent *files;
+    char* path_documents;
 
     unsigned char* iv;
     int num_file;
@@ -352,8 +361,11 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
     // ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     // if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-
-
+    // Build path
+    path_documents = (char*) malloc((15+strlen(username)+11)*sizeof(char));
+    memcpy(path_documents, "../../database/", 15);
+    memcpy(&*(path_documents+15), username, strlen(username));
+    memcpy(&*(path_documents+15+strlen(username)), "/documents/", 11);
 
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
     *nonce = *nonce+1;
@@ -390,12 +402,15 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
     free(bufferSupp1);
     free(msg_to_hash);
     free(digest);
+    free(temp);
     
     if (ret == -1) // If the hash comparison failed
     {
         operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
+
+    printf("List request message parsed successfully\n\n");
 
 
 
@@ -405,11 +420,13 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
     len_filename = 0;
     num_file = 0;
     tot_num_file = 0;
+
     while (num_file != -1) {
         // Build the filenames' list
         bufferSupp1 = (unsigned char*) malloc((CHUNK_SIZE+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-        d = opendir(".");
+
+        d = opendir(path_documents);        
         
         // If this is the second list of filenames, reset the pointer to the prev. position
         for (int i = 0; i < tot_num_file; i++) files = readdir(d);
@@ -421,7 +438,7 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
             {
                 len_filename = strlen(files->d_name);
                 // The filename fits the list length
-                if ((offset+len_filename+1) <= CHUNK_SIZE)
+                if ((offset+len_filename+BLANK_SPACE) <= CHUNK_SIZE)
                 {
                     memcpy(&*(bufferSupp1+offset), files->d_name, len_filename);
                     offset += len_filename;
@@ -429,29 +446,30 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
                     offset += BLANK_SPACE;
                     num_file += 1;
                 }
-                // List is full
-                else if (offset != 0)
-                {
-                    // End string character at the end
-                    memcpy(&*(bufferSupp1+offset-1), "\0", 1);
-                    tot_num_file += num_file;
-                }
-                // No filenames
-                else 
-                {
-                    // End string character as the only text
-                    memcpy(&*(bufferSupp1+offset), "\0", 1);
-                }
             }
+
+            if (offset == 0)
+            {
+                memcpy(bufferSupp1, "empty", strlen("empty"));
+                offset += strlen("empty");
+            }
+            memcpy(&*(bufferSupp1+offset), "\0", 1);
+            tot_num_file += num_file;
         }
+        closedir(d);
 
         // Encrypt the list
-        ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
+        ret = RAND_bytes(iv, IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+        ciphertext = (unsigned char*) malloc((CHUNK_SIZE+BLOCK_SIZE)*sizeof(unsigned char));
+        if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
         encrypt_AES_128_CBC(&ciphertext, &cipher_len, bufferSupp1, offset, iv, session_key1);
         if (cipher_len > (CHUNK_SIZE+BLOCK_SIZE)) exit_with_failure("Wrong ciphertext length, more than CHUNK+BLOCK size", 0);
 
         // Prepare the hash
+        *nonce = *nonce + 1;
         msg_to_hash_len = LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
         msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
@@ -473,15 +491,9 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);  
 
-        // Generate new IV
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-        if (!iv) exit_with_failure("Malloc iv failed", 1);
-        ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-        if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
         // Build the message
         msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+HASH_LEN \
-        +BLANK_SPACE+IV_LEN; // max. length
+        +BLANK_SPACE+IV_LEN+1; // max. length
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
@@ -502,11 +514,14 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
         memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
         cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
 
+        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
+        cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN), "\0", 1);
 
-        printf("I'm sending to the client the filename's list\n");
+        printf("I'm sending to the client the filename's list\n"); 
         ret = send(sd, buffer, msg_len, 0); 
         if (ret == -1) exit_with_failure("Send failed", 1);
 
+        free(temp);
         free(bufferSupp1);
         free(buffer);
         free(ciphertext);
@@ -539,6 +554,7 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
             {
                 free(bufferSupp1);
                 free(buffer);
+                free(path_documents);
 
                 return 1;
             }
@@ -554,10 +570,12 @@ int listServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, u
             printf("We don't know what the client said...\n\n");
             free(bufferSupp1);
             free(buffer);
+            free(path_documents);
             return 1;
         }
     }
 
+    free(path_documents);
     return 1;
 }
 

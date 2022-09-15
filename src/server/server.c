@@ -169,7 +169,7 @@ int main()
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, received_buffer, &user_list, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer, &username, &user_list, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");
@@ -236,10 +236,10 @@ int main()
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA list request hasasdjhadasjkdhjaskdjkasdhs came up...\n\n");
+                            printf("\nA list request has came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
-                            ret = listServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
+                            ret = listServer(i, received_buffer, username, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client list request...\n\n");

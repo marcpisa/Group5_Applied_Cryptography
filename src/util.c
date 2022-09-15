@@ -232,7 +232,7 @@ unsigned char* hash_SHA256(char* msg)
     return digest;
 }
 
-unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len, unsigned int* signature_len)
+unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len, unsigned int* signature_len, int server)
 {
     int ret;
     EVP_PKEY* rsa_prvkey = NULL;
@@ -241,7 +241,14 @@ unsigned char* sign_msg(char* path_key, unsigned char* msg_to_sign, int msg_len,
     FILE* file_prvkey_pem = fopen(path_key, "r");
     if(!file_prvkey_pem) exit_with_failure("Fopen failed", 1);
 
-    rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, NULL);
+    if (server) // The server knows its password 
+    { 
+        rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, "password");
+    } 
+    else // The client should inserts the password to proves its identity
+    {
+        rsa_prvkey = PEM_read_PrivateKey(file_prvkey_pem, NULL, NULL, NULL);
+    }
     fclose(file_prvkey_pem);
     if (!rsa_prvkey) exit_with_failure("PEM_read_PrivateKey failed", 1);
 
@@ -372,9 +379,11 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
     EVP_PKEY* dh_params;
     EVP_PKEY_CTX* ctx;
     unsigned char* pubkey_byte;
+    DH* params;
 
     dh_params = EVP_PKEY_new();
-    ret = EVP_PKEY_set1_DH(dh_params, DH_get_1024_160());
+    params = DH_get_1024_160();
+    ret = EVP_PKEY_set1_DH(dh_params, params);
     if (ret != 1) exit_with_failure("EVP_PKEY_set1_DH failed", 1);
 
     ctx = EVP_PKEY_CTX_new(dh_params, NULL);
@@ -394,6 +403,7 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
 
     EVP_PKEY_CTX_free(ctx);
     EVP_PKEY_free(dh_params);
+    DH_free(params);
 
     return pubkey_byte;
 }
@@ -517,6 +527,8 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     *nonce = *nonce + 1;
 
     // Encrypt the reason
+    ciphertext = (unsigned char*) malloc((strlen(reason)+BLOCK_SIZE)*sizeof(unsigned char));
+    if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
     // Calculate the hash
@@ -794,6 +806,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
         ret = 1;
     }
 
+    free(iv);
     free(digest);
     free(temp);
     free(msg_to_hash);

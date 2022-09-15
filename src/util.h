@@ -108,7 +108,7 @@ EVP_PKEY *save_read_PUBKEY(char *path_pubkey, EVP_PKEY *my_prvkey);
 void encrypt_AES_128_CBC(unsigned char **out, int *out_len, unsigned char *in, unsigned int inl, unsigned char *iv, unsigned char *key);
 void decrypt_AES_128_CBC(unsigned char **out, unsigned int *out_len, unsigned char *in, unsigned int inl, unsigned char *iv, unsigned char *key);
 unsigned char *hash_SHA256(char *msg);
-unsigned char *sign_msg(char *path_key, unsigned char *msg_to_sign, int msg_len, unsigned int *signature_len);
+unsigned char *sign_msg(char *path_key, unsigned char *msg_to_sign, int msg_len, unsigned int *signature_len, int server);
 int verify_signature(unsigned char *exp_digsig, int len_exp_digsig, unsigned char *msg_to_ver, int len_msg_ver, EVP_PKEY *pub_rsa_key);
 unsigned char *cert_to_byte(X509 *cert, int *cert_len);
 unsigned char *key_derivation(EVP_PKEY *prvkey, EVP_PKEY *peer_pubkey, size_t *secretlen);

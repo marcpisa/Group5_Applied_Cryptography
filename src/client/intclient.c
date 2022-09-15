@@ -70,7 +70,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
 
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &dh_pubkey, &pubkey_len);
-    
+    EVP_PKEY_free(dh_pubkey);    
 
 
 
@@ -182,7 +182,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     // Generate digital signature
-    signature = sign_msg(path_rsa_key, exp_digsig, expected_len, &signature_len);
+    signature = sign_msg(path_rsa_key, exp_digsig, expected_len, &signature_len, 0);
 
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
@@ -264,7 +264,6 @@ int logoutClient(int* nonce, unsigned char* session_key2, struct sockaddr_in srv
     printf("I'm sending to the server the logout message.\n");
     ret = send(sock, buffer, msg_len, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
     free(temp);
     free(buffer);
@@ -436,7 +435,6 @@ int listClient(char*** file_list, unsigned char* session_key1, unsigned char* se
         printf("Received first chunk of filenames.\n");
         *nonce = *nonce+1;
 
-
         // Check if something failed server-side
         bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1); 
@@ -455,13 +453,6 @@ int listClient(char*** file_list, unsigned char* session_key1, unsigned char* se
                 return -1;
             }
 
-        }
-        else 
-        {
-            printf("We don't know what the server said...\n\n");
-            free(bufferSupp1);
-            free(buffer);
-            return -1;
         }
 
         free(bufferSupp1);
@@ -650,6 +641,8 @@ int renameClient(char* filename, char* new_filename, unsigned char* session_key1
     memcpy(&*(msg_to_encr+strlen(filename)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_encr+strlen(filename)+BLANK_SPACE), new_filename, strlen(new_filename));
 
+    encr_msg = (unsigned char*) malloc((msg_to_encr_len+BLOCK_SIZE)*sizeof(unsigned char));
+    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
     // Create the hash
@@ -793,6 +786,9 @@ int deleteClient(char* filename, unsigned char* session_key1, unsigned char* ses
     bufferSupp1 = (unsigned char*) malloc(strlen(filename)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, filename, strlen(filename));
+    
+    encr_msg = (unsigned char*) malloc((strlen(filename)+BLOCK_SIZE)*sizeof(unsigned char));
+    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, bufferSupp1, strlen(filename), iv, session_key1); 
     free(bufferSupp1);
 
