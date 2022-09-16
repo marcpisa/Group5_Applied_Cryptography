@@ -11,8 +11,8 @@ typedef struct user_stat {
 #endif
 
 int createSocket();
-int loginServer(int sd, char* rec_mex, user_stat** user_list, unsigned char* session_key1, unsigned char* session_key2);
-int logoutServer(int sd, char* rec_mex, char** username, user_stat** user_list, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
+int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, unsigned char* session_key1, unsigned char* session_key2);
+int logoutServer(int sd, char* rec_mex, char* username, user_stat** user_list, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
 int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
 int renameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2);
 int deleteServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2);

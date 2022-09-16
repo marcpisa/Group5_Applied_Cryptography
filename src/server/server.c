@@ -21,9 +21,9 @@ int main()
     // Buffers
     char received_buffer[4*BUF_LEN];
     char remote_comm[BUF_LEN];
-    char username[BUF_LEN];
     char filename[BUF_LEN];
     char local_comm[BUF_LEN];
+    char* username;
 
     // Timeout varible for the select function
     struct timeval tv;
@@ -51,6 +51,10 @@ int main()
 
     fclose(fp);
     free(line);
+
+    // Allocate username
+    username = (char*) malloc((MAX_LEN_USERNAME+1)*sizeof(char));
+    if (!username) exit_with_failure("Malloc username failed", 1);
 
 
     // ********** END VARIABLES *********
@@ -202,7 +206,8 @@ int main()
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
-                            ret = logoutServer(i, received_buffer, &user_list, &nonce_cs, session_key1, session_key2);
+                            memcpy(username, "teo\0", 4); // TO REMOVE ONLY FOR DEBUGGING
+                            ret = logoutServer(i, received_buffer, username, &user_list, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client logout request...\n\n");
@@ -239,6 +244,7 @@ int main()
                             printf("\nA list request has came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
+                            memcpy(username, "teo\0", 4); // TO REMOVE ONLY FOR DEBUGGING
                             ret = listServer(i, received_buffer, username, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
@@ -440,6 +446,7 @@ int main()
     free(session_key1);
     free(session_key2);
     free(user_list);
+    free(username);
     
     return 0;
 }

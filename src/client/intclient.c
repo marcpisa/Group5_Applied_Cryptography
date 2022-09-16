@@ -489,9 +489,7 @@ int listClient(char*** file_list, unsigned char* session_key1, unsigned char* se
         msg_to_hash_len = LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
         msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-        temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-
+    
         sprintf(temp, "%d", num_file);
         memcpy(msg_to_hash, temp, LEN_SIZE);  // num. file
         memcpy(&*(msg_to_hash+LEN_SIZE), " ", BLANK_SPACE);

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -g -lcrypto
+CFLAGS=-Wall -Wextra -fsanitize=undefined -fsanitize=address -lmcheck -g -lcrypto
 
 # -fsanitize=undefined -fsanitize=address -lmcheck
 

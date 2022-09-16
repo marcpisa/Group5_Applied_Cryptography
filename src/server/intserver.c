@@ -100,11 +100,16 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     // Sanitize and check username
     if (len_username > MAX_LEN_USERNAME) exit_with_failure("Username too long", 0);
     if (!username_sanitization((char*) bufferSupp1)) exit_with_failure("Username sanitization fails.\n", 0);
-    
+
+    ret = chdir(MAIN_FOLDER_SERVER);
+    if (ret == -1) exit_with_failure("No such directory.\n", 0);
+    ret = chdir((char*) bufferSupp1);
+    if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
+  
     // Server checks if the user is already online
     for(int i = 0; i < NUM_USER; i++)
     {
-        if (strcmp((*user_list+i)->username, username) == 0)
+        if (strcmp((*user_list+i)->username, (char*)bufferSupp1) == 0)
         {
             if ((*user_list+i)->connected == 1)
             {
@@ -112,19 +117,16 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
             }
         }
     }
+    printf("User is not online.\n");
 
-    ret = chdir(MAIN_FOLDER_SERVER);
-    if (ret == -1) exit_with_failure("No such directory.\n", 0);
-    ret = chdir((char*) bufferSupp1);
-    if (ret == -1) exit_with_failure("Error: username doesn't exists...\n", 0);
-  
-    memcpy(username, bufferSupp1, len_username);
+    memcpy(*username, bufferSupp1, len_username);
+    memcpy(&*(*username+len_username), "\0", 1);
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
     path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4+1));
     memcpy(path_cert_client_rsa, "cert_", 5);
-    memcpy(&*(path_cert_client_rsa+5), username, strlen(username));
-    memcpy(&*(path_cert_client_rsa+5+strlen(username)), ".pem\0", 4+1);
+    memcpy(&*(path_cert_client_rsa+5), *username, len_username);
+    memcpy(&*(path_cert_client_rsa+5+len_username), ".pem\0", 4+1);
     pub_rsa_client = get_client_pubkey(path_cert_client_rsa);
     
     // Calculate K = g^a^b mod p, established key
@@ -135,7 +137,7 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     issue_session_keys(K, K_len, &session_key1, &session_key2);
     
     printf("First message is correct. Preparing the response...\n");
-
+    
     free(bufferSupp1);
     free(path_cert_client_rsa);
     EVP_PKEY_free(my_prvkey);
@@ -164,7 +166,7 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     // Come back to the user directory
     ret = chdir("../database/");
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
-    ret = chdir(username);
+    ret = chdir(*username);
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
 
     // Calculating message length and allocate memory for it
@@ -235,7 +237,7 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     // Set user to online
     for(int i = 0; i < NUM_USER; i++)
     {
-        if (strcmp((*user_list+i)->username, username) == 0)
+        if (strcmp((*user_list+i)->username, *username) == 0)
         {
             (*user_list+i)->connected = 1;
             break;
@@ -245,7 +247,7 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     return 1;
 }
 
-int logoutServer(int sd, char* rec_mex, user_stat** user_list, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int logoutServer(int sd, char* rec_mex, char* username, user_stat** user_list, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     unsigned int digest_len;
     int ret;
@@ -307,7 +309,6 @@ int logoutServer(int sd, char* rec_mex, user_stat** user_list, int* nonce, unsig
     free(digest);
     free(msg_to_hash);
 
-    /*
     // Set user to offline
     for(int i = 0; i < NUM_USER; i++)
     {
@@ -317,7 +318,6 @@ int logoutServer(int sd, char* rec_mex, user_stat** user_list, int* nonce, unsig
             break;
         }
     }
-    */
 
 
     return 1;
@@ -362,10 +362,10 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
     // if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
     // Build path
-    path_documents = (char*) malloc((15+strlen(username)+11)*sizeof(char));
+    path_documents = (char*) malloc((15+strlen(username)+11+1)*sizeof(char));
     memcpy(path_documents, "../../database/", 15);
     memcpy(&*(path_documents+15), username, strlen(username));
-    memcpy(&*(path_documents+15+strlen(username)), "/documents/", 11);
+    memcpy(&*(path_documents+15+strlen(username)), "/documents/\0", (11+1));
 
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
     *nonce = *nonce+1;
@@ -454,6 +454,7 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
                 offset += strlen("empty");
             }
             memcpy(&*(bufferSupp1+offset), "\0", 1);
+            offset += 1;
             tot_num_file += num_file;
         }
         closedir(d);
