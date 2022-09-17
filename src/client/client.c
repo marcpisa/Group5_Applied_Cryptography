@@ -19,9 +19,6 @@ int main(int argc, char* argv[])
     char command3[MAX_LEN_CMD];
     char username[MAX_LEN_USERNAME];
 
-    // Variables for file management
-    FILE* fd1;
-
     // Others
     int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     struct timeval tv;
@@ -29,6 +26,7 @@ int main(int argc, char* argv[])
     X509* cert_serv = NULL;;
     BIO* bio_cert;
     char* path_cert_serv = "../cert.pem";
+    char** file_list;
 
     // Cryptographic operation
     unsigned char* session_key1;
@@ -240,15 +238,14 @@ int main(int argc, char* argv[])
                             break;
 
                         case 3: //************ LIST *************
-                        
                             if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
 
-                            ret = listClient(connectedSock, username);
-                            if (ret == -1) {printf("Something bad happend\n\n"); exit(1);}
+                            ret = listClient(connectedSock, username, &file_list, session_key1, session_key2, &nonce_cs);
+                            if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
                         
                             break;
                         
@@ -258,8 +255,9 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
+                            
                             // Sanitization and check length filename and new_filename
-                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3 > MAX_LEN_FILENAME)) 
+                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3) > MAX_LEN_FILENAME) 
                             {
                                 printf("Filename or new_filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
                                 break;
@@ -268,16 +266,13 @@ int main(int argc, char* argv[])
                             ret += filename_sanitization (command3, "/");
                             if (ret <= 1) 
                             {
-                                printf("Filename sanitization failed.\n\n", MAX_LEN_FILENAME);
+                                printf("Filename sanitization failed.\n\n");
                                 break;
                             }
-                            //Management of rename operation
+
+                            // Handle rename request
                             ret = renameClient(connectedSock, username, command2, command3, session_key1, session_key2, &nonce_cs);
-                            if (ret == -1)
-                            {
-                                printf("Error during the rename operation request!\n\n");
-                                exit(1);
-                            }
+                            if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
                         case 5: //*********** DELETE **********
@@ -287,8 +282,23 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            ret = deleteClient(connectedSock, username, command2);
-                            if (ret == -1) {printf("Something bad happend during the delete operation\n\n"); exit(1);}
+
+                            // Check length and filename sanitization
+                            if (strlen(command2) > MAX_LEN_FILENAME) 
+                            {
+                                printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
+                                break;
+                            } 
+                            ret = filename_sanitization (command2, "/");
+                            if (ret == -1) 
+                            {
+                                printf("Filename sanitization failed.\n\n");
+                                break;
+                            }
+
+                            ret = deleteClient(connectedSock, username, command2, session_key1, session_key2, &nonce_cs);
+                            if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
+
 
                             break;
 
@@ -298,7 +308,9 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
+
                             ret = downloadClient(connectedSock, username, command2); // format of the input given to the input stream: download filename
+
                             if (ret == -1)
                             {
                                 printf("Error during the download operation request!\n\n");
@@ -313,7 +325,9 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
+                            
                             ret = uploadClient(connectedSock, username, command2);
+                            
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
@@ -328,8 +342,10 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
+
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
                             ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
+
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");
@@ -354,9 +370,14 @@ int main(int argc, char* argv[])
                         case 10:
                                 if(connected == 1)
                                 {
-                                    //logout
-                                    // if (ret == -1)
-                                    printf("Logging out...\n");
+                                    ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                            
+                                    if (ret != -1)
+                                    {
+                                        printf("Logging out...\n\n");
+                                        connected = 0;
+                                    }
+                                    else printf("Logout failed.\n\n");
                                 }
 
                                 printf("Exiting the program.\n");

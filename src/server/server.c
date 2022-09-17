@@ -1,12 +1,17 @@
 #include "intserver.h"
-int main(int argc, char* argv[])
+
+int main()
 {
     //*********** VARIABLES ************
     int exit_flag = 0;
+    user_stat* user_list;
+    FILE* fp;
+    char* line;
+    int index = 0;
 
     // Socket management variables
     int ret, pid, listenerTCP, i, fdmax, new_sd;
-    uint32_t addr_app;
+    //uint32_t addr_app;
     fd_set master;
     fd_set read_fds;
     socklen_t addrlen;
@@ -15,9 +20,9 @@ int main(int argc, char* argv[])
     // Buffers
     char received_buffer[4*BUF_LEN];
     char remote_comm[BUF_LEN];
-    char username[BUF_LEN];
     char filename[BUF_LEN];
     char local_comm[BUF_LEN];
+    char* username;
 
     // Timeout varible for the select function
     struct timeval tv;
@@ -28,19 +33,30 @@ int main(int argc, char* argv[])
     
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(session_key1 == NULL || session_key2 == NULL)
-    {
-        printf("Unable to allocate session keys...\n\n");
-        return -1;
+    if(session_key1 == NULL || session_key2 == NULL) exit_with_failure("Unable to allocate session keys", 1);
+
+    // Recover the user list
+    user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));
+    fp = fopen("../user_list.txt", "r");
+    if (!fp) exit_with_failure("Open user_list.txt failed", 1);
+    line = (char*) malloc(MAX_LEN_USERNAME*sizeof(char));
+    if (!line) exit_with_failure("Malloc line failed", 1);
+
+    while (getline(&line, NULL, fp) != -1) {
+        memcpy((user_list+index)->username, line, strlen(line));
+        (user_list+index)->connected = 0;
+        index += 1;
     }
+
+    fclose(fp);
+    free(line);
+
+    // Allocate username
+    username = (char*) malloc((MAX_LEN_USERNAME+1)*sizeof(char));
+    if (!username) exit_with_failure("Malloc username failed", 1);
+
 
     // ********** END VARIABLES *********
-
-    if (argc != 1)
-    {
-        printf("Error during boot phase: number of arguments is wrong...\n\n");
-        exit(-1);
-    }
 
     printf("\n+++++++++++ FILE CLOUD SERVER +++++++++++\n");
 
@@ -130,7 +146,7 @@ int main(int argc, char* argv[])
                     ret = recv(i, received_buffer, 4*BUF_LEN, 0);
                     if (ret < 0)
                     {
-                        perror("Errore during recv operation: ");
+                        perror("Error during recv operation: ");
                         close(listenerTCP);
                         exit(-1);
                     }
@@ -156,15 +172,13 @@ int main(int argc, char* argv[])
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, received_buffer, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer, &username, &user_list, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client login request...\n\n");
                                 exit(1);
                             }
                             else printf("I managed a login request and all was good!\n\n");
-
-                            //END COMMUNICATION
 
                             printf("End of login request management!\n\n");
                             close(i);
@@ -193,6 +207,8 @@ int main(int argc, char* argv[])
     
     free(session_key1);
     free(session_key2);
+    free(user_list);
+    free(username);
     
     return 0;
 }
