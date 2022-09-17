@@ -33,6 +33,7 @@
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MEX_TYPE_LEN 8
+
 #define NUM_USER 4
 
 #define MAIN_FOLDER_SERVER "../../database/"
@@ -84,7 +85,8 @@
 #define RESET "\x1B[0m"
 
 #define MAX_LEN_REQUEST 15
-#define LEN_SIZE 5
+#define LEN_SIZE 10
+#define REST_SIZE 3
 #define MAX_CERT_LEN 2*BUF_LEN
 
 #define DELIM ' '

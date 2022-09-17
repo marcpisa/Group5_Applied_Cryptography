@@ -3,7 +3,6 @@
 int main()
 {
     //*********** VARIABLES ************
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     int exit_flag = 0;
     user_stat* user_list;
     FILE* fp;
@@ -176,7 +175,7 @@ int main()
                             ret = loginServer(i, received_buffer, &username, &user_list, session_key1, session_key2);
                             if (ret == -1)
                             {
-                                printf("Something bad happened during the management of the client list request...\n\n");
+                                printf("Something bad happened during the management of the client login request...\n\n");
                                 exit(1);
                             }
                             else printf("I managed a login request and all was good!\n\n");
@@ -186,252 +185,17 @@ int main()
                             exit(0);
                         }
                     }
-
-                     //************ LOGOUT REQUEST MANAGER ************
-                    else if (strcmp(remote_comm, LOGOUT_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA logout request has came up...\n\n");
-                            // LOGOUT MANAGER: SERVER SIDE
-                            
-                            ret = logoutServer(i, received_buffer, username, &user_list, &nonce_cs, session_key1, session_key2);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client logout request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed a logout request and all was good!\n\n");
-
-
-                            // Do stuff
-
-                            printf("End of logout request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    // ************* LIST REQUEST MANAGER ***************
-                    else if (strcmp(remote_comm, LIST_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA list request has came up...\n\n");
-                            // LIST MANAGER: SERVER SIDE
-                            
-                            ret = listServer(i, received_buffer, username, &nonce_cs, session_key1, session_key2);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client list request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed a list request and all was good!\n\n");
-
-                            //END COMMUNICATION
-
-                            printf("End of list request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    //*************** RENAME REQUEST MANAGER *****************
-                    else if (strcmp(remote_comm, RENAME_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA rename request has came up...\n\n");
-                            // RENAME MANAGER: SERVER SIDE
-                            
-                            ret = renameServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client rename request...\n\n");
-                                exit(1);
-                            }
-
-                            printf("End of rename request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    // **************** DELETE REQUEST MANAGER ******************
-                    else if (strcmp(remote_comm, DELETE_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA delete request has came up...\n\n");
-                            // DELETE MANAGER: SERVER SIDE
-                            
-                            ret = deleteServer(i, received_buffer, &nonce_cs, session_key1, session_key2);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client delete request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed a delete request and all was good!\n\n");
-
-                            printf("End of delete request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    // *************** DOWNLOAD REQUEST MANAGER ****************
-                    else if (strcmp(remote_comm, DOWNLOAD_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA download request has came up from %s and the filename is %s...\n\n", username, filename);
-
-                            // DOWNLOAD MANAGER: SERVER SIDE
-                            
-                            ret = downloadServer(i, received_buffer);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client download request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed a download request and all was good!\n\n");
-
-                            printf("End of download request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    // *************** UPLOAD REQUEST MANAGER ***************
-                    else if (strcmp(remote_comm, UPLOAD_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nAn upload request has came up...\n\n");
-                            // UPLOAD MANAGER: SERVER SIDE
-                            
-                            ret = uploadServer(i, received_buffer);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client upload request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed an upload request and all was good!\n\n");
-
-                            printf("End of upload request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
-
-
-                    // **************** SHARE REQUEST MANAGER ****************
-                    else if (strcmp(remote_comm, SHARE_REQUEST) == 0)
-                    {
-                        // Using fork function we are choosing a multiprocess approach
-                        // for the management of requests from clients and to avoid
-                        // deadlock conditions on the listener socket.
-                        pid = fork();
-                        if (pid < 0)
-                        {
-                            perror("Error during fork execution: ");
-                            exit(-1);
-                        }
-                        if (pid == 0)
-                        {
-                            //We are in the son part of code
-                            close(listenerTCP);
-                            printf("\nA share request has came up...\n\n");
-                            // SHARE MANAGER: SERVER SIDE
-                            
-                            ret = shareServer(i, received_buffer);
-                            if (ret == -1)
-                            {
-                                printf("Something bad happened during the management of the client share request...\n\n");
-                                exit(1);
-                            }
-                            else printf("I managed a share request and all was good!\n\n");
-
-                            printf("End of share request management!\n\n");
-                            close(i);
-                            exit(0);
-                        }
-                    }
+                    else if (strcmp(remote_comm, LOGOUT_REQUEST) == 0 ||
+                             strcmp(remote_comm, LIST_REQUEST) == 0 ||
+                             strcmp(remote_comm, RENAME_REQUEST) == 0 ||
+                             strcmp(remote_comm, DELETE_REQUEST) == 0 ||
+                             strcmp(remote_comm, DOWNLOAD_REQUEST) == 0 ||
+                             strcmp(remote_comm, UPLOAD_REQUEST) == 0 ||
+                             strcmp(remote_comm, SHARE_REQUEST) == 0
+                             ) printf("We received a request about an operation but the user is not logged yet... Something bad happened...\n\n");
 
                     else printf("Unknown type of request by the Client...\n");
-                    // Here we can also send a message to the client saying that we didn't understand what it wants
-                    memset(received_buffer, 0, 4*BUF_LEN);
+                    memset(received_buffer, 0, BUF_LEN);
                     close(i);
                     FD_CLR(i, &master);
                 }

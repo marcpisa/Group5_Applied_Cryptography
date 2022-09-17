@@ -20,6 +20,8 @@ int createSocket()
 
 int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, unsigned char* session_key1, unsigned char* session_key2)
 {
+    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    
     unsigned char* buffer;
     unsigned char* msg_to_sign;
     char* temp;
@@ -54,6 +56,9 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     
     int pubkey_len = 0;
     unsigned int len_username;
+
+    char funcBuff[BUF_LEN];
+    char funcSupp1[BUF_LEN];
 
     /*********************
      * END VARIABLES
@@ -232,7 +237,6 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
     free(msg_to_sign);
     free(K);
     EVP_PKEY_free(pub_rsa_client);
-
     
     // Set user to online
     for(int i = 0; i < NUM_USER; i++)
@@ -243,7 +247,154 @@ int loginServer(int sd, char* rec_mex, char** username, user_stat** user_list, u
             break;
         }
     }
+    
+    // FUNCTIONAL PART
+    // Now that we have the cryptographic elements to have a secure communication with the client we are able to receive function messages
+    
+    printf("I managed a login request and all was good!\n\n");
+    
+    //printf("Now the buffer contains %s\n\n", funcBuff);
+    while (1)
+    {
+        memset(funcBuff, 0, BUF_LEN);
+        ret = recv(sd, funcBuff, BUF_LEN, 0);
+        if (ret < 0)
+        {
+            perror("Error during recv operation: ");
+            exit(-1);
+        }
+        // We check the first keyword to understand what the Client wants us to do
+        memset(funcSupp1, 0, BUF_LEN);
+        memcpy(funcSupp1, funcBuff, str_ssplit((unsigned char*) funcBuff, DELIM));
 
+
+        // ************ LOGIN REQUEST MANAGER ***********
+        if (strcmp(funcSupp1, LOGIN_REQUEST) == 0)
+        {
+            printf("\nWe received a login request but this client is already logged... Something bad happened...\n\n");
+        }
+
+
+        //************ LOGOUT REQUEST MANAGER ************
+        else if (strcmp(funcSupp1, LOGOUT_REQUEST) == 0)
+        {
+            printf("\nA logout request has came up...\n\n");
+            // LOGOUT MANAGER: SERVER SIDE
+                            
+            ret = logoutServer(sd, funcBuff, &nonce_cs, session_key2);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client logout request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a logout request and all was good!\n\n");
+
+            printf("End of logout request management!\n\n");
+            close(sd);
+            exit(0);
+        }
+
+
+        // ************* LIST REQUEST MANAGER ***************
+        else if (strcmp(funcSupp1, LIST_REQUEST) == 0)
+        {
+            printf("\nA list request has came up...\n\n");
+            // LIST MANAGER: SERVER SIDE
+                            
+            ret = listServer(sd, funcBuff);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client list request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a list request and all was good!\n\n");
+        }
+
+
+        //*************** RENAME REQUEST MANAGER *****************
+        else if (strcmp(funcSupp1, RENAME_REQUEST) == 0)
+        {
+            printf("\nA rename request has came up...\n\n");
+            // RENAME MANAGER: SERVER SIDE
+                            
+            ret = renameServer(sd, funcBuff);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client rename request...\n\n");
+                exit(1);
+            }
+            else printf("End of rename request management!\n\n");
+        }
+
+
+        // **************** DELETE REQUEST MANAGER ******************
+        else if (strcmp(funcSupp1, DELETE_REQUEST) == 0)
+        {
+            printf("\nA delete request has came up...\n\n");
+            // DELETE MANAGER: SERVER SIDE
+                            
+            ret = deleteServer(sd, funcBuff);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client delete request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a delete request and all was good!\n\n");
+        }
+
+        
+        // *************** DOWNLOAD REQUEST MANAGER ****************
+        else if (strcmp(funcSupp1, DOWNLOAD_REQUEST) == 0)
+        {
+            printf("\nA download request has came up...\n\n");
+
+            // DOWNLOAD MANAGER: SERVER SIDE
+                            
+            ret = downloadServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client download request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a download request and all was good!\n\n");
+        }
+
+
+        // *************** UPLOAD REQUEST MANAGER ***************
+        else if (strcmp(funcSupp1, UPLOAD_REQUEST) == 0)
+        {
+            printf("\nAn upload request has came up...\n\n");
+            // UPLOAD MANAGER: SERVER SIDE
+                            
+            ret = uploadServer(sd, funcBuff);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client upload request...\n\n");
+                exit(1);
+            }
+            else printf("I managed an upload request and all was good!\n\n");
+        }
+
+
+        // **************** SHARE REQUEST MANAGER ****************
+        else if (strcmp(funcSupp1, SHARE_REQUEST) == 0)
+        {
+            printf("\nA share request has came up...\n\n");
+            // SHARE MANAGER: SERVER SIDE
+                            
+            ret = shareServer(sd, funcBuff);
+            if (ret == -1)
+            {
+                printf("Something bad happened during the management of the client share request...\n\n");
+                exit(1);
+            }
+            else printf("I managed a share request and all was good!\n\n");
+        }
+
+        else printf("Unknown type of request by the Client...\n");  
+    }
+    close(sd);
+    
     return 1;
 }
 
@@ -1006,6 +1157,257 @@ int downloadServer(int sd, char* rec_mex)
     printf("We have completed successfully the donwload operation!\n\n");
     return 1;
    
+}
+
+int cryptoRenameServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1, unsigned char* session_key2 )
+{
+    int ret;
+    size_t old_offset;
+    size_t offset;
+    char* iv;
+
+    unsigned int encr_len;
+    unsigned int plain_len;
+    unsigned char* plaintext;
+
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    int msg_len;
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+
+    char* filename;
+    int len_fn;
+    char* new_filename;
+    int len_newfn;
+
+    // Seed for the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    //ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    //if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+
+    /* ---- Parse first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
+    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    
+    
+    offset = strlen(RENAME_REQUEST)+BLANK_SPACE;
+    memcpy(temp, &*(buffer+offset), LEN_SIZE); // len. encr.
+    offset += LEN_SIZE+BLANK_SPACE;
+    encr_len = atoi(temp);
+
+    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+
+    memcpy(bufferSupp1, &*(buffer+offset), encr_len); // encr
+    offset += encr_len+BLANK_SPACE;
+
+    memcpy(bufferSupp2, &*(buffer+offset), HASH_LEN); // hash
+    offset += HASH_LEN+BLANK_SPACE;
+    
+    memcpy(iv, &*(buffer+offset), IV_LEN); // iv
+    
+    // Check hash
+    msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST)); // rename req.
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE), bufferSupp1, encr_len); // encr.  
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
+    temp, LEN_SIZE); // nonce
+
+    // If hash correct, decrypt
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    if (ret == -1) 
+    {
+        operation_denied(sd, "Wrong rename request hash", RENAME_DENIED);
+        
+        free(bufferSupp1);
+        free(bufferSupp2);        
+        free(temp);
+        free(iv);
+        free(msg_to_hash);
+        free(digest);
+
+        return -1;
+    }
+
+    decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
+
+    free(bufferSupp1);
+    free(bufferSupp2);        
+    free(temp);
+    free(iv);
+    free(msg_to_hash);
+    free(digest);
+
+
+    // Obtain the filenames from the plaintext and sanitize them
+    // Filename
+    offset = str_ssplit(plaintext, DELIM);
+    len_fn = (int)offset;
+    if (len_fn > MAX_LEN_FILENAME) 
+    {
+        operation_denied(sd, "Filename too long", RENAME_DENIED);
+        
+        free(plaintext);
+        return -1;
+    }
+
+    filename = (char*) malloc(len_fn*sizeof(char));
+    if (!filename) exit_with_failure("Malloc filename failed", 0);
+    memcpy(filename, plaintext, len_fn); 
+
+    // New_filename
+    old_offset = offset + BLANK_SPACE;
+    offset = str_ssplit(&*(plaintext+old_offset), DELIM);
+    len_newfn = (int)offset;
+    if (len_newfn > MAX_LEN_FILENAME)
+    {
+        operation_denied(sd, "New_filename too long", RENAME_DENIED);
+        
+        free(plaintext);
+        free(filename);
+        return -1;
+    } 
+    
+    new_filename = (char*) malloc(len_newfn*sizeof(char));
+    if (!new_filename) exit_with_failure("Malloc new_filename failed", 0);
+    memcpy(new_filename, &*(plaintext+old_offset), len_newfn);
+                   
+    ret = filename_sanitization (filename, "/");
+    ret += filename_sanitization (new_filename, "/");
+    if (ret <= 1) {
+        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED);
+
+        
+        free(plaintext);
+        free(filename);
+        free(new_filename);
+        return -1;
+    }
+
+    // Execute the rename if possible, otherwise send failed message to client
+    /*chdir(MAIN_FOLDER_SERVER);
+    ret = chdir(bufferSupp2);
+    if (ret == -1)
+    {
+        printf("Error: username doesn't exists...\n");
+        exit(1);
+    }*/
+    ret = rename(filename, new_filename);
+    if (ret == -1) {
+        operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED);
+
+        
+        free(plaintext);
+        free(filename);
+        free(new_filename);
+        return -1;
+    }
+    
+    free(plaintext);
+    free(filename);
+    free(new_filename);
+
+
+
+
+    // Send success message to client
+    *nonce = *nonce+1;
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN); // IV for hash randomness
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    msg_len = strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    // Calculate the hash
+    msg_to_hash_len = strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
+    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
+
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 0);
+
+    sprintf(temp, "%d", *nonce);
+    memcpy(msg_to_hash, RENAME_ACCEPTED, strlen(RENAME_ACCEPTED)); // rename acc.
+    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE), iv, IV_LEN); // iv.  
+    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
+    memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+    // Compose the message
+    memcpy(buffer, RENAME_ACCEPTED, strlen(RENAME_ACCEPTED)); // rename acc.
+    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE), digest, HASH_LEN); // hash
+    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
+    memcpy(&*(buffer+strlen(RENAME_ACCEPTED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
+
+    ret = send(sd, buffer, msg_len, 0);
+    if (ret == -1) exit_with_failure("Send failed", 1);
+    
+    return 1;
+}
+
+int cryptoDownloadServer(int sock, char* rec_mex, char* username, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+{
+    int ret;
+    size_t old_offset;
+    size_t offset;
+    char* iv;
+
+    unsigned int encr_len;
+    unsigned int plain_len;
+    unsigned char* plaintext;
+    unsigned char* encr_msg;
+
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    int msg_len;
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+
+    char payload[CHUNK_SIZE+1];
+    char username[MAX_LEN_USERNAME];
+    char filename[MAX_LEN_FILENAME];
+    struct stat st;
+    int i, j, nchunk, ret, start_payload, rest;
+    FILE* fd;
+
+    //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv)
+    bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    memcpy(bufferSupp1, &*(rec_mex+strlen(DOWNLOAD_REQUEST)+BLANK_SPACE), LEN_SIZE);
+    encr_len = atoi(bufferSupp1);
+
+    encr_msg = (unsigned char*)malloc(sizeof(unsigned char)*encr_len);
+    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
+    memcpy(encr_msg, &*(rec_mex+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len); //Now we have the encr_msg, we should confirm the auth and take the iv later to decrypt it
 }
 
 
