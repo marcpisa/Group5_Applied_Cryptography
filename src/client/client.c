@@ -237,7 +237,7 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-
+                            
                             ret = listClient(&file_list, session_key1, session_key2, &nonce_cs, srv_addr);
                             if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
                         

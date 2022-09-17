@@ -436,6 +436,9 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
         {
             while((files = readdir(d)) != NULL)
             {
+                // Skip these two files
+                if (!strcmp(files->d_name, ".") || !strcmp(files->d_name, "..")) continue;
+                
                 len_filename = strlen(files->d_name);
                 // The filename fits the list length
                 if ((offset+len_filename+BLANK_SPACE) <= CHUNK_SIZE)
@@ -464,7 +467,7 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         ret = RAND_bytes(iv, IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-        ciphertext = (unsigned char*) malloc((CHUNK_SIZE+BLOCK_SIZE)*sizeof(unsigned char));
+        ciphertext = (unsigned char*) malloc((offset+BLOCK_SIZE)*sizeof(unsigned char));
         if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
         encrypt_AES_128_CBC(&ciphertext, &cipher_len, bufferSupp1, offset, iv, session_key1);
         if (cipher_len > (CHUNK_SIZE+BLOCK_SIZE)) exit_with_failure("Wrong ciphertext length, more than CHUNK+BLOCK size", 0);

@@ -185,7 +185,7 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
-    
+
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if (ret != 1) exit_with_failure("DecryptInit failed", 1);
 
@@ -195,13 +195,13 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     ret = EVP_DecryptUpdate(ctx, *out, &update_len, in, inl);
     if (ret != 1) exit_with_failure("DecryptUpdate failed", 1);
     total_len += update_len;
-
+    
     ret = EVP_DecryptFinal(ctx, *out+total_len, &update_len);
     if (ret != 1) exit_with_failure("DecryptFinal failed", 1);
     total_len += update_len;
     *out_len = total_len;
 
-    EVP_CIPHER_CTX_free(ctx);   
+    EVP_CIPHER_CTX_free(ctx);
 }
 
 unsigned char* hash_SHA256(char* msg)

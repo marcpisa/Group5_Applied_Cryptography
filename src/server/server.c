@@ -206,7 +206,6 @@ int main()
                             printf("\nA logout request has came up...\n\n");
                             // LOGOUT MANAGER: SERVER SIDE
                             
-                            memcpy(username, "teo\0", 4); // TO REMOVE ONLY FOR DEBUGGING
                             ret = logoutServer(i, received_buffer, username, &user_list, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {
@@ -244,7 +243,6 @@ int main()
                             printf("\nA list request has came up...\n\n");
                             // LIST MANAGER: SERVER SIDE
                             
-                            memcpy(username, "teo\0", 4); // TO REMOVE ONLY FOR DEBUGGING
                             ret = listServer(i, received_buffer, username, &nonce_cs, session_key1, session_key2);
                             if (ret == -1)
                             {

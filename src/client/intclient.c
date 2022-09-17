@@ -172,6 +172,7 @@ int loginClient(unsigned char* session_key1, unsigned char* session_key2, char* 
     X509_free(serv_cert);
     EVP_PKEY_free(pub_rsa_key_serv);
     EVP_PKEY_free(my_prvkey);
+    EVP_PKEY_free(peer_pubkey);
     
 
 
@@ -364,7 +365,7 @@ int listClient(char*** file_list, unsigned char* session_key1, unsigned char* se
         exit(1);
     }
 
-    // Generate the IV128
+    // Generate the IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
