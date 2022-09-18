@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
     char username[MAX_LEN_USERNAME];
 
     // Others
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    int nonce_cs = -1; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
@@ -32,6 +32,8 @@ int main(int argc, char* argv[])
     unsigned char* session_key1;
     unsigned char* session_key2;
     
+    //********* END VARIABLES *********
+
     session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(!session_key1 || !session_key2)
@@ -39,8 +41,7 @@ int main(int argc, char* argv[])
         printf("Unable to allocate session keys...\n\n");
         return -1;
     }
-    //********* END VARIABLES *********
-
+    
     if (argc != 3) { 
         printf("Error, the number of arguments is wrong... (./clientPr username port_num)\n");
         exit(-1);
@@ -195,13 +196,8 @@ int main(int argc, char* argv[])
                             }
                     
                             ret = loginClient(&connectedSock, session_key1, session_key2, username, srv_addr, ca_store);
-                            // TO ADD the return -1 cases
-                            if (ret == -1) 
-                            {
-                                // Notify error to server
-                                // TODO 
-                                printf("Login failed.\n\n");
-                            }
+                            
+                            if (ret == -1) printf("Login failed.\n\n");
                             else 
                             {
                                 printf("Login succedded.\n\n");
@@ -224,7 +220,9 @@ int main(int argc, char* argv[])
                             {
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
-                                // clean some variables like session keys
+
+                                free(session_key1);
+                                free(session_key2);
                                 
                                 // CONFIGURATION OF THE SERVER INFO
                                 memset(&srv_addr, 0, sizeof(srv_addr));
@@ -378,6 +376,10 @@ int main(int argc, char* argv[])
                                         connected = 0;
                                     }
                                     else printf("Logout failed.\n\n");
+
+                                    
+                                    free(session_key1);
+                                    free(session_key2);
                                 }
 
                                 printf("Exiting the program.\n");
@@ -429,8 +431,6 @@ int main(int argc, char* argv[])
     close(listenerTCP);
     
     X509_STORE_free(ca_store);
-    free(session_key1);
-    free(session_key2);
     
     return 0;
 }

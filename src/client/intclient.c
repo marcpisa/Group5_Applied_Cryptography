@@ -14,7 +14,8 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) {
+int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) 
+{
     /*********************
      * VARIABLES
      ********************/
@@ -55,7 +56,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     // Creation of socket
     *sock = createSocket();
-    if (connect(*sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("asfasfiled", 1);
+    if (connect(*sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);
 
     // Compose the path for the current user
     path_pubkey = (char*) malloc(sizeof(char)*(15+strlen(username)+14+1));
@@ -109,7 +110,19 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     ret = recv(*sock, buffer, msg_len, 0);
-    if (ret == -1) exit_with_failure("Receive failed", 1);
+    if (ret == -1) 
+    {
+        free(path_pubkey);
+        free(path_rsa_key);
+     
+        free(buffer);
+        free(pubkey_byte);
+        EVP_PKEY_free(my_prvkey);
+
+        printf("Receive failed.\n");
+        return -1;
+        
+    }
     printf("Received the server's response.\n");
 
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
@@ -129,8 +142,21 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     memcpy(temp, &*(buffer+offset), LEN_SIZE); // len cert
     offset += LEN_SIZE+BLANK_SPACE;
     cert_len = atoi(temp);
-    if (cert_len <= 0 || (msg_len-offset) < (unsigned int) cert_len) exit_with_failure("Incorrect certificate length", 0);
+    if (cert_len <= 0 || (msg_len-offset) < (unsigned int) cert_len) 
+    {
+        free(path_pubkey);
+        free(path_rsa_key);
 
+        free(buffer);
+        free(pubkey_byte);
+        EVP_PKEY_free(my_prvkey);
+        free(temp);
+        free(bufferSupp1);
+        free(bufferSupp2);
+
+        printf("Incorrect certificate length.\n");
+        return -1;
+    } 
 
     // The certificate is greater than 1024
     cert_buffer = (unsigned char*) malloc((cert_len+1)*sizeof(unsigned char));
@@ -160,19 +186,29 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     
     // Verify the digital signature received
     ret = verify_signature(exp_digsig, expected_len, bufferSupp2, SIGN_LEN, pub_rsa_key_serv);
-    if (ret != 1) exit_with_failure("Signature verification failed.\n", 0);
-    
       
     free(temp);
     free(buffer);
     free(bufferSupp1);
     free(bufferSupp2);
-    free(pubkey_byte); // Is this necessary?
+    free(pubkey_byte);
     free(cert_buffer);
     X509_free(serv_cert);
     EVP_PKEY_free(pub_rsa_key_serv);
     EVP_PKEY_free(my_prvkey);
     EVP_PKEY_free(peer_pubkey);
+    
+    if (ret != 1) 
+    {
+        free(path_pubkey);
+        free(path_rsa_key);
+
+        free(K);
+        free(exp_digsig);
+
+        printf("Signature verification failed.\n");
+        return -1;    
+    }
     
 
 
@@ -191,7 +227,6 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     //printf("%s\n", buffer);
     printf("I'm sending to the server the last message.\n");
     ret = send(*sock, buffer, msg_len, 0); 
-    if (ret == -1) exit_with_failure("Send failed", 1);
 
     free(path_pubkey);
     free(path_rsa_key);
@@ -199,6 +234,12 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     free(signature);
     free(exp_digsig);
     free(K);
+
+    if (ret == -1)
+    {
+        printf("Send failed.\n");
+        return -1;
+    } 
  
     return 1;
 }
@@ -216,13 +257,12 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     unsigned char* digest;
     unsigned char* iv;    
 
-    /*sock = createSocket();
-    if (connect(sock, (struct sockaddr*)&srv_addr, sizeof(srv_addr)) < 0) exit_with_failure("Connect failed", 1);*/
 
     // Generate the IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
-    RAND_poll(); // Seed OpenSSL PRNG
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
@@ -230,6 +270,7 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 
 
     /* ---- Create the first message (request + hash + iv) ---- */
+    *nonce = *nonce + 1;
     msg_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
     // Generating the hash of the request and the nonce
@@ -248,8 +289,7 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     temp, LEN_SIZE); // nonce
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
-
+    
     // Compose the message
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
@@ -263,74 +303,23 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 
     printf("I'm sending to the server the logout message.\n");
     ret = send(sock, buffer, msg_len, 0); 
-    if (ret == -1) exit_with_failure("Send failed", 1);
-
+    
     free(temp);
     free(buffer);
     free(msg_to_hash);
     free(digest);
     free(iv);
-
-
-    /*
-    // Check the response (logoutSucceed + nonce + hash)
-    msg_len = strlen(LOGOUT_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+HASH_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    ret = recv(sock, buffer, msg_len, 0);
-    if (ret == -1) exit_with_failure("Receive failed", 1);
-    printf("Received the server's response.\n");
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-    // Parse the server response
-    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*strlen(LOGOUT_ACCEPTED));
-    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
-    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-
-    offset = str_ssplit(buffer, DELIM);
-    memcpy(bufferSupp1, buffer, strlen(LOGOUT_ACCEPTED)); // logout accepted
-    offset += BLANK_SPACE;
-
-    memcpy(temp, &*(buffer+offset), LEN_SIZE); // nonce
-    offset += LEN_SIZE+BLANK_SPACE;
-    temp_nonce = atoi(temp);
-
-    memcpy(bufferSupp2, &*(buffer+offset), HASH_LEN); // hash
-
-    // Check logout accepted
-    if(!strcmp(LOGOUT_ACCEPTED, bufferSupp1)) exit_with_failure("The field is not logout_accepted, error.", 0);
-
-    // Check nonce
-    if (temp_nonce != *nonce) exit_with_failure("Nonce is incorrect, error.", 0);
-
-    // Check hash correctness
-    msg_to_hash_len = strlen(LOGOUT_ACCEPTED)+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     
-    memcpy(msg_to_hash, LOGOUT_ACCEPTED, strlen(LOGOUT_ACCEPTED));
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_ACCEPTED)), " ", BLANK_SPACE);
-    sprintf(temp, "%d", *nonce);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_ACCEPTED)+BLANK_SPACE), temp, LEN_SIZE); // nonce
-
-    // digest = the correct hash
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
-    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-
-    free(msg_to_hash);
-    free(digest);
-    free(temp);
-    free(buffer);
-    free(bufferSupp1);
-    free(bufferSupp2);
-    */
-       
+    if (ret == -1) 
+    {
+        printf("Send failed.\n");
+        return -1;   
+    }
+   
     return 1;
 }
 
-int listClient(int sock, char* username, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
+int listClient(int sock, char* username, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
 {
     unsigned char* iv;
     unsigned int index;
@@ -371,6 +360,7 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
 
     /* ---- Create the first message (req., hash(req, iv, nonce), iv) ---- */
     *nonce = *nonce + 1;
+
     // Create the hash
     msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
@@ -403,13 +393,18 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
 
     printf("I'm sending to the server the list message.\n");
     ret = send(sock, buffer, msg_len, 0); 
-    if (ret == -1) exit_with_failure("Send failed", 1);
 
     free(temp);
     free(buffer);
     free(msg_to_hash);
     free(digest);
     free(iv);
+
+    if (ret == -1)
+    {
+        printf("Send failed.\n");
+        return -1;
+    }
 
 
 
@@ -425,7 +420,13 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         ret = recv(sock, buffer, msg_len,0);
-        if (ret == -1) exit_with_failure("Receive failed", 0);
+        if (ret == -1) 
+        {
+            free(buffer);
+
+            printf("Receive failed.\n");
+            return -1;
+        }
         printf("Received first chunk of filenames.\n");
         *nonce = *nonce+1;
 
@@ -438,15 +439,14 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
-            if (ret == -1) exit_with_failure("Error checking list denied message", 0);
-            else 
-            {
-                free(bufferSupp1);
-                free(buffer);
+            if (ret == -1) printf("Error checking list denied message.\n");
+            else printf("List denied.\n"); 
+            
+            
+            free(bufferSupp1);
+            free(buffer);
 
-                return -1;
-            }
-
+            return -1;
         }
 
         free(bufferSupp1);
@@ -514,12 +514,23 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
 
             return -1;
         }
+        else if (num_file < 0 || num_file >= CHUNK_SIZE)
+        {
+            operation_denied(sock, "Incorrect num_file", LIST_DENIED, session_key1, session_key2, nonce);
+
+            free(buffer);
+            free(temp);
+            free(bufferSupp1);
+            free(bufferSupp2);
+            free(iv);
+            free(msg_to_hash);
+            free(digest);
+
+            return -1;
+        }
 
         // Decrypt list
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
-
-        // Check on num_file
-        if (num_file < 0 || num_file >= CHUNK_SIZE) exit_with_failure("Incorrect num_file", 0);
 
         // Fill list array
         if (tot_num_file == 0 && num_file != 0)
@@ -583,8 +594,7 @@ int listClient(int sock, char* username, char*** file_list, unsigned char* sessi
     return 1;
 }
 
-
-int renameClient(int sock, char* filename, char* new_filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce, struct sockaddr_in srv_addr)
+int renameClient(int sock, char* filename, char* new_filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
 {
     unsigned char* iv;
 
