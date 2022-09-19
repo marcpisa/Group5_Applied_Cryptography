@@ -583,7 +583,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     free(buffer);
 }
 
-void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce)
+void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* nonce)
 {
     int ret;
     int msg_len;
@@ -627,7 +627,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
     memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
 
-    digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+    digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     // Compose the message
     memcpy(buffer, req_accepted, strlen(req_accepted)); // req. acc.

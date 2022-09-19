@@ -1033,14 +1033,21 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         nchunk = atoi(bufferSupp1);
         rest = atoi(temp);
         free(temp);
+
         if (nchunk == 0)
         {
             printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
+
+            free(buffer);
+            free(bufferSupp1);
+            free(bufferSupp2);
+            free(iv);
+
             return 1;
         }
         
         // Check hash on DOWNLOAD_ACCEPTED, NONCE, NCHUNK, REST, IV
-        msg_to_hash_len = strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+REST_SIZE+BLANK_SPACE+IV_LEN; 
+        msg_to_hash_len = strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+IV_LEN; 
         msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
@@ -1050,7 +1057,7 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 for nchunk failed", 1);
 
         sprintf(temp, "%d", *nonce);
-        memcpy(bufferSupp3, &*(bufferSupp2+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE);
+        memcpy(bufferSupp3, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE);
 
         memcpy(msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED));  // download acc
         memcpy(&*(msg_to_hash+strlen(DOWNLOAD_ACCEPTED)), " ", BLANK_SPACE);
@@ -1062,20 +1069,9 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE), " ", BLANK_SPACE);
         memcpy(&*(msg_to_hash+strlen(RENAME_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE), iv, IV_LEN);  
 
-        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-        if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        if (ret == -1)
-        {
-            printf("Wrong download accepted hash\n\n");
-            ret = -1;
-        }
-        else
-        {
-            printf("The download request has been accepted!\n\n");
-            ret = 1;
-        }
 
         free(digest);
         free(temp);
@@ -1083,13 +1079,28 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         free(bufferSupp1);
         free(bufferSupp2);
         free(bufferSupp3);
+        free(buffer);
         free(iv);
+
+        if (ret == -1)
+        {
+            operation_denied(sock, "Wrong download accepted hash", DOWNLOAD_DENIED, session_key1, session_key2, &nonce);
+            return -1;
+        }
+        else
+        {
+            operation_succeed(sock, DOWNLOAD_ACCEPTED, session_key2, &nonce);
+            printf("The download request has been accepted!\n");
+        }
+
+
+
 
         //NOW WE CAN BEGIN DOWNLOAD THE CHUNKS
         f1 = fopen(filename, "w");
         for (i = 0; i < nchunk; i++)
         {
-            //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {FILENAME, CHUNK}K1, H(FILENAME, CHUNK, NONCE)
+            //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {FILENAME, CHUNK}K1, H(encr, iv, NONCE),iv
             msg_len = strlen(filename)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
             buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);

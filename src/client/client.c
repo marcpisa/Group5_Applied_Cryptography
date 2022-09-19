@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = listClient(connectedSock, username, &file_list, session_key1, session_key2, &nonce_cs);
+                            ret = listClient(connectedSock, &file_list, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
                         
                             break;
@@ -269,7 +269,7 @@ int main(int argc, char* argv[])
                             }
 
                             // Handle rename request
-                            ret = renameClient(connectedSock, username, command2, command3, session_key1, session_key2, &nonce_cs);
+                            ret = renameClient(connectedSock, command2, command3, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = deleteClient(connectedSock, username, command2, session_key1, session_key2, &nonce_cs);
+                            ret = deleteClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
 
 
@@ -307,7 +307,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = downloadClient(connectedSock, username, command2); // format of the input given to the input stream: download filename
+                            ret = downloadClient(connectedSock, command2); // format of the input given to the input stream: download filename
 
                             if (ret == -1)
                             {
@@ -324,7 +324,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
                             
-                            ret = uploadClient(connectedSock, username, command2);
+                            ret = uploadClient(connectedSock, command2);
                             
                             if (ret == -1)
                             {
@@ -342,7 +342,7 @@ int main(int argc, char* argv[])
                             }
 
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
+                            ret = shareClient(connectedSock, command2, command3); //command2 = filename, command3 = peername
 
                             if (ret == -1)
                             {
@@ -368,7 +368,7 @@ int main(int argc, char* argv[])
                         case 10:
                                 if(connected == 1)
                                 {
-                                    ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                                    ret = logoutClient(connectedSock, &nonce_cs, session_key2);
                             
                                     if (ret != -1)
                                     {
