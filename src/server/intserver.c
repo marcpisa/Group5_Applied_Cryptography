@@ -58,7 +58,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* username;
     unsigned int len_username;
 
-    unsigned char funcBuff[BUF_LEN];
+    char funcBuff[BUF_LEN];
     char funcSupp1[BUF_LEN];
 
     /*********************
@@ -140,7 +140,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     // Retrieve the client pubkey (from the client cert., already owned by the server)
     path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4+1));
     memcpy(path_cert_client_rsa, "cert_", 5);
-    memcpy(&*(path_cert_client_rsa+5), *username, len_username);
+    memcpy(&*(path_cert_client_rsa+5), username, len_username);
     memcpy(&*(path_cert_client_rsa+5+len_username), ".pem\0", 4+1);
     pub_rsa_client = get_client_pubkey(path_cert_client_rsa);
     
@@ -181,7 +181,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     // Come back to the user directory
     ret = chdir("../database/");
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
-    ret = chdir(*username);
+    ret = chdir(username);
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
 
     // Calculating message length and allocate memory for it
@@ -489,7 +489,7 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     return 1;
 }
 
-int listServer(int sd, char* rec_mex, char* username int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     DIR* d;
     struct dirent *files;
@@ -1078,7 +1078,7 @@ int downloadServer(int sock, char* rec_mex, int* nonce, unsigned char* session_k
     char username[MAX_LEN_USERNAME];
     char filename[MAX_LEN_FILENAME];
     struct stat st;
-    int i, j, nchunk, ret, start_payload, rest;
+    int i, j, nchunk, start_payload, rest;
     FILE* fd;
 
     //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv)
@@ -1090,6 +1090,8 @@ int downloadServer(int sock, char* rec_mex, int* nonce, unsigned char* session_k
     encr_msg = (unsigned char*)malloc(sizeof(unsigned char)*encr_len);
     if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     memcpy(encr_msg, &*(rec_mex+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len); //Now we have the encr_msg, we should confirm the auth and take the iv later to decrypt it
+
+    return 1;
 }
 
 

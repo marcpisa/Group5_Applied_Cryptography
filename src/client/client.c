@@ -307,7 +307,7 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = downloadClient(connectedSock, command2); // format of the input given to the input stream: download filename
+                            ret = downloadClient(connectedSock, command2, session_key1, session_key2, &nonce_cs); // format of the input given to the input stream: download filename
 
                             if (ret == -1)
                             {
@@ -324,7 +324,20 @@ int main(int argc, char* argv[])
                                 break;
                             }
                             
-                            ret = uploadClient(connectedSock, command2);
+                            // Check length and filename sanitization
+                            if (strlen(command2) > MAX_LEN_FILENAME) 
+                            {
+                                printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
+                                break;
+                            } 
+                            ret = filename_sanitization (command2, "/");
+                            if (ret == -1) 
+                            {
+                                printf("Filename sanitization failed.\n\n");
+                                break;
+                            }
+
+                            ret = uploadClient(connectedSock, username, command2);
                             
                             if (ret == -1)
                             {
@@ -342,7 +355,7 @@ int main(int argc, char* argv[])
                             }
 
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(connectedSock, command2, command3); //command2 = filename, command3 = peername
+                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
 
                             if (ret == -1)
                             {

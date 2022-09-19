@@ -319,7 +319,7 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     return 1;
 }
 
-int listClient(int sock, char* username, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
+int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
 {
     unsigned char* iv;
     unsigned int index;
@@ -885,7 +885,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     return ret;
 }
 
-int downloadClient(int sock, char* username, char* filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
+int downloadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
 {
     char* reason;
     unsigned char* iv;
@@ -1084,12 +1084,12 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
 
         if (ret == -1)
         {
-            operation_denied(sock, "Wrong download accepted hash", DOWNLOAD_DENIED, session_key1, session_key2, &nonce);
+            operation_denied(sock, "Wrong download accepted hash", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
             return -1;
         }
         else
         {
-            operation_succeed(sock, DOWNLOAD_ACCEPTED, session_key2, &nonce);
+            operation_succeed(sock, DOWNLOAD_ACCEPTED, session_key2, nonce);
             printf("The download request has been accepted!\n");
         }
 
@@ -1101,6 +1101,7 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         for (i = 0; i < nchunk; i++)
         {
             //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {FILENAME, CHUNK}K1, H(encr, iv, NONCE),iv
+            // filename is needed??
             msg_len = strlen(filename)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
             buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);
@@ -1114,15 +1115,16 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
             memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
 
             //Now we take the encr_len and the encrypted part to decrypt it later
-            bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
-            if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-            memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
-            encr_len = atoi(bufferSupp1);
-            bufferSupp2 = (unsigned char*)malloc(encr_len);
+            temp = (char*) malloc(LEN_SIZE*sizeof(char));
+            if (!temp) exit_with_failure("Malloc temp failed", 1);
+            memcpy(temp, buffer, LEN_SIZE); // Here we have len_enc
+            encr_len = atoi(temp);
+            bufferSupp2 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
             if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
             memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
             
             decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
+            // ???
             if (i == nchunk-1)
             {
                 chunk = (unsigned char*)malloc(sizeof(unsigned char)*rest);
@@ -1134,12 +1136,12 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
                 memcpy(chunk, plaintext, CHUNK_SIZE);
             }
 
-            free(bufferSupp1);
+            free(temp);
             free(buffer);
 
             //NOW WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
-            temp = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
-            sprintf(temp, "%d", nonce);
+            temp = (char*)malloc(sizeof(char)*LEN_SIZE);
+            sprintf(temp, "%d", *nonce);
             bufferSupp3 = (unsigned char*)malloc(HASH_LEN*sizeof(unsigned char*));
             if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
             memcpy(bufferSupp3, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN); //Here we have the hash to compare
@@ -1158,7 +1160,7 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
             if (ret == -1)
             {
                 printf("Wrong download chunk hash\n\n");
-                ret -1;
+                return -1;
             }
 
             free(digest);
@@ -1198,7 +1200,6 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         memcpy(&*(msg_to_hash+strlen(DOWNLOAD_FINISHED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), iv, IV_LEN); // iv
         
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-        if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
         // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
         msg_len = strlen(DOWNLOAD_FINISHED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
@@ -1213,7 +1214,7 @@ int downloadClient(int sock, char* username, char* filename, unsigned char* sess
         memcpy(&*(buffer+strlen(DOWNLOAD_FINISHED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // encr
         // The message in the buffer now is: DOWNLOAD_FINISHED, hash, iv. We can send it now
 
-        printf("I'm sending to the server the download request.\n");
+        printf("I'm sending to the server the download finished message.\n");
         ret = send(sock, buffer, msg_len, 0); 
         if (ret == -1) exit_with_failure("Send failed", 1);
         *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages

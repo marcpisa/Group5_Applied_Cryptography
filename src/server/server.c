@@ -172,7 +172,7 @@ int main()
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, received_buffer, &username, &user_list, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer, session_key1, session_key2);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client login request...\n\n");
