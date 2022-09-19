@@ -22,6 +22,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     char* path_pubkey;
     char* path_rsa_key;
     unsigned int msg_len;
+    unsigned int exp_msg_len;
     size_t offset;
     size_t K_len;
 
@@ -76,20 +77,9 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
 
     /* ---- 1st message: login request message + username + DH pubkey ---- */
-    // Calculate the message length and allocate the memory
-    msg_len = strlen(LOGIN_REQUEST)+BLANK_SPACE+strlen(username)+BLANK_SPACE+pubkey_len+1;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-
-    // Compose the message and send it to the server
-    memcpy(buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST));  // login req
-    memcpy(&*(buffer+strlen(LOGIN_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+BLANK_SPACE), username, strlen(username)); // username
-    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+BLANK_SPACE+strlen(username)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(LOGIN_REQUEST)+BLANK_SPACE+strlen(username)+BLANK_SPACE) \
-    , pubkey_byte, pubkey_len); // dh pubkey
-
-    memcpy(&*(buffer+msg_len-1), "\0", 1);
+    exp_msg_len = strlen(LOGIN_REQUEST)+BLANK_SPACE+strlen(username)+BLANK_SPACE+pubkey_len;
+    msg_len = build_msg_3(&buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST), username, strlen(username), pubkey_byte, pubkey_len);
+    if (exp_msg_len != msg_len) exit_with_failure("Wrong message length", 0);
 
     /*
     for(unsigned int i = 0; i < msg_len; i++) { printf("%c", *(buffer+i)); }
@@ -249,7 +239,9 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     unsigned int digest_len;
     int ret;
     unsigned int msg_len;
+    unsigned int exp_msg_len;
     unsigned int msg_to_hash_len;
+    unsigned int exp_msg_to_hash_len;
 
     char* temp;
     unsigned char* buffer;
@@ -271,35 +263,22 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 
     /* ---- Create the first message (request + hash + iv) ---- */
     *nonce = *nonce + 1;
-    msg_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
     // Generating the hash of the request and the nonce
-    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+    exp_msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST));  // logout req
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), iv, IV_LEN, temp, LEN_SIZE);
+    if(msg_to_hash_len != exp_msg_to_hash_len) exit_with_failure("Wrong hash length", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
     
     // Compose the message
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+    exp_msg_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+    msg_len = build_msg_3(&buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), digest, HASH_LEN, iv, IV_LEN);
 
-    memcpy(buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST));  // logout req
-    memcpy(&*(buffer+strlen(LOGOUT_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(LOGOUT_REQUEST)+BLANK_SPACE), digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), \
-    iv, IV_LEN); // iv
 
     printf("I'm sending to the server the logout message.\n");
     ret = send(sock, buffer, msg_len, 0); 

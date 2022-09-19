@@ -32,7 +32,8 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* path_rsa_key = "rsa_prvkey.pem";
     char* path_cert_client_rsa;
     int ret;
-    int msg_len;
+    unsigned int msg_len;
+    unsigned int exp_msg_len;
     size_t offset, old_offset;
     size_t K_len;
 
@@ -185,27 +186,16 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
 
     // Calculating message length and allocate memory for it
-    msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cert_len+1;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    exp_msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cert_len;
+    //buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    //if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+    //temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    //if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     // Compose the message
-    memcpy(buffer, pubkey_byte, pubkey_len); // g^b
-    memcpy(&*(buffer+pubkey_len), " ", BLANK_SPACE);
-    memcpy(&*(buffer+pubkey_len+BLANK_SPACE), signature, SIGN_LEN); // dig. sig.
-    memcpy(&*(buffer+pubkey_len+BLANK_SPACE+SIGN_LEN), " ", BLANK_SPACE);
-
     sprintf(temp, "%d", cert_len);
-    memcpy(&*(buffer+pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE), temp, LEN_SIZE); // len cert    
-
-    memcpy(&*(buffer+pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
-    memcpy(&*(buffer+pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
-    cert_byte, cert_len); // cert.
-
-    memcpy(&*(buffer+msg_len-1), "\0", 1);
-
+    msg_len = build_msg_4(&buffer, pubkey_byte, pubkey_len, signature, SIGN_LEN, temp, LEN_SIZE, cert_byte, cert_len);
+    if (exp_msg_len != msg_len) exit_with_failure("Wrong msg len", 0);
 
     //printf("%s\n", buffer);
     printf("I'm sending to the client the response.\n");
