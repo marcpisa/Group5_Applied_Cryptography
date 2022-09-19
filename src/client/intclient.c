@@ -530,6 +530,8 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         }
 
         // Decrypt list
+        plaintext = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+        if (!plaintext) exit_with_failure("Malloc plaintext failed", 1);
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
         // Fill list array
@@ -1101,8 +1103,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         for (i = 0; i < nchunk; i++)
         {
             //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {FILENAME, CHUNK}K1, H(encr, iv, NONCE),iv
-            // filename is needed??
-            msg_len = strlen(filename)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+            msg_len = LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
             buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
@@ -1123,19 +1124,9 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
             memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
             
+            // Malloc inside decrypt and also encrypt
             decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
-            // ???
-            if (i == nchunk-1)
-            {
-                chunk = (unsigned char*)malloc(sizeof(unsigned char)*rest);
-                memcpy(chunk, plaintext, rest);
-            }
-            else
-            {
-                chunk = (unsigned char*)malloc(sizeof(unsigned char)*CHUNK_SIZE);
-                memcpy(chunk, plaintext, CHUNK_SIZE);
-            }
-
+         
             free(temp);
             free(buffer);
 

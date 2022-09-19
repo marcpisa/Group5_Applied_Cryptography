@@ -714,6 +714,7 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
         bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         memcpy(bufferSupp1, buffer, strlen(LIST_DENIED)); // denied or accepted same length
+        memcpy(&*(bufferSupp1+strlen(LIST_DENIED)-1), "\0", 1);
 
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {

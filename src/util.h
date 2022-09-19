@@ -124,3 +124,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* nonce);
 int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2);
 int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* session_key2);
+unsigned int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len);
+unsigned int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len);
+unsigned int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len);
+unsigned int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len);

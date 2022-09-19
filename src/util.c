@@ -643,6 +643,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* n
     free(buffer);
     free(msg_to_hash);
     free(digest);
+    free(temp);
 }
 
 
@@ -813,4 +814,101 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
     free(bufferSupp2);
 
     return ret;
+}
+
+
+unsigned int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len)
+{
+    unsigned int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+(BLANK_SPACE*2);
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+
+    return buff_len;
+}
+
+unsigned int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len)
+{
+    unsigned int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+(BLANK_SPACE*3);
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+
+    return buff_len;
+}
+
+unsigned int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len)
+{
+    unsigned int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+(BLANK_SPACE*4);
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE), param5, param5_len);
+
+    return buff_len;
+}
+
+unsigned int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len)
+{
+    unsigned int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+param6_len+(BLANK_SPACE*5);
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE), param5, param5_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE+param5_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE+param5_len+BLANK_SPACE), param6, param6_len);
+
+    return buff_len;
 }
