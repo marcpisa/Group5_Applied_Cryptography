@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
     char username[MAX_LEN_USERNAME];
 
     // Others
-    int nonce_cs = -1; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    unsigned int nonce_cs = 0;
     struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;

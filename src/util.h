@@ -23,7 +23,7 @@
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
-#define BUF_LEN 1024
+#define BUF_LEN 3*1024
 #define COM_LEN 16
 #define MAX_LEN_FILENAME 20
 #define MAX_LEN_USERNAME 20
@@ -121,10 +121,10 @@ void issue_session_keys(unsigned char *K, int K_len, unsigned char **session_key
 EVP_PKEY *get_ver_server_pubkey(X509 *serv_cert, X509_STORE *ca_store);
 unsigned char *hmac_sha256(unsigned char *key, int keylen, unsigned char *msg, int msg_len, unsigned int *out_len);
 
-void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, int* nonce);
-void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* nonce);
-int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2);
-int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* session_key2);
+void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, unsigned int* nonce);
+void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce);
+int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, unsigned char* session_key1, unsigned char* session_key2);
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce, unsigned char* session_key2);
 
 int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len);
 int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len);

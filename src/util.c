@@ -498,7 +498,7 @@ unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, i
     return digest;
 }
 
-void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, int* nonce)
+void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, unsigned int* nonce)
 {
     int ret;
 
@@ -583,7 +583,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     free(buffer);
 }
 
-void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* nonce)
+void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
 {
     int ret;
     int msg_len;
@@ -608,10 +608,6 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* n
     // Increment nonce for new message
     *nonce = *nonce + 1;
 
-    msg_len = strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-
     // Calculate the hash
     msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
@@ -630,12 +626,10 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* n
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     // Compose the message
-    memcpy(buffer, req_accepted, strlen(req_accepted)); // req. acc.
-    memcpy(&*(buffer+strlen(req_accepted)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE), digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
-
+    msg_len = build_msg_3(&buffer, req_accepted, strlen(req_accepted), \
+                                   digest, HASH_LEN, \
+                                   iv, IV_LEN);
+                                   
     ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1) exit_with_failure("Send failed", 1);
 
@@ -648,7 +642,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* n
 
 
 
-int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2)
+int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
@@ -746,7 +740,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned 
     return ret;
 }
 
-int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* key)
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce, unsigned char* key)
 {
     unsigned char* bufferSupp2;
 
@@ -821,7 +815,7 @@ int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int para
     int buff_len;
 
     buff_len = param1_len+param2_len+BLANK_SPACE;
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
@@ -841,7 +835,7 @@ int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int para
     int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+(BLANK_SPACE*2);
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
@@ -862,7 +856,7 @@ int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int para
     int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+(BLANK_SPACE*3);
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
@@ -885,7 +879,7 @@ int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int para
     int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+(BLANK_SPACE*4);
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
@@ -910,7 +904,7 @@ int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int para
     int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+param6_len+(BLANK_SPACE*5);
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
