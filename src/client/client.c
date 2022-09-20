@@ -21,7 +21,6 @@ int main(int argc, char* argv[])
 
     // Others
     unsigned int nonce_cs = 0;
-    struct timeval tv;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
     BIO* bio_cert;
@@ -79,14 +78,6 @@ int main(int argc, char* argv[])
 
     X509_free(cert_serv);
     BIO_free(bio_cert);
-    
-    // WE NEED TO SET ALSO THE CRL?????????????
-
-
-    // Set the value of the max interval that the select function wait for an action to do
-    tv.tv_sec = SELECT_SEC_TO_WAIT;
-	tv.tv_usec = 0;
-
 
 
     // CONFIGURATION OF THE SERVER INFO

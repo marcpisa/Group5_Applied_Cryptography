@@ -20,7 +20,6 @@ int main()
     // Buffers
     char received_buffer[4*BUF_LEN];
     char remote_comm[BUF_LEN];
-    char filename[BUF_LEN];
     char local_comm[BUF_LEN];
     char* username;
 

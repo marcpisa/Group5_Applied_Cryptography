@@ -24,7 +24,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     unsigned char* buffer;
     unsigned char* msg_to_sign;
-    char* temp;
+    unsigned char* temp;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
     char* path_pubkey = "../dh_server_pubkey.pem";
@@ -166,10 +166,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
 
     // Compose the message
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    temp = (unsigned char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf(temp, "%d", cert_len);
+    sprintf((char*)temp, "%d", cert_len);
     msg_len = build_msg_4(&buffer, pubkey_byte, pubkey_len, \
                                    signature, SIGN_LEN, \
                                    temp, LEN_SIZE, \
@@ -387,7 +387,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
     size_t offset;
 
-    char* temp;
+    unsigned char* temp;
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
     unsigned char* msg_to_hash;
@@ -395,7 +395,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
 
     /* ---- Parse the first client message (request + hash + iv) ---- */
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    temp = (unsigned char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);   
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);   
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
@@ -411,7 +411,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
 
     // Check hash correctness
-    sprintf(temp, "%d", *nonce);
+    sprintf((char*)temp, "%d", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), \
                                                 bufferSupp3, IV_LEN, \
                                                 temp, LEN_SIZE);
@@ -484,18 +484,15 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
 
     // Compare the hash
     msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST));  // list req
-    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    sprintf((char*)temp, "%d", *nonce);
+
+    ret = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
+                                    iv, IV_LEN,\
+                                    temp, LEN_SIZE);
+    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
@@ -579,51 +576,39 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         // Prepare the hash
         *nonce = *nonce + 1;
         msg_to_hash_len = LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-        msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-        if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
+        bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*LEN_SIZE);
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         temp = (char*) malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-        sprintf(temp, "%d", num_file);
-        memcpy(msg_to_hash, temp, LEN_SIZE);  // num. file
-        memcpy(&*(msg_to_hash+LEN_SIZE), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE), ciphertext, cipher_len); // encr. list
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len), " ", BLANK_SPACE);
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE), \
-        iv, IV_LEN); // iv
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN), \
-        " ", BLANK_SPACE);
-        sprintf(temp, "%d", *nonce);
-        memcpy(&*(msg_to_hash+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+ \
-        BLANK_SPACE), temp, LEN_SIZE); // nonce
+        sprintf((char*)temp, "%d", num_file);
+        sprintf((char*)bufferSupp1, "%d", *nonce);
+
+        ret = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
+                                        ciphertext, cipher_len,\
+                                        iv, IV_LEN,\
+                                        bufferSupp1, LEN_SIZE);
+        if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+        free(temp);
+        free(bufferSupp1);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);  
 
         // Build the message
         msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+HASH_LEN \
         +BLANK_SPACE+IV_LEN+1; // max. length
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-        if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        sprintf(temp, "%d", num_file);
-        memcpy(buffer, temp, LEN_SIZE); // num. file
-        memcpy(&*(buffer+LEN_SIZE), " ", BLANK_SPACE);
-        sprintf(temp, "%d", cipher_len);
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE), temp, LEN_SIZE); // len. encr.
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), \
-        ciphertext, cipher_len); // encr. list
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
-        cipher_len), " ", BLANK_SPACE);
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
-        cipher_len+BLANK_SPACE), digest, HASH_LEN); // hash
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
-        cipher_len+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
-        cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
+        sprintf((char*)temp, "%d", num_file);
+        sprintf((char*)bufferSupp1, "%d", cipher_len);
 
-        memcpy(&*(buffer+LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+ \
-        cipher_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN), "\0", 1);
+        ret = build_msg_5(&buffer, temp, LEN_SIZE,\
+                                   bufferSupp1, LEN_SIZE,\
+                                   ciphertext, cipher_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+        if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+        free(bufferSupp1);
+        free(temp);
 
         printf("I'm sending to the client the filename's list\n"); 
         ret = send(sd, buffer, msg_len, 0); 
@@ -646,7 +631,7 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        ret = recv(sd, buffer, msg_len,0);
+        ret = recv(sd, buffer, BUF_LEN,0);
         if (ret == -1) exit_with_failure("Receive failed", 0);
         printf("Received the client outcome.\n");
 
@@ -734,9 +719,10 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     offset = strlen(RENAME_REQUEST)+BLANK_SPACE;
     memcpy(temp, &*(rec_mex+offset), LEN_SIZE); // len. encr.
     offset += LEN_SIZE+BLANK_SPACE;
-    encr_len = atoi(temp);
+    encr_len = atoi((char*)temp);
 
     bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
     memcpy(bufferSupp1, &*(rec_mex+offset), encr_len); // encr
     offset += encr_len+BLANK_SPACE;
@@ -748,17 +734,13 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     
     // Check hash
     msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+    sprintf((char*)temp, "%d", *nonce);
 
-    sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST)); // rename req.
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE), bufferSupp1, encr_len); // encr.  
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    ret = build_msg_4(&msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST),\
+                                    bufferSupp1, encr_len,\
+                                    iv, IV_LEN,\
+                                    temp, LEN_SIZE);
+    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
 
     // If hash correct, decrypt
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
@@ -896,7 +878,7 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     offset = strlen(DELETE_REQUEST)+BLANK_SPACE;
     memcpy(temp, &*(rec_mex+offset), LEN_SIZE); // len. encr.
     offset += LEN_SIZE+BLANK_SPACE;
-    encr_len = atoi(temp);
+    encr_len = atoi((char*)temp);
 
     bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -910,17 +892,14 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     memcpy(iv, &*(rec_mex+offset), IV_LEN); // iv
 
     msg_to_hash_len = strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
 
-    sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST)); // rename req.
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE), bufferSupp1, encr_len); // encr.  
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    sprintf((char*)temp, "%d", *nonce);
+
+    ret = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
+                                    bufferSupp1, encr_len,\
+                                    iv, IV_LEN,\
+                                    temp, LEN_SIZE);
+    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
@@ -1023,7 +1002,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, &*(rec_mex+strlen(DOWNLOAD_REQUEST)+BLANK_SPACE), LEN_SIZE);
-    encr_len = atoi(bufferSupp1);
+    encr_len = atoi((char*)bufferSupp1);
 
     //HERE WE TAKE THE MAC
     bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
@@ -1043,7 +1022,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     // HERE WE TAKE THE NONCE IN STRING
     buffer = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    sprintf(buffer, "%u", *nonce);
+    sprintf((char*)buffer, "%u", *nonce);
     
     //Now we prepare the message to hash to compare it with the one we received
     msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST), \
@@ -1099,7 +1078,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
     printf("The number of chunk is %i\n\n", nchunk);    
-    sprintf(bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); 
+    sprintf((char*)bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); 
     printf("I'm sending %s\n\n", bufferSupp1);
 
 
@@ -1115,9 +1094,9 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     temp = (char*)malloc(LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf(temp, "%u", *nonce); //nonce is put on temp as a string
-    sprintf(bufferSupp1, "%u", nchunk); //nchunk is put on bufferSupp1 as a string
-    sprintf(bufferSupp2, "%u", rest); //rest is put on bufferSUpp2 as a string
+    sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
+    sprintf((char*)bufferSupp1, "%u", nchunk); //nchunk is put on bufferSupp1 as a string
+    sprintf((char*)bufferSupp2, "%u", rest); //rest is put on bufferSUpp2 as a string
     msg_to_hash_len = build_msg_3(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
                                                 temp, LEN_SIZE, \
                                                 bufferSupp1, LEN_SIZE);
@@ -1156,7 +1135,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
         {
             for (j = 0; j < rest; j++)
             {
-                if (fgets(msg_to_encr+j, 2, fd) == NULL)
+                if (fgets((char*)msg_to_encr+j, 2, fd) == NULL)
                 {
                     *(msg_to_encr+j) = '\0';
                     printf("File over!");
@@ -1168,7 +1147,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
         {
             for (j = 0; j < CHUNK_SIZE; j++)
             {
-                if (fgets(msg_to_encr+j, 2, fd) == NULL)
+                if (fgets((char*)msg_to_encr+j, 2, fd) == NULL)
                 {
                     *(msg_to_encr+j) = '\0';
                     printf("File over!");
@@ -1200,7 +1179,7 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
         free(buffer);
         temp = (char*)malloc(LEN_SIZE*(sizeof(char)));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        sprintf(temp, "%u", encr_len);
+        sprintf((char*)temp, "%u", encr_len);
         msg_len = build_msg_4(&buffer, temp, LEN_SIZE, encr_msg, encr_len, digest, HASH_LEN, iv, IV_LEN);
         if (msg_len == -1) exit_with_failure("Error during the creation of the function", 1);
 
@@ -1257,8 +1236,8 @@ int uploadServer(int sd, char* rec_mex)
     printf("I received %s\n\n", rec_mex);
     sscanf(rec_mex, "%s %s %s %s %s", bufferSupp1, username, filename, bufferSupp2, bufferSupp3);
     
-    rest = atoi(bufferSupp3);
-    nchunk = atoi(bufferSupp2);
+    rest = atoi((char*)bufferSupp3);
+    nchunk = atoi((char*)bufferSupp2);
 
     printf("The number of chunk of the file is %i", nchunk);
 
@@ -1283,7 +1262,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(buffer, 0, strlen(buffer));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
-        sprintf(buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
+        sprintf((char*)buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
         printf("I'm sending %s\n\n", buffer);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
@@ -1300,7 +1279,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(buffer, 0, strlen(buffer));
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
-        sprintf(buffer, "%s %s %s", UPLOAD_DENIED, username, filename);
+        sprintf((char*)buffer, "%s %s %s", UPLOAD_DENIED, username, filename);
         printf("I'm sending %s\n\n", buffer);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1) printf("Had some problem with the send operation...\n\n");
@@ -1373,7 +1352,7 @@ int uploadServer(int sd, char* rec_mex)
     }
     fclose(f1);
     memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
+    sprintf((char*)buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
     printf("I'm sending %s\n\n", buffer);
     ret = send(sd, buffer, BUF_LEN, 0);
     if (ret == -1)
@@ -1423,7 +1402,7 @@ int shareServer(int sd, char* rec_mex)
     {
         printf("The sharer doesn't have any file called %s\n\n", filename);
         memset(buffer, 0, strlen(buffer));
-        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
+        sprintf((char*)buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
@@ -1443,12 +1422,12 @@ int shareServer(int sd, char* rec_mex)
         return -1;
 	}
     memset(buffer, 0, strlen(buffer));
-    sprintf(buffer, "%s.txt", receivername);
+    sprintf((char*)buffer, "%s.txt", receivername);
     if (!(f1 = fopen(buffer, "r")))
     {
         printf("The receiver %s is not online... Try it later\n\n", receivername);
         memset(buffer, 0, strlen(buffer));
-        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
+        sprintf((char*)buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
@@ -1464,7 +1443,7 @@ int shareServer(int sd, char* rec_mex)
         printf("Problem during the reading of the file to downlaod... \n\n");
         return -1;
     }
-    receiverport = atoi(buffer);
+    receiverport = atoi((char*)buffer);
 
     memset(&rec_addr, 0, sizeof(rec_addr));
 	rec_addr.sin_family = AF_INET;
