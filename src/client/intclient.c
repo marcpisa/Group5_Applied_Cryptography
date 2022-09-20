@@ -245,7 +245,7 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
         printf("Send failed.\n");
         return -1;   
     }
-   
+    exit(1);
     return 1;
 }
 
