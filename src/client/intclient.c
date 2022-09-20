@@ -242,9 +242,9 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     {
         printf("Send failed.\n");
         return -1;   
-    } else *nonce = 0;
+    }
 
-    return 1;
+    exit(1);
 }
 
 int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, int* nonce)
