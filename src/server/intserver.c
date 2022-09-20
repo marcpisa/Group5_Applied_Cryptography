@@ -529,7 +529,7 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         bufferSupp1 = (unsigned char*) malloc((CHUNK_SIZE+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
-        d = opendir(path_documents);        
+        d = opendir(path_documents);   
         
         // If this is the second list of filenames, reset the pointer to the prev. position
         for (int i = 0; i < tot_num_file; i++) files = readdir(d);
@@ -563,6 +563,7 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
             offset += 1;
             tot_num_file += num_file;
         }
+        else exit_with_failure("Impossible to open path_documents", 1);     
         closedir(d);
 
         // Encrypt the list
