@@ -28,11 +28,11 @@ int main()
     struct timeval tv;
 
     // Cryptographic operation
-    char* session_key1;
-    char* session_key2;    
+    unsigned char* session_key1;
+    unsigned char* session_key2;    
     
-    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
-    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
+    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(session_key1 == NULL || session_key2 == NULL) exit_with_failure("Unable to allocate session keys", 1);
 
     // Recover the user list
@@ -152,7 +152,7 @@ int main()
                     }
                     // We check the first keyword to understand what the Client wants us to do
                     memset(remote_comm, 0, BUF_LEN);
-                    memcpy(remote_comm, received_buffer, str_ssplit((char*) received_buffer, DELIM));
+                    memcpy(remote_comm, received_buffer, str_ssplit((unsigned char*) received_buffer, DELIM));
                     // ************ LOGIN REQUEST MANAGER ***********
                     if (strcmp(remote_comm, LOGIN_REQUEST) == 0)
                     {

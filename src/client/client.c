@@ -29,13 +29,13 @@ int main(int argc, char* argv[])
     char** file_list;
 
     // Cryptographic operation
-    char* session_key1;
-    char* session_key2;
+    unsigned char* session_key1;
+    unsigned char* session_key2;
     
     //********* END VARIABLES *********
 
-    session_key1 = (char*) malloc(16*sizeof(char)); // 128 bit
-    session_key2 = (char*) malloc(16*sizeof(char)); // 128 bit
+    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
     if(!session_key1 || !session_key2)
     {
         printf("Unable to allocate session keys...\n\n");
