@@ -14,7 +14,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) 
+int loginClient(int *sock, char* session_key1, char* session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) 
 {
     /*********************
      * VARIABLES
@@ -26,8 +26,8 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     size_t K_len;
 
     // Digital signature
-    unsigned char* exp_digsig;
-    unsigned char* signature;
+    char* exp_digsig;
+    char* signature;
     int expected_len;
     unsigned int signature_len;
 
@@ -35,8 +35,8 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     EVP_PKEY* my_prvkey = NULL;
     EVP_PKEY* dh_pubkey = NULL;
     EVP_PKEY* peer_pubkey;
-    unsigned char* K;
-    unsigned char* pubkey_byte = NULL;
+    char* K;
+    char* pubkey_byte = NULL;
     int pubkey_len = 0;
     
     // Certificate
@@ -46,10 +46,10 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     int ret;
     char* temp;
-    unsigned char* buffer;
-    unsigned char* cert_buffer;
-    unsigned char* bufferSupp1;
-    unsigned char* bufferSupp2;
+    char* buffer;
+    char* cert_buffer;
+    char* bufferSupp1;
+    char* bufferSupp2;
     /*********************
      * END VARIABLES
      ********************/
@@ -92,7 +92,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     /* ---- Obtain and parse response server (DH pubkey, signature, len. cert. and cert.) ----*/
     msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+MAX_CERT_LEN+1;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     ret = recv(*sock, buffer, msg_len, 0);
     if (ret == -1) 
@@ -106,9 +106,9 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*pubkey_len);
+    bufferSupp1 = (char*) malloc(sizeof(char)*pubkey_len);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*SIGN_LEN);
+    bufferSupp2 = (char*) malloc(sizeof(char)*SIGN_LEN);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
     // Parse the server response
@@ -132,7 +132,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     */
 
     // The certificate is greater than 1024
-    cert_buffer = (unsigned char*) malloc((cert_len+1)*sizeof(unsigned char));
+    cert_buffer = (char*) malloc((cert_len+1)*sizeof(char));
     if (!cert_buffer) exit_with_failure("cert_buffer malloc failed", 1);
     memcpy(cert_buffer, &*(buffer+offset), cert_len); // cert
 
@@ -171,7 +171,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
     /* ---- Generate last message for the server (digital signature) ---- */
     msg_len = SIGN_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     // Generate digital signature
@@ -194,7 +194,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     return 1;
 }
 
-int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
+int logoutClient(int sock, unsigned int* nonce, char* session_key2)
 {
     unsigned int digest_len;
     int ret;
@@ -202,18 +202,18 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     int msg_to_hash_len;
 
     char* temp;
-    unsigned char* buffer;
-    unsigned char* msg_to_hash;
-    unsigned char* digest;
-    unsigned char* iv;    
+    char* buffer;
+    char* msg_to_hash;
+    char* digest;
+    char* iv;    
 
 
     // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    iv = (char*) malloc(sizeof(char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    ret = RAND_bytes((char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
 
@@ -248,19 +248,19 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     exit(1);
 }
 
-int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
+int listClient(int sock, char*** file_list, char* session_key1, char* session_key2, unsigned int* nonce)
 {
-    unsigned char* iv;
+    char* iv;
     unsigned int index;
     int num_file;
     int tot_num_file;
 
-    unsigned char* plaintext;
+    char* plaintext;
     int encr_len;
     unsigned int plain_len;
     
-    unsigned char* msg_to_hash;
-    unsigned char* digest;
+    char* msg_to_hash;
+    char* digest;
     unsigned int digest_len;
     int msg_to_hash_len;
     
@@ -271,17 +271,17 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     char* temp;
     char *token;
     char** new_file_list;
-    unsigned char* buffer;
-    unsigned char* bufferSupp1;
-    unsigned char* bufferSupp2;
+    char* buffer;
+    char* bufferSupp1;
+    char* bufferSupp2;
 
 
     // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    iv = (char*) malloc(sizeof(char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    ret = RAND_bytes((char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
 
@@ -292,7 +292,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
 
     // Create the hash
     msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -311,7 +311,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     // Compose the message
     msg_len = strlen(LIST_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     memcpy(buffer, LIST_REQUEST, strlen(LIST_REQUEST));  // list req
@@ -345,7 +345,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     while (num_file != -1) 
     {
         msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        buffer = (char*) malloc(sizeof(char)*msg_len);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         ret = recv(sock, buffer, msg_len,0);
@@ -360,7 +360,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         *nonce = *nonce+1;
 
         // Check if something failed server-side
-        bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
+        bufferSupp1 = (char*) malloc(strlen(LIST_DENIED)*sizeof(char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1); 
 
         memcpy(bufferSupp1, buffer, strlen(LIST_DENIED));
@@ -384,11 +384,11 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         // No operation denied, let's obtain the list
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        bufferSupp1 = (unsigned char*) malloc(2*CHUNK_SIZE*sizeof(unsigned char));
+        bufferSupp1 = (char*) malloc(2*CHUNK_SIZE*sizeof(char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-        bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+        bufferSupp2 = (char*) malloc(HASH_LEN*sizeof(char));
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        iv = (char*) malloc(sizeof(char)*IV_LEN);
         if (!iv) exit_with_failure("Malloc iv failed", 1);
 
         // Parsing
@@ -410,7 +410,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         
         // Check hash
         msg_to_hash_len = LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-        msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+        msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     
         sprintf(temp, "%d", num_file);
@@ -459,7 +459,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         }
 
         // Decrypt list
-        plaintext = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+        plaintext = (char*) malloc(encr_len*sizeof(char));
         if (!plaintext) exit_with_failure("Malloc plaintext failed", 1);
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
@@ -526,32 +526,32 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     return 1;
 }
 
-int renameClient(int sock, char* filename, char* new_filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
+int renameClient(int sock, char* filename, char* new_filename, char* session_key1, char* session_key2, unsigned int* nonce)
 {
-    unsigned char* iv;
+    char* iv;
 
-    unsigned char* msg_to_encr;
-    unsigned char* encr_msg;
+    char* msg_to_encr;
+    char* encr_msg;
     unsigned int msg_to_encr_len;
     int encr_len;
     
-    unsigned char* msg_to_hash;
-    unsigned char* digest;
+    char* msg_to_hash;
+    char* digest;
     unsigned int digest_len;
     int msg_to_hash_len;
 
     int ret;
     int msg_len;
     char* temp;
-    unsigned char* buffer;
-    unsigned char* bufferSupp1;
+    char* buffer;
+    char* bufferSupp1;
 
     // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    iv = (char*) malloc(sizeof(char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    ret = RAND_bytes((char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
 
@@ -560,20 +560,20 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
     // Encrypt the two names
     msg_to_encr_len = strlen(filename)+BLANK_SPACE+strlen(new_filename);
-    msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
+    msg_to_encr = (char*) malloc(msg_to_encr_len*sizeof(char));
     if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
 
     memcpy(msg_to_encr, filename, strlen(filename));
     memcpy(&*(msg_to_encr+strlen(filename)), " ", BLANK_SPACE);
     memcpy(&*(msg_to_encr+strlen(filename)+BLANK_SPACE), new_filename, strlen(new_filename));
 
-    encr_msg = (unsigned char*) malloc((msg_to_encr_len+BLOCK_SIZE)*sizeof(unsigned char));
+    encr_msg = (char*) malloc((msg_to_encr_len+BLOCK_SIZE)*sizeof(char));
     if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
     // Create the hash
     msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -596,7 +596,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     // Compose the message
     msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
     BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     memcpy(buffer, RENAME_REQUEST, strlen(RENAME_REQUEST));  // rename req
@@ -637,7 +637,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     /* ---- Parse the response ---- */
     // Max. size of the msg, RENAME_DENIED and ACCEPTED have the same length
     msg_len = strlen(RENAME_DENIED)+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, msg_len,0);
@@ -650,7 +650,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     printf("Received the server's response.\n");
     *nonce = *nonce+1;
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char));
+    bufferSupp1 = (char*) malloc(strlen(RENAME_DENIED)*sizeof(char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(RENAME_DENIED)); // denied or accepted same length
 
@@ -676,30 +676,30 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     return ret;
 }
 
-int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
+int deleteClient(int sock, char* filename, char* session_key1, char* session_key2, unsigned int* nonce)
 {       
-    unsigned char* iv;
-    unsigned char* encr_msg;
+    char* iv;
+    char* encr_msg;
     int encr_len;
     
-    unsigned char* msg_to_hash; 
-    unsigned char* digest; 
+    char* msg_to_hash; 
+    char* digest; 
     unsigned int digest_len; 
     int msg_to_hash_len;
     
     int ret;
     int msg_len; 
     char* temp; 
-    unsigned char* buffer;   
-    unsigned char* bufferSupp1;
+    char* buffer;   
+    char* bufferSupp1;
     
 
     // Generate the IV 
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN); 
+    iv = (char*) malloc(sizeof(char)*IV_LEN); 
     if (!iv) exit_with_failure("Malloc iv failed", 1); 
     ret = RAND_poll(); 
     if (ret != 1) exit_with_failure("Rand_poll failed\n", 0); 
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN); 
+    ret = RAND_bytes((char*)&iv[0], IV_LEN); 
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0); 
 
 
@@ -708,18 +708,18 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     /* ---- Send delete request (req., len. encr., encr. filename, hash(req, encr, iv, nonce), iv) ---- */
     *nonce = *nonce+1;
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(filename)*sizeof(unsigned char));
+    bufferSupp1 = (char*) malloc(strlen(filename)*sizeof(char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, filename, strlen(filename));
     
-    encr_msg = (unsigned char*) malloc((strlen(filename)+BLOCK_SIZE)*sizeof(unsigned char));
+    encr_msg = (char*) malloc((strlen(filename)+BLOCK_SIZE)*sizeof(char));
     if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, bufferSupp1, strlen(filename), iv, session_key1); 
     free(bufferSupp1);
 
     // Create hash 
     msg_to_hash_len = strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -741,7 +741,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     // Compose the message
     msg_len = strlen(DELETE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
     BLANK_SPACE+IV_LEN;   
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1); 
 
     memcpy(buffer, DELETE_REQUEST, strlen(DELETE_REQUEST));  // delete req
@@ -780,7 +780,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     
     // Here we receive the reply of the server
     msg_len = strlen(DELETE_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, msg_len,0);
@@ -793,7 +793,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     printf("Received the server's response.\n");
     *nonce = *nonce+1;
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(DELETE_DENIED)*sizeof(unsigned char));
+    bufferSupp1 = (char*) malloc(strlen(DELETE_DENIED)*sizeof(char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(DELETE_DENIED));
 
@@ -817,19 +817,19 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     return ret;
 }
 
-int downloadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
+int downloadClient(int sock, char* filename, char* session_key1, char* session_key2, unsigned int* nonce)
 {
-    unsigned char* iv;
+    char* iv;
 
-    unsigned char* msg_to_encr;
-    unsigned char* encr_msg;
-    unsigned char* plaintext;
+    char* msg_to_encr;
+    char* encr_msg;
+    char* plaintext;
     unsigned int plain_len;
     unsigned int msg_to_encr_len;
     int encr_len;
     
-    unsigned char* msg_to_hash;
-    unsigned char* digest;
+    char* msg_to_hash;
+    char* digest;
     unsigned int digest_len;
     int msg_to_hash_len;
     
@@ -838,26 +838,26 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     int ret, nchunk, i, j, rest;
     int msg_len;
     char* temp;
-    unsigned char* buffer;
-    unsigned char* bufferSupp1;
-    unsigned char* bufferSupp2;
-    unsigned char* bufferSupp3;
+    char* buffer;
+    char* bufferSupp1;
+    char* bufferSupp2;
+    char* bufferSupp3;
 
     
 
     // Initialization of IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    iv = (char*) malloc(sizeof(char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    ret = RAND_bytes((char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
     /* first message M1: download_request, nonce, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv) ---- */
     
     // Encrypt the two names
     msg_to_encr_len = strlen(filename);
-    msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
+    msg_to_encr = (char*) malloc(msg_to_encr_len*sizeof(char));
     if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
 
     memcpy(msg_to_encr, filename, strlen(filename)); //Now on msg_to_encr there is the string to encrypt
@@ -866,7 +866,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
     // Create the hash
     msg_to_hash_len = strlen(DOWNLOAD_REQUEST) + BLANK_SPACE + encr_len + BLANK_SPACE + IV_LEN + BLANK_SPACE + LEN_SIZE; // LEN SIZE WHY?
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+    msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -886,7 +886,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
     msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     memcpy(buffer, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST));  // download req
@@ -916,14 +916,14 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
     //END OF THE COMMUNICATION OF THE FIRST MESSAGE, NOW WE SHOULD RECEIVE A RESPONSE FROM THE SERVER
     msg_len = strlen(DOWNLOAD_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (char*) malloc(sizeof(char)*msg_len);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, msg_len,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(DOWNLOAD_DENIED)*sizeof(unsigned char));
+    bufferSupp1 = (char*) malloc(strlen(DOWNLOAD_DENIED)*sizeof(char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(DOWNLOAD_DENIED)); // denied or accepted same length
 
@@ -937,13 +937,13 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     {        
         //HERE WE SHOULD CHECK THE HASH: the format of the message received should be: DOWNLOAD_ACCEPTED, nchunk, rest, hash
         // Parse the message
-        bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+        bufferSupp2 = (char*) malloc(sizeof(char)*HASH_LEN);
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp2, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE), HASH_LEN); // hash
         
         //SETTING OF THE NCHUNK AND THE REST VARIABLE RECEIVED BY THE SERVER
         free(bufferSupp1);
-        bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE); // Here we save the nchunk value of the message
+        bufferSupp1 = (char*)malloc(sizeof(char)*LEN_SIZE); // Here we save the nchunk value of the message
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 for nchunk failed", 1);
         temp = (char*)malloc(sizeof(char)*REST_SIZE); // Here we save the number of bytes of the last chunk
         if (!temp) exit_with_failure("Malloc bufferSupp1 for nchunk failed", 1);
@@ -960,12 +960,12 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         
         // Check hash on DOWNLOAD_ACCEPTED, NONCE, NCHUNK, REST
         msg_to_hash_len = strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+REST_SIZE; 
-        msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
+        msg_to_hash = (char*) malloc(msg_to_hash_len*sizeof(char));
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
         temp = (char*) malloc(sizeof(char)*LEN_SIZE); //Here we save the nonce
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*REST_SIZE); // Here we save the rest value of the message
+        bufferSupp3 = (char*)malloc(sizeof(char)*REST_SIZE); // Here we save the rest value of the message
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 for nchunk failed", 1);
 
         sprintf(temp, "%d", *nonce);
@@ -1008,23 +1008,23 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         {
             //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H(FILENAME, CHUNK, NONCE), iv
             msg_len = LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-            buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+            buffer = (char*) malloc(sizeof(char)*msg_len);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
             ret = recv(sock, buffer, msg_len,0);
             if (ret == -1) exit_with_failure("Receive failed", 0);
             printf("Received the server's response.\n");
 
-            iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+            iv = (char*) malloc(sizeof(char)*IV_LEN);
             if (!iv) exit_with_failure("Malloc iv failed", 1);
             memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
 
             //Now we take the encr_len and the encrypted part to decrypt it later
-            bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
+            bufferSupp1 = (char*) malloc(LEN_SIZE);
             if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
             memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
             encr_len = atoi(bufferSupp1);
-            bufferSupp2 = (unsigned char*)malloc(encr_len);
+            bufferSupp2 = (char*)malloc(encr_len);
             if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
             memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
             
@@ -1036,11 +1036,11 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             //NOW WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
             temp = (char*)malloc(sizeof(char)*LEN_SIZE);
             sprintf(temp, "%ls", nonce);
-            bufferSupp3 = (unsigned char*)malloc(HASH_LEN*sizeof(unsigned char*));
+            bufferSupp3 = (char*)malloc(HASH_LEN*sizeof(char*));
             if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
             memcpy(bufferSupp3, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN); //Here we have the hash to compare
             msg_to_hash_len = plain_len + BLANK_SPACE + LEN_SIZE + BLANK_SPACE + IV_LEN;
-            msg_to_hash = (unsigned char*)malloc(sizeof(unsigned char)*msg_to_hash_len);
+            msg_to_hash = (char*)malloc(sizeof(char)*msg_to_hash_len);
             memcpy(&*(msg_to_hash), bufferSupp2, encr_len);
             memcpy(&*(msg_to_hash+encr_len), " ", BLANK_SPACE);
             memcpy(&*(msg_to_hash+encr_len+BLANK_SPACE), temp, LEN_SIZE);
@@ -1072,16 +1072,16 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         //Now we should send a message of download completed
 
         // Initialization of IV
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        iv = (char*) malloc(sizeof(char)*IV_LEN);
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         ret = RAND_poll(); // Seed OpenSSL PRNG
         if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-        ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+        ret = RAND_bytes((char*)&iv[0], IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
         // Create the hash
         msg_to_hash_len = strlen(DOWNLOAD_FINISHED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+IV_LEN;
-        msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
+        msg_to_hash = (char*) malloc(sizeof(char)*msg_to_hash_len);
         if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
         temp = (char*) malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -1099,7 +1099,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
         msg_len = strlen(DOWNLOAD_FINISHED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
 
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        buffer = (char*) malloc(sizeof(char)*msg_len);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         memcpy(buffer, DOWNLOAD_FINISHED, strlen(DOWNLOAD_FINISHED));  // download finished
