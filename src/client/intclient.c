@@ -219,8 +219,6 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 
 
     /* ---- Create the first message (request + hash + iv) ---- */
-    *nonce = *nonce + 1;
-
     // Generating the hash of the request and the nonce
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -236,7 +234,7 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     if(msg_len== -1) exit_with_failure("Something bad happened building the message...", 0);
 
     printf("I'm sending to the server the logout message.\n");
-    ret = send(sock, buffer, msg_len, 0); 
+    ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_5(temp, buffer, msg_to_hash, digest, iv);
     
@@ -244,8 +242,8 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     {
         printf("Send failed.\n");
         return -1;   
-    }
-   
+    } else *nonce = 0;
+
     return 1;
 }
 

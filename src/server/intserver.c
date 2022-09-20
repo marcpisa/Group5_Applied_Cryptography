@@ -20,7 +20,7 @@ int createSocket()
 
 int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned char* session_key2)
 {
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    unsigned int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
     
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -264,13 +264,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client logout request...\n\n");
-                exit(1);
+                printf("End of logout request management!\n\n");
             }
-            else printf("I managed a logout request and all was good!\n\n");
-
-            printf("End of logout request management!\n\n");
-            close(sd);
-            exit(0);
+            else
+            {
+                printf("I managed a logout request and all was good!\n\n");
+                printf("End of logout request management!\n\n");
+                close(sd);
+                exit(0);
+            }
         }
 
 
@@ -279,7 +281,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
         {
             printf("\nA list request has came up...\n\n");
             // LIST MANAGER: SERVER SIDE
-                            
+        
             ret = listServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);
             if (ret == -1)
             {
@@ -393,7 +395,6 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 
 
     /* ---- Parse the first client message (request + hash + iv) ---- */
-    *nonce = *nonce + 1;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);   
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);   
@@ -418,8 +419,12 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1) operation_denied(sd, "Wrong logout request hash", LOGOUT_DENIED, session_key1, session_key2, nonce);
-    
+    if (ret == -1) 
+    {
+        printf("Wrong logout request hash.\n");
+        return -1;
+    }
+
     free_5(bufferSupp2, bufferSupp3, temp, digest, msg_to_hash);
     return 1;
 }
@@ -468,8 +473,6 @@ int listServer(int sd, char* rec_mex, char* username, int* nonce, unsigned char*
     memcpy(&*(path_documents+15+strlen(username)), "/documents/\0", (11+1));
 
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
-    *nonce = *nonce+1;
-
     bufferSupp1 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 

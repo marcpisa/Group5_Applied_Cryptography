@@ -572,7 +572,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
     BLANK_SPACE), iv, IV_LEN); // iv
     
-    ret = send(sock, buffer, msg_len, 0);
+    ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1) exit_with_failure("Send failed", 0);
 
     free(iv);
@@ -636,7 +636,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, int* n
     memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
     memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
 
-    ret = send(sock, buffer, msg_len, 0);
+    ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1) exit_with_failure("Send failed", 1);
 
     free(iv);
