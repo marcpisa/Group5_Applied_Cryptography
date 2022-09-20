@@ -816,10 +816,29 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
     return ret;
 }
 
-
-unsigned int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len)
+int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len)
 {
-    unsigned int buff_len;
+    int buff_len;
+
+    buff_len = param1_len+param2_len+BLANK_SPACE;
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+
+    return buff_len;
+}
+
+
+int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len)
+{
+    int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+(BLANK_SPACE*2);
     *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
@@ -838,9 +857,9 @@ unsigned int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned
     return buff_len;
 }
 
-unsigned int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len)
+int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len)
 {
-    unsigned int buff_len;
+    int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+(BLANK_SPACE*3);
     *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
@@ -861,9 +880,9 @@ unsigned int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned
     return buff_len;
 }
 
-unsigned int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len)
+int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len)
 {
-    unsigned int buff_len;
+    int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+(BLANK_SPACE*4);
     *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
@@ -886,9 +905,9 @@ unsigned int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned
     return buff_len;
 }
 
-unsigned int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len)
+int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len)
 {
-    unsigned int buff_len;
+    int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+param6_len+(BLANK_SPACE*5);
     *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
@@ -911,4 +930,44 @@ unsigned int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned
     memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE+param5_len+BLANK_SPACE), param6, param6_len);
     
     return buff_len;
+}
+
+void free_2(void* param1, void* param2)
+{
+    free(param1);
+    free(param2);
+}
+
+void free_3(void* param1, void* param2, void* param3)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+}
+
+void free_4(void* param1, void* param2, void* param3, void* param4)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+}
+
+void free_5(void* param1, void* param2, void* param3, void* param4, void* param5)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+    free(param5);
+}
+
+void free_6(void* param1, void* param2, void* param3, void* param4, void* param5, void* param6)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+    free(param5);
+    free(param6);
 }

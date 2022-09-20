@@ -32,8 +32,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* path_rsa_key = "rsa_prvkey.pem";
     char* path_cert_client_rsa;
     int ret;
-    unsigned int msg_len;
-    unsigned int exp_msg_len;
+    int msg_len;
     size_t offset, old_offset;
     size_t K_len;
 
@@ -91,33 +90,23 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*pubkey_len);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
-    offset = str_ssplit((unsigned char*) rec_mex, DELIM); // login request already parsed
-    if (offset != (unsigned int) strlen(LOGIN_REQUEST)) {
-        free(username);
-        free(bufferSupp1);
-        free(bufferSupp2);
+    // Skip the login request field
+    old_offset = strlen(LOGIN_REQUEST)+BLANK_SPACE;
 
-        printf("Wrong login request length\n");
-        return -1;
-    }
-    old_offset = offset+BLANK_SPACE;
-
+    // Parse the username
     offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
     memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
     memcpy(&*(bufferSupp1+offset), "\0", 1);
     len_username = offset;
     old_offset += offset+BLANK_SPACE;
 
+    // Parse pubkey
     memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len); // dh pubkey
-
 
     // Sanitize and check username
     if (len_username > MAX_LEN_USERNAME || !username_sanitization((char*) bufferSupp1))
     {
-        free(username);
-        free(bufferSupp1);
-        free(bufferSupp2);
-
+        free_3(username, bufferSupp1, bufferSupp2);
         printf("Username too long or sanitization fails.\n");
         return -1;
     } 
@@ -127,10 +116,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     ret = chdir((char*) bufferSupp1);
     if (ret == -1) 
     {
-        free(username);
-        free(bufferSupp1);
-        free(bufferSupp2);
-
+        free_3(username, bufferSupp1, bufferSupp2);
         printf("Username doesn't exists...\n");
         return -1;
     }
@@ -154,8 +140,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     printf("First message is correct. Preparing the response...\n");
     
-    free(bufferSupp1);
-    free(path_cert_client_rsa);
+    free_2(bufferSupp1, path_cert_client_rsa);
     EVP_PKEY_free(my_prvkey);
     EVP_PKEY_free(peer_pubkey);
 
@@ -163,14 +148,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
     /* --- Send response (DH pubkey, signature, len. cert. and cert.) --- */
-    // Prepare the digital signature
-    msg_to_sign_len = pubkey_len+BLANK_SPACE+pubkey_len;
-    msg_to_sign = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_sign_len);
-    if (!msg_to_sign) exit_with_failure("Malloc msg_to_sign failed", 1);
-    
-    memcpy(msg_to_sign, bufferSupp2, pubkey_len); // peer pubkey is still inside bufferSupp2
-    memcpy(&*(msg_to_sign+pubkey_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_sign+pubkey_len+BLANK_SPACE), pubkey_byte, pubkey_len);
+    // Prepare the digital signature (g^a || g^b)
+    msg_to_sign_len = build_msg_2(&msg_to_sign, bufferSupp2, pubkey_len, pubkey_byte, pubkey_len);
+    if (msg_to_sign_len == -1) exit_with_failure("Something bad happened building signature for second message...", 0);
     
     ret = chdir("../../src");
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
@@ -185,36 +165,26 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     ret = chdir(username);
     if (ret == -1) exit_with_failure("No such directory.\n", 0);
 
-    // Calculating message length and allocate memory for it
-    exp_msg_len = pubkey_len+BLANK_SPACE+SIGN_LEN+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cert_len;
-    //buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
-    //if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-    //temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    //if (!temp) exit_with_failure("Malloc temp failed", 1);
-
     // Compose the message
-    sprintf(temp, "%d", cert_len);
-    msg_len = build_msg_4(&buffer, pubkey_byte, pubkey_len, signature, SIGN_LEN, temp, LEN_SIZE, cert_byte, cert_len);
-    if (exp_msg_len != msg_len) exit_with_failure("Wrong msg len", 0);
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    //printf("%s\n", buffer);
+    sprintf(temp, "%d", cert_len);
+    msg_len = build_msg_4(&buffer, pubkey_byte, pubkey_len, \
+                                   signature, SIGN_LEN, \
+                                   temp, LEN_SIZE, \
+                                   cert_byte, cert_len);
+    if (msg_len == 1) exit_with_failure("Something bad happened building the message...", 0);
+
     printf("I'm sending to the client the response.\n");
     ret = send(sd, buffer, msg_len, 0); 
 
-    free(bufferSupp2);
-    free(temp);
-    free(buffer);
-    free(pubkey_byte);
-    free(cert_byte);
-    free(signature);
+    free_6(bufferSupp2, temp, buffer, pubkey_byte, cert_byte, signature);
     EVP_PKEY_free(dh_pubkey);
 
     if (ret == -1)
     {
-        free(username);
-        free(K);
-        free(msg_to_sign);
-
+        free_3(username, K, msg_to_sign);
         printf("Send failed.\n");
         return -1;
     } 
@@ -232,31 +202,24 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     ret = recv(sd, buffer, msg_len, 0);
     if (ret == -1) 
     {
-        free(buffer);
-        free(username);
-        free(K);
-        free(msg_to_sign);
-        free(bufferSupp1);
-
+        free_5(buffer, username, K, msg_to_sign, bufferSupp1);
         printf("Receive failed.\n");
         return -1;
     } 
  
+    // Parse signature
     memcpy(bufferSupp1, buffer, SIGN_LEN);
     memcpy(&*(bufferSupp1+SIGN_LEN), "\0", 1);
 
     // Verify signature
     ret = verify_signature(msg_to_sign, msg_to_sign_len, bufferSupp1, SIGN_LEN, pub_rsa_client);
     
-    free(buffer);
-    free(bufferSupp1);
-    free(msg_to_sign);
-    free(K);
+    free_4(buffer, bufferSupp1, msg_to_sign, K);
     EVP_PKEY_free(pub_rsa_client);
     
-    if (ret != 1) {
+    if (ret != 1) 
+    {
         free(username);
-
         printf("Signature verification failed.\n");
         return -1;
     }
@@ -418,12 +381,11 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 {
     unsigned int digest_len;
     int ret;
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
 
     size_t offset;
 
     char* temp;
-    unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
     unsigned char* msg_to_hash;
@@ -434,17 +396,12 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
     *nonce = *nonce + 1;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);   
-    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*strlen(LOGOUT_REQUEST));
-    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);   
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
     bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);   
     if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
 
-    offset = str_ssplit((unsigned char*) rec_mex, DELIM);
-    memcpy(bufferSupp1, rec_mex, strlen(LOGOUT_REQUEST)); // logout req.
-    if (offset != (unsigned int)strlen(LOGOUT_REQUEST)) exit_with_failure("Incorrect logout req. length", 0);
-    offset += BLANK_SPACE;
+    offset = strlen(LOGOUT_REQUEST)+BLANK_SPACE;
 
     memcpy(bufferSupp2, &*((unsigned char*) rec_mex+offset), HASH_LEN); // hash
     offset += HASH_LEN+BLANK_SPACE;
@@ -453,29 +410,17 @@ int logoutServer(int sd, char* rec_mex, int* nonce, unsigned char* session_key1,
 
 
     // Check hash correctness
-    msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(sizeof(unsigned char)*msg_to_hash_len);
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-    
-    memcpy(msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST)); // logout req.
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE), bufferSupp3, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
     sprintf(temp, "%d", *nonce);
-    memcpy(&*(msg_to_hash+strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), \
+                                                bufferSupp3, IV_LEN, \
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash message...", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
     if (ret == -1) operation_denied(sd, "Wrong logout request hash", LOGOUT_DENIED, session_key1, session_key2, nonce);
     
-
-    free(bufferSupp1);
-    free(bufferSupp2);
-    free(bufferSupp3);
-    free(temp);
-    free(digest);
-    free(msg_to_hash);
-
+    free_5(bufferSupp2, bufferSupp3, temp, digest, msg_to_hash);
     return 1;
 }
 

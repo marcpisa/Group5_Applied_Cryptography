@@ -21,8 +21,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
      ********************/
     char* path_pubkey;
     char* path_rsa_key;
-    unsigned int msg_len;
-    unsigned int exp_msg_len;
+    int msg_len;
     size_t offset;
     size_t K_len;
 
@@ -77,15 +76,11 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
 
 
     /* ---- 1st message: login request message + username + DH pubkey ---- */
-    exp_msg_len = strlen(LOGIN_REQUEST)+BLANK_SPACE+strlen(username)+BLANK_SPACE+pubkey_len;
-    msg_len = build_msg_3(&buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST), username, strlen(username), pubkey_byte, pubkey_len);
-    if (exp_msg_len != msg_len) exit_with_failure("Wrong message length", 0);
+    msg_len = build_msg_3(&buffer, LOGIN_REQUEST, strlen(LOGIN_REQUEST), \ 
+                                   username, strlen(username), \
+                                   pubkey_byte, pubkey_len);
+    if (msg_len == -1) exit_with_failure("Something bad happened building first login message...", 0);
 
-    /*
-    for(unsigned int i = 0; i < msg_len; i++) { printf("%c", *(buffer+i)); }
-    printf("\n\n");    
-    */
-    //printf("%d\n%d\n%d\n", pubkey_len, iv_len, signature_len);
     printf("I'm sending to the server the first message.\n");
     ret = send(*sock, buffer, msg_len, 0);
     if (ret == -1) exit_with_failure("Send failed", 1);
@@ -102,16 +97,10 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     ret = recv(*sock, buffer, msg_len, 0);
     if (ret == -1) 
     {
-        free(path_pubkey);
-        free(path_rsa_key);
-     
-        free(buffer);
-        free(pubkey_byte);
+        free_4(path_pubkey, path_rsa_key, buffer, pubkey_byte);
         EVP_PKEY_free(my_prvkey);
-
         printf("Receive failed.\n");
         return -1;
-        
     }
     printf("Received the server's response.\n");
 
@@ -134,16 +123,9 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     cert_len = atoi(temp);
     if (cert_len <= 0 || (msg_len-offset) < (unsigned int) cert_len) 
     {
-        free(path_pubkey);
-        free(path_rsa_key);
-
-        free(buffer);
-        free(pubkey_byte);
+        free_4(path_pubkey, path_rsa_key, buffer, pubkey_byte);
         EVP_PKEY_free(my_prvkey);
-        free(temp);
-        free(bufferSupp1);
-        free(bufferSupp2);
-
+        free_3(temp, bufferSupp1, bufferSupp2);
         printf("Incorrect certificate length.\n");
         return -1;
     } 
@@ -165,24 +147,12 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     if (!serv_cert) exit_with_failure("cert_to_X509 failed", 1);
     pub_rsa_key_serv = get_ver_server_pubkey(serv_cert, ca_store);
     
-    // Generate the digital signature expected
-    expected_len = pubkey_len+BLANK_SPACE+pubkey_len;
-    exp_digsig = (unsigned char*) malloc(sizeof(unsigned char)*expected_len);
-    if (!exp_digsig) exit_with_failure("Malloc exp_digsig failed", 1);
-    
-    memcpy(exp_digsig, pubkey_byte, pubkey_len);
-    memcpy(&*(exp_digsig+pubkey_len), " ", BLANK_SPACE);
-    memcpy(&*(exp_digsig+pubkey_len+BLANK_SPACE), bufferSupp1, pubkey_len); // peer pubkey
-    
-    // Verify the digital signature received
+    // Generate the digital signature expected and verify it
+    expected_len = build_msg_2(&exp_digsig, pubkey_byte, pubkey_len, bufferSupp1, pubkey_len);
+    if (expected_len == -1) exit_with_failure("Something bad happened building the expected dig. sign.", 0);
     ret = verify_signature(exp_digsig, expected_len, bufferSupp2, SIGN_LEN, pub_rsa_key_serv);
       
-    free(temp);
-    free(buffer);
-    free(bufferSupp1);
-    free(bufferSupp2);
-    free(pubkey_byte);
-    free(cert_buffer);
+    free_6(temp, buffer, bufferSupp1, bufferSupp2, pubkey_byte, cert_buffer);
     X509_free(serv_cert);
     EVP_PKEY_free(pub_rsa_key_serv);
     EVP_PKEY_free(my_prvkey);
@@ -190,12 +160,7 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     
     if (ret != 1) 
     {
-        free(path_pubkey);
-        free(path_rsa_key);
-
-        free(K);
-        free(exp_digsig);
-
+        free_4(path_pubkey, path_rsa_key, K, exp_digsig);
         printf("Signature verification failed.\n");
         return -1;    
     }
@@ -214,16 +179,10 @@ int loginClient(int *sock, unsigned char* session_key1, unsigned char* session_k
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
 
-    //printf("%s\n", buffer);
     printf("I'm sending to the server the last message.\n");
     ret = send(*sock, buffer, msg_len, 0); 
 
-    free(path_pubkey);
-    free(path_rsa_key);
-    free(buffer);
-    free(signature);
-    free(exp_digsig);
-    free(K);
+    free_6(path_pubkey, path_rsa_key, K, exp_digsig, signature, buffer);
 
     if (ret == -1)
     {
@@ -238,10 +197,8 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
 {
     unsigned int digest_len;
     int ret;
-    unsigned int msg_len;
-    unsigned int exp_msg_len;
-    unsigned int msg_to_hash_len;
-    unsigned int exp_msg_to_hash_len;
+    int msg_len;
+    int msg_to_hash_len;
 
     char* temp;
     unsigned char* buffer;
@@ -265,29 +222,23 @@ int logoutClient(int sock, int* nonce, unsigned char* session_key2)
     *nonce = *nonce + 1;
 
     // Generating the hash of the request and the nonce
-    exp_msg_to_hash_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), iv, IV_LEN, temp, LEN_SIZE);
-    if(msg_to_hash_len != exp_msg_to_hash_len) exit_with_failure("Wrong hash length", 0);
+    if(msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
     
     // Compose the message
-    exp_msg_len = strlen(LOGOUT_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
     msg_len = build_msg_3(&buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), digest, HASH_LEN, iv, IV_LEN);
-
+    if(msg_len== -1) exit_with_failure("Something bad happened building the message...", 0);
 
     printf("I'm sending to the server the logout message.\n");
     ret = send(sock, buffer, msg_len, 0); 
     
-    free(temp);
-    free(buffer);
-    free(msg_to_hash);
-    free(digest);
-    free(iv);
+    free_5(temp, buffer, msg_to_hash, digest, iv);
     
     if (ret == -1) 
     {
