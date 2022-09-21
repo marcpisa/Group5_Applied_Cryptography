@@ -6,6 +6,7 @@ int main(int argc, char* argv[])
     // Socket management
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
+    int connectedSock;
     int new_sd, listenerTCP, ret, fdmax, pid, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
@@ -19,25 +20,16 @@ int main(int argc, char* argv[])
     char username[MAX_LEN_USERNAME];
 
     // Others
-    int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
-    struct timeval tv;
+    unsigned int nonce_cs = 0;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
     BIO* bio_cert;
     char* path_cert_serv = "../cert.pem";
-    char** file_list;
 
     // Cryptographic operation
     unsigned char* session_key1;
     unsigned char* session_key2;
     
-    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(!session_key1 || !session_key2)
-    {
-        printf("Unable to allocate session keys...\n\n");
-        return -1;
-    }
     //********* END VARIABLES *********
 
     if (argc != 3) { 
@@ -77,14 +69,6 @@ int main(int argc, char* argv[])
 
     X509_free(cert_serv);
     BIO_free(bio_cert);
-    
-    // WE NEED TO SET ALSO THE CRL?????????????
-
-
-    // Set the value of the max interval that the select function wait for an action to do
-    tv.tv_sec = SELECT_SEC_TO_WAIT;
-	tv.tv_usec = 0;
-
 
 
     // CONFIGURATION OF THE SERVER INFO
@@ -192,15 +176,24 @@ int main(int argc, char* argv[])
                                 printf("Connection already established. Login impossible operation!\n\n");
                                 break;
                             }
-                    
-                            ret = loginClient(session_key1, session_key2, username, srv_addr, ca_store);
-                            // TO ADD the return -1 cases
-                            if (ret == -1) 
+                            else 
                             {
-                                // Notify error to server
-                                // TODO 
-                                printf("Login failed.\n\n");
+                                session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+                                session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+                                if(!session_key1 || !session_key2)
+                                {
+                                    printf("Unable to allocate session keys...\n\n");
+                                    return -1;
+                                }
                             }
+                    
+                            ret = loginClient(&connectedSock, session_key1, session_key2, username, srv_addr, ca_store);
+                            
+                            if (ret == -1){
+                                printf("Login failed.\n\n");
+                                free(session_key1);
+                                free(session_key2);
+                            } 
                             else 
                             {
                                 printf("Login succedded.\n\n");
@@ -217,30 +210,38 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                            ret = logoutClient(connectedSock, &nonce_cs, session_key2);
                             
                             if (ret != -1)
                             {
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
-                                // clean some variables like session keys
+
+                                free(session_key1);
+                                free(session_key2);
+                                
+                                // CONFIGURATION OF THE SERVER INFO
+                                memset(&srv_addr, 0, sizeof(srv_addr));
+	                            srv_addr.sin_family = AF_INET; // IPv4
+	                            port = SERVER_PORT;
+	                            srv_addr.sin_port = htons(port); // port to connect to
+	                            inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
                             }
                             else printf("Logout failed.\n\n");
                         
                             break;
 
                         case 3: //************ LIST *************
-                        
-                            // Stuff to do
                             if (connected == 0)
                             {
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            
-                            ret = listClient(&file_list, session_key1, session_key2, &nonce_cs, srv_addr);
+
+                            ret = listClient(connectedSock, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
-                        
+                            else printf("List succeeeded.\n\n");
+
                             break;
                         
                         case 4: //*********** RENAME ************
@@ -265,7 +266,7 @@ int main(int argc, char* argv[])
                             }
 
                             // Handle rename request
-                            ret = renameClient(command2, command3, session_key1, session_key2, &nonce_cs, srv_addr);
+                            ret = renameClient(connectedSock, command2, command3, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
                             break;
 
@@ -290,8 +291,9 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = deleteClient(command2, session_key1, session_key2, &nonce_cs, srv_addr);
+                            ret = deleteClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
+
 
                             break;
 
@@ -302,7 +304,8 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = downloadClient(command2, srv_addr); // format of the input given to the input stream: download filename
+                            ret = downloadClient(connectedSock, command2, session_key1, session_key2, &nonce_cs); // format of the input given to the input stream: download filename
+
                             if (ret == -1)
                             {
                                 printf("Error during the download operation request!\n\n");
@@ -317,8 +320,22 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
+                            
+                            // Check length and filename sanitization
+                            if (strlen(command2) > MAX_LEN_FILENAME) 
+                            {
+                                printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
+                                break;
+                            } 
+                            ret = filename_sanitization (command2, "/");
+                            if (ret == -1) 
+                            {
+                                printf("Filename sanitization failed.\n\n");
+                                break;
+                            }
 
-                            ret = uploadClient(command2, srv_addr);
+                            ret = uploadClient(connectedSock, username, command2);
+                            
                             if (ret == -1)
                             {
                                 printf("Error during the upload operation request!\n\n");
@@ -333,9 +350,10 @@ int main(int argc, char* argv[])
                                 printf("Not active connection. Login please!\n\n");
                                 break;
                             }
-                            
+
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(command2, command3, srv_addr); //command2 = filename, command3 = peername
+                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
+
                             if (ret == -1)
                             {
                                 printf("Error during the share operation request!\n\n");
@@ -346,13 +364,13 @@ int main(int argc, char* argv[])
                         
                         case 9: //************HELP***************//
                             printf(GRN "This is the manual with the following commands:\n\n"); 
-                            printf("Login: 'login' \n"); 
+                            printf("Login: 'login' \n");        
                             printf("Logout: 'logout' \n"); 
                             printf("List all files: 'list'\n");
-                            printf("Rename files: 'rename old_filename new_filename'\n");  
+                            printf("Rename files: 'rename old_filename new_filename'\n"); 
                             printf("Delete file: 'delete filename'\n"); 
-                            printf("Download file: 'download filename'\n"); 
-                            printf("Upload file: 'upload file_location'\n"); 
+                            printf("Download file: 'download filename'\n");  
+                            printf("Upload file: 'upload file_location'\n");  
                             printf("Share file with other user: 'share filename username'\n"); 
                             printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
                             break; 
@@ -360,7 +378,7 @@ int main(int argc, char* argv[])
                         case 10:
                                 if(connected == 1)
                                 {
-                                    ret = logoutClient(&nonce_cs, session_key2, srv_addr);
+                                    ret = logoutClient(connectedSock, &nonce_cs, session_key2);
                             
                                     if (ret != -1)
                                     {
@@ -368,6 +386,10 @@ int main(int argc, char* argv[])
                                         connected = 0;
                                     }
                                     else printf("Logout failed.\n\n");
+
+                                    
+                                    free(session_key1);
+                                    free(session_key2);
                                 }
 
                                 printf("Exiting the program.\n");
@@ -419,8 +441,6 @@ int main(int argc, char* argv[])
     close(listenerTCP);
     
     X509_STORE_free(ca_store);
-    free(session_key1);
-    free(session_key2);
     
     return 0;
 }

@@ -1,6 +1,6 @@
 #include "util.h"
 
-static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-"};
+static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
 static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
 int username_sanitization(const char* username) {
@@ -37,12 +37,14 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
 
 int filename_sanitization(const char* file_name, const char* root_dir) {
 
-    char buf[BUF_LEN];
+    char* buf;
 
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
-    char *canon_file_name = realpath(file_name, buf);
+    /*char *canon_file_name = realpath(file_name, buf);
+    free(buf);
     if(!canon_file_name) return 0;
-    if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;
+    if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;*/
+
     return 1;
 }
 
@@ -160,6 +162,9 @@ void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, u
     ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
+    *out = (unsigned char*) malloc((inl+BLOCK_SIZE)*sizeof(unsigned char));
+    if (!(*out)) exit_with_failure("Malloc out failed", 0);    
+
     ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if (ret != 1) exit_with_failure("EncryptInit failed", 1);
     
@@ -185,6 +190,9 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
+
+    *out = (unsigned char*) malloc(inl*sizeof(unsigned char));
+    if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if (ret != 1) exit_with_failure("DecryptInit failed", 1);
@@ -498,7 +506,7 @@ unsigned char* hmac_sha256(unsigned char* key, int keylen, unsigned char* msg, i
     return digest;
 }
 
-void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, int* nonce)
+void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, unsigned int* nonce)
 {
     int ret;
 
@@ -506,7 +514,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     int encr_len;
     unsigned char* ciphertext; 
 
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
     unsigned int digest_len;
     unsigned char* msg_to_hash;
     unsigned char* digest;
@@ -527,68 +535,43 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     *nonce = *nonce + 1;
 
     // Encrypt the reason
-    ciphertext = (unsigned char*) malloc((strlen(reason)+BLOCK_SIZE)*sizeof(unsigned char));
-    if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
     // Calculate the hash
-    msg_to_hash_len = strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
-
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, req_denied, strlen(req_denied)); // denied req.
-    memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), ciphertext, encr_len); // encr.  
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
+                                                ciphertext, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
-
     // Compose and send the message
-    msg_len = strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+ \
-    HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
-    if (!buffer) exit_with_failure("Malloc buffer failed", 0);
+    sprintf(temp, "%d", encr_len);    
+    msg_len = build_msg_5(&buffer, req_denied, strlen(req_denied),\
+                                   temp, LEN_SIZE,\
+                                   ciphertext, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
 
-    memcpy(buffer, req_denied, strlen(req_denied)); // req. denied
-    memcpy(&*(buffer+strlen(req_denied)), " ", BLANK_SPACE);
-    sprintf(temp, "%d", encr_len);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE), temp, LEN_SIZE); // len. encr.
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), ciphertext, encr_len); // encr. reason
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
-    digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
-    " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
-    BLANK_SPACE), iv, IV_LEN); // iv
+    ret = send(sock, buffer, BUF_LEN, 0);
     
-    ret = send(sock, buffer, msg_len, 0);
+    free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
+    
     if (ret == -1) exit_with_failure("Send failed", 0);
-
-    free(iv);
-    free(ciphertext);
-    free(msg_to_hash);
-    free(temp);
-    free(digest);
-    free(buffer);
 }
 
-void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce)
+void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
 {
     int ret;
     int msg_len;
 
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
     unsigned int digest_len;
     unsigned char* msg_to_hash;
     unsigned char* digest;
@@ -608,46 +591,34 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* no
     // Increment nonce for new message
     *nonce = *nonce + 1;
 
-    msg_len = strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
-
     // Calculate the hash
-    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
-
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, req_accepted, strlen(req_accepted)); // req. acc.
-    memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv.  
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
-    digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+    digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     // Compose the message
-    memcpy(buffer, req_accepted, strlen(req_accepted)); // req. acc.
-    memcpy(&*(buffer+strlen(req_accepted)), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE), digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_accepted)+BLANK_SPACE+HASH_LEN+BLANK_SPACE), iv, IV_LEN); // iv
+    msg_len = build_msg_3(&buffer, req_accepted, strlen(req_accepted), \
+                                   digest, HASH_LEN, \
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
-    ret = send(sock, buffer, msg_len, 0);
+    ret = send(sock, buffer, BUF_LEN, 0);
+    
+    free_5(iv, buffer, msg_to_hash, digest, temp);
+
     if (ret == -1) exit_with_failure("Send failed", 1);
-
-    free(iv);
-    free(buffer);
-    free(msg_to_hash);
-    free(digest);
 }
 
 
 
-int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2)
+int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
@@ -727,7 +698,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned 
         reason = (char*) malloc(plain_len*sizeof(char));
         if (!reason) exit_with_failure("Malloc reason failed", 1);
 
-        printf("The request has been denied: %s\n\n", reason);
+        printf("The request has been denied: %s\n", reason);
             
         free(plaintext);
         free(reason);
@@ -745,7 +716,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned 
     return ret;
 }
 
-int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* key)
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce, unsigned char* key)
 {
     unsigned char* bufferSupp2;
 
@@ -782,9 +753,6 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
     msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-
     sprintf(temp, "%d", nonce);
     memcpy(msg_to_hash, req_accepted, strlen(req_accepted));  // req acc
     memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
@@ -802,7 +770,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
     }
     else
     {
-        printf("The request has been accepted!\n\n");
+        printf("The request has been accepted!\n");
         ret = 1;
     }
 
@@ -813,4 +781,160 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned
     free(bufferSupp2);
 
     return ret;
+}
+
+int build_msg_2(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len)
+{
+    int buff_len;
+
+    buff_len = param1_len+param2_len+BLANK_SPACE;
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+
+    return buff_len;
+}
+
+
+int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len)
+{
+    int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+(BLANK_SPACE*2);
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+
+    return buff_len;
+}
+
+int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len)
+{
+    int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+(BLANK_SPACE*3);
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+
+    return buff_len;
+}
+
+int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len)
+{
+    int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+(BLANK_SPACE*4);
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE), param5, param5_len);
+
+    return buff_len;
+}
+
+int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len)
+{
+    int buff_len;
+
+    buff_len = param1_len+param2_len+param3_len+param4_len+param5_len+param6_len+(BLANK_SPACE*5);
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    memcpy(*buffer, param1, param1_len);
+    memcpy(&*(*buffer+param1_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE), param2, param2_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE), param3, param3_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE), param4, param4_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE), param5, param5_len);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE+param5_len), " ", BLANK_SPACE);
+    memcpy(&*(*buffer+param1_len+BLANK_SPACE+param2_len+BLANK_SPACE+param3_len+BLANK_SPACE+param4_len+BLANK_SPACE+param5_len+BLANK_SPACE), param6, param6_len);
+    
+    return buff_len;
+}
+
+void free_2(void* param1, void* param2)
+{
+    free(param1);
+    free(param2);
+}
+
+void free_3(void* param1, void* param2, void* param3)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+}
+
+void free_4(void* param1, void* param2, void* param3, void* param4)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+}
+
+void free_5(void* param1, void* param2, void* param3, void* param4, void* param5)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+    free(param5);
+}
+
+void free_6(void* param1, void* param2, void* param3, void* param4, void* param5, void* param6)
+{
+    free(param1);
+    free(param2);
+    free(param3);
+    free(param4);
+    free(param5);
+    free(param6);
 }

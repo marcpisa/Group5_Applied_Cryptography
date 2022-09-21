@@ -23,7 +23,7 @@
 
 #define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
-#define BUF_LEN 1024
+#define BUF_LEN 3*1024
 #define COM_LEN 16
 #define MAX_LEN_FILENAME 20
 #define MAX_LEN_USERNAME 20
@@ -33,6 +33,7 @@
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MEX_TYPE_LEN 8
+
 #define NUM_USER 4
 
 #define MAIN_FOLDER_SERVER "../../database/"
@@ -84,7 +85,8 @@
 #define RESET "\x1B[0m"
 
 #define MAX_LEN_REQUEST 15
-#define LEN_SIZE 5
+#define LEN_SIZE 10
+#define REST_SIZE 3
 #define MAX_CERT_LEN 2*BUF_LEN
 
 #define DELIM ' '
@@ -118,7 +120,20 @@ EVP_PKEY *get_client_pubkey(char *path_cert_client_rsa);
 void issue_session_keys(unsigned char *K, int K_len, unsigned char **session_key1, unsigned char **session_key2);
 EVP_PKEY *get_ver_server_pubkey(X509 *serv_cert, X509_STORE *ca_store);
 unsigned char *hmac_sha256(unsigned char *key, int keylen, unsigned char *msg, int msg_len, unsigned int *out_len);
-void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, int* nonce);
-void operation_succeed(int sock, char* req_accepted, unsigned char* key, int* nonce);
-int check_reqden_msg (char* req_denied, unsigned char* msg, int nonce, unsigned char* session_key1, unsigned char* session_key2);
-int check_reqacc_msg(char* req_accepted, unsigned char* msg, int nonce, unsigned char* session_key2);
+
+void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, unsigned int* nonce);
+void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce);
+int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, unsigned char* session_key1, unsigned char* session_key2);
+int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce, unsigned char* session_key2);
+
+int build_msg_2(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len);
+int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len);
+int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len);
+int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
+int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len);
+
+void free_2(void* param1, void* param2);
+void free_3(void* param1, void* param2, void* param3);
+void free_4(void* param1, void* param2, void* param3, void* param4);
+void free_5(void* param1, void* param2, void* param3, void* param4, void* param5);
+void free_6(void* param1, void* param2, void* param3, void* param4, void* param5, void* param6);
