@@ -100,7 +100,7 @@
 int username_sanitization(const char *username);
 int input_sanitization_commands(const char *input);
 void rec_buffer_sanitization(char *received_buff, char *buff1[]);
-int filename_sanitization(const char *file_name, const char *root_dir);
+int filename_sanitization(const char *file_name);
 void exit_with_failure(char *err, int perror_enable);
 size_t str_ssplit(unsigned char *a_str, const unsigned char a_delim);
 unsigned char *pubkey_to_byte(EVP_PKEY *pub_key, int *pub_key_len);

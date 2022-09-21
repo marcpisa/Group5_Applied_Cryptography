@@ -257,8 +257,8 @@ int main(int argc, char* argv[])
                                 printf("Filename or new_filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
                                 break;
                             } 
-                            ret = filename_sanitization (command2, "/");
-                            ret += filename_sanitization (command3, "/");
+                            ret = filename_sanitization (command2);
+                            ret += filename_sanitization (command3);
                             if (ret <= 1) 
                             {
                                 printf("Filename sanitization failed.\n\n");
@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
                                 printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
                                 break;
                             } 
-                            ret = filename_sanitization (command2, "/");
+                            ret = filename_sanitization (command2);
                             if (ret == -1) 
                             {
                                 printf("Filename sanitization failed.\n\n");
@@ -327,7 +327,7 @@ int main(int argc, char* argv[])
                                 printf("Filename too long. (Max len: %d)\n\n", MAX_LEN_FILENAME);
                                 break;
                             } 
-                            ret = filename_sanitization (command2, "/");
+                            ret = filename_sanitization (command2);
                             if (ret == -1) 
                             {
                                 printf("Filename sanitization failed.\n\n");

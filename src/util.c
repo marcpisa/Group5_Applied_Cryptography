@@ -35,7 +35,7 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
     //SANIFICATION: username it is checked in the if block server side.
 }
 
-int filename_sanitization(const char* file_name, const char* root_dir) {
+int filename_sanitization(const char* file_name) {
 
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
     /*char *canon_file_name = realpath(file_name, buf);

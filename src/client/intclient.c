@@ -761,7 +761,8 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     
     FILE* f1;
 
-    int ret, nchunk, i, j, rest;
+    int ret, i, j;
+    int rest, nchunk;
     int msg_len;
     char* temp;
     unsigned char* buffer;
@@ -840,6 +841,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
+    printf("We received %s\n", (char*)buffer);
 
     bufferSupp1 = (unsigned char*) malloc((strlen(DOWNLOAD_DENIED)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -880,6 +882,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         }
         
         // Check hash on DOWNLOAD_ACCEPTED, NONCE, NCHUNK, REST
+        printf("I'm going to check the mac value!\n");
         msg_to_hash_len = strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+REST_SIZE;
 
         temp = (char*) malloc(sizeof(char)*LEN_SIZE); //Here we save the nonce
@@ -900,7 +903,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
         free_6(digest, temp, buffer, msg_to_hash, bufferSupp1, bufferSupp2);
-        free_2(bufferSupp3, iv);
+        free(bufferSupp3);
         if (ret == -1)
         {
             printf("Wrong download accepted hash\n\n");
@@ -937,7 +940,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
 
             free(bufferSupp1);
-            free(buffer);
 
             //NOW WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
             temp = (char*)malloc(sizeof(char)*LEN_SIZE);
@@ -953,26 +955,24 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
                                             iv, IV_LEN);
             if (ret == -1) exit_with_failure("Error during the building of the message", 1);
 
-            digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-            if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+            digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
             ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
             if (ret == -1)
             {
                 printf("Wrong download chunk hash\n\n");
+                free_5(digest, temp, msg_to_hash, bufferSupp2, bufferSupp3);
+                free_3(buffer, iv, plaintext);
                 return -1;
             }
 
-            free(digest);
-            free(temp);
-            free(msg_to_hash);
-            free(bufferSupp1);
-            free(bufferSupp2);
-            free(bufferSupp3);
-            free(iv);
+            free_5(digest, temp, msg_to_hash, bufferSupp2, bufferSupp3);
+            free_2(buffer, iv);
 
             if (i == nchunk-1) for (j = 0; j < rest; j++) fprintf(f1, "%c", *(plaintext+j));
 	        else for (j = 0; j < CHUNK_SIZE; j++) fprintf(f1, "%c", *(plaintext+j));
+            free(plaintext);
+            printf("We received correctly the chunk number %i\n", i);
         }
         fclose(f1);
         //Now we should send a message of download completed
