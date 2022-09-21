@@ -506,7 +506,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     int encr_len;
     unsigned char* ciphertext; 
 
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
     unsigned int digest_len;
     unsigned char* msg_to_hash;
     unsigned char* digest;
@@ -532,55 +532,32 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
     // Calculate the hash
-    msg_to_hash_len = strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
-
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, req_denied, strlen(req_denied)); // denied req.
-    memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), ciphertext, encr_len); // encr.  
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
+                                                ciphertext, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
-
     // Compose and send the message
-    msg_len = strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+ \
-    HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
-    if (!buffer) exit_with_failure("Malloc buffer failed", 0);
+    sprintf(temp, "%d", encr_len);    
+    msg_len = build_msg_5(&buffer, req_denied, strlen(req_denied),\
+                                   temp, LEN_SIZE,\
+                                   ciphertext, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
 
-    memcpy(buffer, req_denied, strlen(req_denied)); // req. denied
-    memcpy(&*(buffer+strlen(req_denied)), " ", BLANK_SPACE);
-    sprintf(temp, "%d", encr_len);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE), temp, LEN_SIZE); // len. encr.
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), ciphertext, encr_len); // encr. reason
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), \
-    digest, HASH_LEN); // hash
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN), \
-    " ", BLANK_SPACE);
-    memcpy(&*(buffer+strlen(req_denied)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+ \
-    BLANK_SPACE), iv, IV_LEN); // iv
-    
     ret = send(sock, buffer, BUF_LEN, 0);
+    
+    free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
+    
     if (ret == -1) exit_with_failure("Send failed", 0);
-
-    free(iv);
-    free(ciphertext);
-    free(msg_to_hash);
-    free(temp);
-    free(digest);
-    free(buffer);
 }
 
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
@@ -588,7 +565,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     int ret;
     int msg_len;
 
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
     unsigned int digest_len;
     unsigned char* msg_to_hash;
     unsigned char* digest;
@@ -609,19 +586,14 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     *nonce = *nonce + 1;
 
     // Calculate the hash
-    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 0);
-
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
     sprintf(temp, "%d", *nonce);
-    memcpy(msg_to_hash, req_accepted, strlen(req_accepted)); // req. acc.
-    memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv.  
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+    msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
@@ -629,15 +601,13 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     msg_len = build_msg_3(&buffer, req_accepted, strlen(req_accepted), \
                                    digest, HASH_LEN, \
                                    iv, IV_LEN);
-                                   
-    ret = send(sock, buffer, BUF_LEN, 0);
-    if (ret == -1) exit_with_failure("Send failed", 1);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
-    free(iv);
-    free(buffer);
-    free(msg_to_hash);
-    free(digest);
-    free(temp);
+    ret = send(sock, buffer, BUF_LEN, 0);
+    
+    free_5(iv, buffer, msg_to_hash, digest, temp);
+
+    if (ret == -1) exit_with_failure("Send failed", 1);
 }
 
 
@@ -722,7 +692,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
         reason = (char*) malloc(plain_len*sizeof(char));
         if (!reason) exit_with_failure("Malloc reason failed", 1);
 
-        printf("The request has been denied: %s\n\n", reason);
+        printf("The request has been denied: %s\n", reason);
             
         free(plaintext);
         free(reason);
@@ -777,9 +747,6 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
     if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
 
-    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-
     sprintf(temp, "%d", nonce);
     memcpy(msg_to_hash, req_accepted, strlen(req_accepted));  // req acc
     memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
@@ -797,7 +764,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     }
     else
     {
-        printf("The request has been accepted!\n\n");
+        printf("The request has been accepted!\n");
         ret = 1;
     }
 
@@ -810,7 +777,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     return ret;
 }
 
-int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len)
+int build_msg_2(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len)
 {
     int buff_len;
 
@@ -830,7 +797,7 @@ int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int para
 }
 
 
-int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len)
+int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len)
 {
     int buff_len;
 
@@ -851,7 +818,7 @@ int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int para
     return buff_len;
 }
 
-int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len)
+int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len)
 {
     int buff_len;
 
@@ -874,7 +841,7 @@ int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int para
     return buff_len;
 }
 
-int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len)
+int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len)
 {
     int buff_len;
 
@@ -899,7 +866,7 @@ int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int para
     return buff_len;
 }
 
-int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len)
+int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len)
 {
     int buff_len;
 

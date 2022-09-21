@@ -126,11 +126,11 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
 int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, unsigned char* session_key1, unsigned char* session_key2);
 int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce, unsigned char* session_key2);
 
-int build_msg_2(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len);
-int build_msg_3(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len);
-int build_msg_4(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len);
-int build_msg_5(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len);
-int build_msg_6(unsigned char** buffer, unsigned char* param1, unsigned int param1_len, unsigned char* param2, unsigned int param2_len, unsigned char* param3, unsigned int param3_len, unsigned char* param4, unsigned int param4_len, unsigned char* param5, unsigned int param5_len, unsigned char* param6, unsigned int param6_len);
+int build_msg_2(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len);
+int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len);
+int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len);
+int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
+int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len);
 
 void free_2(void* param1, void* param2);
 void free_3(void* param1, void* param2, void* param3);

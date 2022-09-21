@@ -25,7 +25,6 @@ int main(int argc, char* argv[])
     X509* cert_serv = NULL;;
     BIO* bio_cert;
     char* path_cert_serv = "../cert.pem";
-    char** file_list;
 
     // Cryptographic operation
     unsigned char* session_key1;
@@ -33,14 +32,6 @@ int main(int argc, char* argv[])
     
     //********* END VARIABLES *********
 
-    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(!session_key1 || !session_key2)
-    {
-        printf("Unable to allocate session keys...\n\n");
-        return -1;
-    }
-    
     if (argc != 3) { 
         printf("Error, the number of arguments is wrong... (./clientPr username port_num)\n");
         exit(-1);
@@ -185,10 +176,24 @@ int main(int argc, char* argv[])
                                 printf("Connection already established. Login impossible operation!\n\n");
                                 break;
                             }
+                            else 
+                            {
+                                session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+                                session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+                                if(!session_key1 || !session_key2)
+                                {
+                                    printf("Unable to allocate session keys...\n\n");
+                                    return -1;
+                                }
+                            }
                     
                             ret = loginClient(&connectedSock, session_key1, session_key2, username, srv_addr, ca_store);
                             
-                            if (ret == -1) printf("Login failed.\n\n");
+                            if (ret == -1){
+                                printf("Login failed.\n\n");
+                                free(session_key1);
+                                free(session_key2);
+                            } 
                             else 
                             {
                                 printf("Login succedded.\n\n");
@@ -233,9 +238,10 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            ret = listClient(connectedSock, &file_list, session_key1, session_key2, &nonce_cs);
+                            ret = listClient(connectedSock, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
-                        
+                            else printf("List succeeeded.\n\n");
+
                             break;
                         
                         case 4: //*********** RENAME ************

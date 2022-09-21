@@ -248,10 +248,10 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     exit(1);
 }
 
-int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
+int listClient(int sock, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
 {
     unsigned char* iv;
-    unsigned int index;
+    int index;
     int num_file;
     int tot_num_file;
 
@@ -274,6 +274,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
+    char** file_list;
 
 
     // Generate the IV
@@ -288,25 +289,19 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
 
 
     /* ---- Create the first message (req., hash(req, iv, nonce), iv) ---- */
-    *nonce = *nonce + 1;
-
     // Create the hash
-    msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-
     msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
                                                 iv, IV_LEN,\
                                                 temp, LEN_SIZE);
-    if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
+    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
     // Compose the message
-    msg_len = strlen(LIST_REQUEST)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-
     msg_len = build_msg_3(&buffer, LIST_REQUEST, strlen(LIST_REQUEST),
                                    digest, HASH_LEN,
                                    iv, IV_LEN);
@@ -315,17 +310,14 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     printf("I'm sending to the server the list message.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
 
-    free(temp);
-    free(buffer);
-    free(msg_to_hash);
-    free(digest);
-    free(iv);
+    free_5(temp, buffer, msg_to_hash, digest, iv);
 
     if (ret == -1)
     {
         printf("Send failed.\n");
         return -1;
-    }
+    } 
+    else *nonce = *nonce + 1;
 
 
 
@@ -333,23 +325,20 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
     /* ---- Parse the response (num_file, len. encr., encr. list, hash(num_file, encr. list, iv, nonce), iv) ---- */
     tot_num_file = 0;
     num_file = 0;
-    index = 0;
+    index = -1;
     while (num_file != -1) 
     {
-        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+(CHUNK_SIZE+BLOCK_SIZE)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN; // max. length
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        ret = recv(sock, buffer, msg_len,0);
+        ret = recv(sock, buffer, BUF_LEN, 0);
         if (ret == -1) 
         {
             free(buffer);
-
             printf("Receive failed.\n");
             return -1;
         }
-        printf("Received first chunk of filenames.\n");
-        *nonce = *nonce+1;
+        printf("Received chunk of filenames.\n");
 
         // Check if something failed server-side
         bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
@@ -363,10 +352,7 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
             if (ret == -1) printf("Error checking list denied message.\n");
             else printf("List denied.\n"); 
             
-            
-            free(bufferSupp1);
-            free(buffer);
-
+            free_2(bufferSupp1, buffer);
             return -1;
         }
 
@@ -401,13 +387,11 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         memcpy(iv, &*(buffer+old_offset), IV_LEN); // iv
         
         // Check hash
-        msg_to_hash_len = LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;    
-        sprintf(temp, "%d", num_file);
-
-        ret = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
+        msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
                                         bufferSupp1, encr_len,\
                                         iv, IV_LEN,\
                                         nonce, LEN_SIZE);
+        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
@@ -416,28 +400,16 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         {
             operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, nonce);
 
-            free(buffer);
-            free(temp);
-            free(bufferSupp1);
-            free(bufferSupp2);
-            free(iv);
-            free(msg_to_hash);
+            free_6(buffer, temp, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             free(digest);
-
             return -1;
         }
         else if (num_file < 0 || num_file >= CHUNK_SIZE)
         {
             operation_denied(sock, "Incorrect num_file", LIST_DENIED, session_key1, session_key2, nonce);
 
-            free(buffer);
-            free(temp);
-            free(bufferSupp1);
-            free(bufferSupp2);
-            free(iv);
-            free(msg_to_hash);
+            free_6(buffer, temp, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             free(digest);
-
             return -1;
         }
 
@@ -447,63 +419,67 @@ int listClient(int sock, char*** file_list, unsigned char* session_key1, unsigne
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
         // Fill list array
-        if (tot_num_file == 0 && num_file != 0)
+        if ((tot_num_file == 0 && num_file != 0) || (num_file != 0))
         {
-            tot_num_file += num_file;
-            *file_list = (char**) malloc(tot_num_file*sizeof(char*));
-            if (!(*file_list)) exit_with_failure("Malloc file_list failed", 1);
-
-            token = strtok((char*) buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
-            while (token != NULL) {
-                // Create space for the filename
-                *(*file_list+index) = (char*) malloc(strlen(token)*sizeof(char)); 
-                if (!(*(file_list+index))) exit_with_failure("Malloc file_list+index failed", 1);
-
-                memcpy(*(file_list+index), token, strlen(token));
-
-                //printf("%s\n", token);
-                index += 1;
-                token = strtok(NULL, " ");
+            if (tot_num_file == 0)
+            {
+                tot_num_file += num_file;
+                file_list = (char**) malloc(tot_num_file*sizeof(char*));
+                if (!file_list) exit_with_failure("Malloc file_list failed", 1);
             }
-        }
-        else if (num_file != 0)
-        {
-            tot_num_file += num_file;
-            // Extend the file list reallocating memory
-            new_file_list = realloc(*file_list, tot_num_file*sizeof(char*));
-            if (!new_file_list) exit_with_failure("Realloc failed", 1);
-            else *file_list = new_file_list;
-
-            token = strtok((char*) buffer, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
+            else // File list is already been created, need to be expanded
+            {
+                // Extend the file list reallocating memory
+                tot_num_file += num_file;
+                new_file_list = realloc(file_list, tot_num_file*sizeof(char*));
+                if (!new_file_list) exit_with_failure("Realloc failed", 1);
+                else file_list = new_file_list;
+            }
+            
+            token = strtok((char*) plaintext, " "); // BE CAREFUL THE LIST SERVER SIDE SHOULD HAVE THE END STRING CHARACTER
             while (token != NULL) {
+                index += 1;
                 // Create space for the filename
-                *(*file_list+index) = (char*) malloc(strlen(token)*sizeof(char)); 
+                *(file_list+index) = (char*) malloc((strlen(token)+1)*sizeof(char)); 
                 if (!(*(file_list+index))) exit_with_failure("Malloc file_list+index failed", 1);
 
-                memcpy(*(file_list+index), token, strlen(token));
+                memcpy(*(file_list+index), token, strlen(token)+1);
 
-                //printf("%s\n", token);
-                index += 1;
+                //printf("Tok:%s\n", token);
+                
                 token = strtok(NULL, " ");
             }
         }
         else // num_file == 0
         {
             num_file = -1;
-            printf("The client receives the complete file's list (%d filenames).\n\n", index);
+            if (!file_list) printf("No filenames are stored in the cloud.\n");
+            else 
+            {
+                printf("The client receives the complete file's list (%d filenames):\n", tot_num_file);
+                for (int i = 0; i <= index; i++)
+                {
+                    // Skip these two files
+                    if (!strcmp(*(file_list+i), ".") || !strcmp(*(file_list+i), "..")) 
+                    {
+                        free(*(file_list+i));
+                        continue;
+                    }
+                    
+                    printf("%s\n", *(file_list+i));
+                    free(*(file_list+i));
+                }
+                printf("\n");
+                free(file_list);
+            }
+            
         }
 
         // Send success message
         operation_succeed(sock, LIST_ACCEPTED, session_key2, nonce);
 
-        free(temp);
-        free(iv);
-        free(buffer);
-        free(bufferSupp1);
-        free(bufferSupp2);
-        free(msg_to_hash);
-        free(digest);
-        free(plaintext);       
+        free_6(temp, iv, buffer, bufferSupp1, bufferSupp2, msg_to_hash);
+        free_2(digest, plaintext);
     }
 
     return 1;
@@ -568,16 +544,13 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
     // Compose the message
-    msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+\
-    BLANK_SPACE+IV_LEN;
     sprintf(temp, "%d", encr_len); // Here we put the encryption length in string format
-
-    ret = build_msg_5(&buffer, RENAME_REQUEST, strlen(RENAME_REQUEST),\
+    msg_len = build_msg_5(&buffer, RENAME_REQUEST, strlen(RENAME_REQUEST),\
                                temp, LEN_SIZE,\
                                encr_msg, encr_len,\
                                digest, HASH_LEN,\
                                iv, IV_LEN);
-    if (ret == -1) exit_with_failure("Error during the building of a message", 1);
+    if (msg_len == -1) exit_with_failure("Error during the building of a message", 1);
 
 
     printf("I'm sending to the server the rename message.\n");
@@ -912,7 +885,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         memcpy(bufferSupp3, &*(bufferSupp2+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE); //rest string format
 
         ret = build_msg_4(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED),\
-                                        temp, LEN_SIZE, \ 
+                                        temp, LEN_SIZE, \
                                         bufferSupp1, LEN_SIZE,\
                                         bufferSupp3, REST_SIZE);
         if (ret == -1) exit_with_failure("Error during the building of the message...", 1);

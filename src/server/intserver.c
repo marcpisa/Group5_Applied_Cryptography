@@ -20,7 +20,7 @@ int createSocket()
 
 int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned char* session_key2)
 {
-    unsigned int nonce_cs = 0; // CHECK WRAPPING UP, SHOULD BE UNSIGNED?? ENOGUH FOR 4GB?
+    unsigned int nonce_cs = 0;
     
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -463,14 +463,14 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    // ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    // if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
     // Build path
     path_documents = (char*) malloc((15+strlen(username)+11+1)*sizeof(char));
     memcpy(path_documents, "../../database/", 15);
     memcpy(&*(path_documents+15), username, strlen(username));
     memcpy(&*(path_documents+15+strlen(username)), "/documents/\0", (11+1));
+
+
 
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
     bufferSupp1 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
@@ -483,34 +483,29 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
     memcpy(iv, &*(rec_mex+old_offset), IV_LEN); // iv
 
     // Compare the hash
-    msg_to_hash_len = strlen(LIST_REQUEST)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf((char*)temp, "%d", *nonce);
-
-    ret = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
+    msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
                                     iv, IV_LEN,\
                                     temp, LEN_SIZE);
-    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     ret = CRYPTO_memcmp(digest, bufferSupp1, HASH_LEN);
     
-    free(iv);
-    free(bufferSupp1);
-    free(msg_to_hash);
-    free(digest);
-    free(temp);
+    free_5(iv, bufferSupp1, msg_to_hash, digest, temp);
     
     if (ret == -1) // If the hash comparison failed
     {
+        free(path_documents);
         operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
 
-    printf("List request message parsed successfully\n\n");
+    printf("List request message parsed successfully\n");
 
 
 
@@ -526,19 +521,15 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         bufferSupp1 = (unsigned char*) malloc((CHUNK_SIZE+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
-        d = opendir(path_documents);   
-        
-        // If this is the second list of filenames, reset the pointer to the prev. position
-        for (int i = 0; i < tot_num_file; i++) files = readdir(d);
-
         num_file = 0;
+        d = opendir(path_documents);   
         if(d)
         {
+            // If this is the second list of filenames, reset the pointer to the prev. position
+            for (int i = 0; i < tot_num_file; i++) files = readdir(d);
+
             while((files = readdir(d)) != NULL)
             {
-                // Skip these two files
-                if (!strcmp(files->d_name, ".") || !strcmp(files->d_name, "..")) continue;
-                
                 len_filename = strlen(files->d_name);
                 // The filename fits the list length
                 if ((offset+len_filename+BLANK_SPACE) <= CHUNK_SIZE)
@@ -571,74 +562,72 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         ciphertext = (unsigned char*) malloc((offset+BLOCK_SIZE)*sizeof(unsigned char));
         if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
         encrypt_AES_128_CBC(&ciphertext, &cipher_len, bufferSupp1, offset, iv, session_key1);
-        if (cipher_len > (CHUNK_SIZE+BLOCK_SIZE)) exit_with_failure("Wrong ciphertext length, more than CHUNK+BLOCK size", 0);
+
+        free(bufferSupp1);
+        offset = 0;
 
         // Prepare the hash
-        *nonce = *nonce + 1;
-        msg_to_hash_len = LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
         bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*LEN_SIZE);
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         temp = (char*) malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-        sprintf((char*)temp, "%d", num_file);
+        *nonce = *nonce + 1;
+        
+        sprintf(temp, "%d", num_file);
         sprintf((char*)bufferSupp1, "%d", *nonce);
-
-        ret = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
-                                        ciphertext, cipher_len,\
-                                        iv, IV_LEN,\
-                                        bufferSupp1, LEN_SIZE);
-        if (ret == -1) exit_with_failure("Error during the building of the message", 1);
-        free(temp);
-        free(bufferSupp1);
-
+        msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
+                                                    ciphertext, cipher_len,\
+                                                    iv, IV_LEN,\
+                                                    bufferSupp1, LEN_SIZE);
+        if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
+        
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);  
 
         // Build the message
-        msg_len = LEN_SIZE+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+cipher_len+BLANK_SPACE+HASH_LEN \
-        +BLANK_SPACE+IV_LEN+1; // max. length
-
-        sprintf((char*)temp, "%d", num_file);
+        sprintf(temp, "%d", num_file);
         sprintf((char*)bufferSupp1, "%d", cipher_len);
-
-        ret = build_msg_5(&buffer, temp, LEN_SIZE,\
-                                   bufferSupp1, LEN_SIZE,\
-                                   ciphertext, cipher_len,\
-                                   digest, HASH_LEN,\
-                                   iv, IV_LEN);
-        if (ret == -1) exit_with_failure("Error during the building of the message", 1);
-        free(bufferSupp1);
-        free(temp);
+        msg_len = build_msg_5(&buffer, temp, LEN_SIZE,\
+                                       bufferSupp1, LEN_SIZE,\
+                                       ciphertext, cipher_len,\
+                                       digest, HASH_LEN,\
+                                       iv, IV_LEN);
+        if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
         printf("I'm sending to the client the filename's list\n"); 
-        ret = send(sd, buffer, msg_len, 0); 
-        if (ret == -1) exit_with_failure("Send failed", 1);
+        ret = send(sd, buffer, BUF_LEN, 0); 
+        
+        free_5(temp, bufferSupp1, buffer, ciphertext, digest);
+        free_2(msg_to_hash, iv);
+        
+        if (ret == -1) 
+        {
+            free(path_documents);
+            printf("Send failed.\n");
+            return -1;
+        }
+        else *nonce = *nonce+1;
 
-        free(temp);
-        free(bufferSupp1);
-        free(buffer);
-        free(ciphertext);
-        free(digest);
-        free(msg_to_hash);
-        free(iv);
-
+        
 
 
         /* ---- Check if the client succeed or failed ---- */
-        *nonce = *nonce+1;
-
-        msg_len = strlen(LIST_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-        buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+        //msg_len = strlen(LIST_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+        buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         ret = recv(sd, buffer, BUF_LEN,0);
-        if (ret == -1) exit_with_failure("Receive failed", 0);
+        if (ret == -1)
+        {
+            free_2(buffer, path_documents);
+            printf("Receive failed.\n");
+            return -1;
+        }
         printf("Received the client outcome.\n");
 
-        bufferSupp1 = (unsigned char*) malloc(strlen(LIST_DENIED)*sizeof(unsigned char));
+        bufferSupp1 = (unsigned char*) malloc((strlen(LIST_DENIED)+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         memcpy(bufferSupp1, buffer, strlen(LIST_DENIED)); // denied or accepted same length
-        memcpy(&*(bufferSupp1+strlen(LIST_DENIED)-1), "\0", 1);
+        memcpy(&*(bufferSupp1+strlen(LIST_DENIED)), "\0", 1);
 
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {
@@ -646,10 +635,8 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
             if (ret == -1) exit_with_failure("Error checking list denied message", 0);
             else 
             {
-                free(bufferSupp1);
-                free(buffer);
-                free(path_documents);
-
+                free_3(bufferSupp1, buffer, path_documents);
+                printf("Received list denied message.\n");
                 return 1;
             }
         }
@@ -658,14 +645,13 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
             ret = check_reqacc_msg(LIST_ACCEPTED, buffer, *nonce, session_key2);
             if (ret == -1) exit_with_failure("Error checking list accepted message", 0);
             if (num_file == 0) num_file = -1;
+            free_2(buffer, bufferSupp1);
         }
         else
         {
             printf("We don't know what the client said...\n\n");
-            free(bufferSupp1);
-            free(buffer);
-            free(path_documents);
-            return 1;
+            free_3(bufferSupp1, buffer, path_documents);
+            return -1;
         }
     }
 
