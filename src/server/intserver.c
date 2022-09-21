@@ -1030,7 +1030,8 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
         printf("Wrong rename failed hash\n\n");
         ret = -1;
     } 
-    else printf("The MAC is been correctly compared!\n"); 
+    else printf("The MAC is been correctly compared!\n");
+    free(digest); 
 
     //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
     decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
@@ -1047,18 +1048,14 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     free(bufferSupp2);
     free(msg_to_hash);
     free(encr_msg);
+    free(plaintext);
     free(iv);
     free(buffer);
 
-    chdir(MAIN_FOLDER_SERVER);
-
-    ret = chdir(username);
-    if (ret == -1)
-    {
-        printf("Error: username doesn't exists...\n");
-        exit(1);
-    }
-    if (!(fd = fopen(filename, "r")))
+    chdir("documents");
+    fd = fopen(filename, "r");
+    chdir("..");
+    if (!(fd))
     {
         printf("File %s doesn't exist...\n\n", filename);
         return -1;
@@ -1068,9 +1065,11 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
+    bufferSupp1 = (unsigned char*)malloc((sizeof(unsigned char)*BUF_LEN));
     printf("The number of chunk is %i\n\n", nchunk);    
     sprintf((char*)bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); 
     printf("I'm sending %s\n\n", bufferSupp1);
+    free(bufferSupp1);
 
 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS DOWNLOAD_ACCEPTED NCHUNK REST HASH

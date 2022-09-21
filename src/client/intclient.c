@@ -834,22 +834,25 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
     //END OF THE COMMUNICATION OF THE FIRST MESSAGE, NOW WE SHOULD RECEIVE A RESPONSE FROM THE SERVER
     msg_len = strlen(DOWNLOAD_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(DOWNLOAD_DENIED)*sizeof(unsigned char));
+    bufferSupp1 = (unsigned char*) malloc((strlen(DOWNLOAD_DENIED)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(DOWNLOAD_DENIED)); // denied or accepted same length
+    memcpy(&*(bufferSupp1+strlen(DOWNLOAD_DENIED)), "\0", 1);
 
 
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
     {
         // WAITING FOR TEO STUFFS
+        free(bufferSupp1);
+        free(buffer);
     }
     else if (strcmp((char*)bufferSupp1, DOWNLOAD_ACCEPTED) == 0)
     {        
@@ -896,24 +899,14 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+        free_6(digest, temp, buffer, msg_to_hash, bufferSupp1, bufferSupp2);
+        free_2(bufferSupp3, iv);
         if (ret == -1)
         {
             printf("Wrong download accepted hash\n\n");
             ret = -1;
         }
-        else
-        {
-            printf("The download request has been accepted!\n\n");
-            ret = 1;
-        }
-
-        free(digest);
-        free(temp);
-        free(msg_to_hash);
-        free(bufferSupp1);
-        free(bufferSupp2);
-        free(bufferSupp3);
-        free(iv);
+        printf("The download request has been accepted!\n\n");
 
         //NOW WE CAN BEGIN DOWNLOAD THE CHUNKS
         f1 = fopen(filename, "w");
