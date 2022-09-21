@@ -529,9 +529,6 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    // Increment nonce for new message
-    *nonce = *nonce + 1;
-
     // Encrypt the reason
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
@@ -560,6 +557,8 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     ret = send(sock, buffer, BUF_LEN, 0);
     
     free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
+
+    *nonce +=1;
     
     if (ret == -1) exit_with_failure("Send failed", 0);
 }
@@ -586,9 +585,6 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    // Increment nonce for new message
-    *nonce = *nonce + 1;
-
     // Calculate the hash
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
@@ -608,6 +604,8 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
     ret = send(sock, buffer, BUF_LEN, 0);
+
+    *nonce += 1;
     
     free_5(iv, buffer, msg_to_hash, digest, temp);
 

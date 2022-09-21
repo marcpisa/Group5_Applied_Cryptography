@@ -419,6 +419,8 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             return -1;
         }
 
+        *nonce += 1;
+
         // Decrypt list
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
@@ -569,7 +571,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
         printf("Send failed.\n");
         return -1;
     }
-
+    *nonce += 1;
     
 
 
@@ -699,10 +701,9 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     {
         printf("Send failed.\n");
         return -1;
-    } 
+    }
 
-
-    
+    *nonce += 1;
     
     // Here we receive the reply of the server
     msg_len = strlen(DELETE_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;

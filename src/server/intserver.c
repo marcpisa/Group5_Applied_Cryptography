@@ -506,6 +506,7 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
     }
 
     printf("List request message parsed successfully\n");
+    *nonce += 1;
 
 
 
@@ -569,7 +570,6 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         temp = (char*) malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        *nonce = *nonce + 1;
         
         sprintf(temp, "%d", num_file);
         sprintf((char*)bufferSupp1, "%u", *nonce);
