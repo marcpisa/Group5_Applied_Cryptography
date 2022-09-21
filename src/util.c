@@ -37,8 +37,6 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
 
 int filename_sanitization(const char* file_name, const char* root_dir) {
 
-    char* buf;
-
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
     /*char *canon_file_name = realpath(file_name, buf);
     free(buf);
@@ -695,8 +693,10 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     {
         // Decrypt the reason (bufferSupp3)
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp3, encr_len, iv, session_key1);
-        reason = (char*) malloc(plain_len*sizeof(char));
+        reason = (char*) malloc((plain_len+1)*sizeof(char));
         if (!reason) exit_with_failure("Malloc reason failed", 1);
+        memcpy(reason, plaintext, plain_len);
+        memcpy(&*(reason+plain_len), "\0", 1);
 
         printf("The request has been denied: %s\n", reason);
             

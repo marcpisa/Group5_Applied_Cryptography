@@ -743,8 +743,11 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
         return -1;
     }
+    else printf("Hash of M1 is correct\n");
 
     decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
+
+    printf("The plaintext is %s\n", plaintext);
 
     free(bufferSupp1);
     free(bufferSupp2);        
@@ -756,8 +759,6 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
     // Obtain the filenames from the plaintext and sanitize them
     // Filename
-    plaintext = (unsigned char*)malloc(encr_len*sizeof(unsigned char));
-    if (!plaintext) exit_with_failure("Malloc plaintext error", 1);
     offset = str_ssplit(plaintext, DELIM);
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 
@@ -768,9 +769,11 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         return -1;
     }
 
-    filename = (char*) malloc(len_fn*sizeof(char));
+    filename = (char*) malloc(len_fn*sizeof(char)+1);
     if (!filename) exit_with_failure("Malloc filename failed", 0);
-    memcpy(filename, plaintext, len_fn); 
+    memcpy(filename, plaintext, len_fn);
+    *(filename+len_fn) = '\0';
+    printf("The filename we should change is %s\n", filename);
 
     // New_filename
     old_offset = offset + BLANK_SPACE;
@@ -785,9 +788,11 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         return -1;
     } 
     
-    new_filename = (char*) malloc(len_newfn*sizeof(char));
+    new_filename = (char*) malloc(len_newfn*sizeof(char)+1);
     if (!new_filename) exit_with_failure("Malloc new_filename failed", 0);
     memcpy(new_filename, &*(plaintext+old_offset), len_newfn);
+    *(new_filename+len_newfn) = '\0';
+    printf("The new filename should be %s\n", new_filename);
                    
     ret = filename_sanitization (filename, "/");
     ret += filename_sanitization (new_filename, "/");
@@ -802,17 +807,17 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     }
 
     // Execute the rename if possible, otherwise send failed message to client
+    chdir("documents");
     ret = rename(filename, new_filename);
+    chdir("..");
     if (ret == -1) {
         operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED, session_key1, session_key2, nonce);
 
-        
         free(plaintext);
         free(filename);
         free(new_filename);
         return -1;
     }
-    
     free(plaintext);
     free(filename);
     free(new_filename);

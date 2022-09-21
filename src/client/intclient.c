@@ -420,8 +420,6 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         }
 
         // Decrypt list
-        plaintext = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
-        if (!plaintext) exit_with_failure("Malloc plaintext failed", 1);
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
         // Fill list array
@@ -462,7 +460,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             if (!file_list) printf("No filenames are stored in the cloud.\n");
             else 
             {
-                printf("The client receives the complete file's list (%d filenames):\n", tot_num_file);
+                printf("The client receives the complete file's list (%d filenames):\n", tot_num_file-2);
                 for (int i = 0; i <= index; i++)
                 {
                     // Skip these two files
@@ -524,14 +522,11 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     *nonce = *nonce+1;
 
     // Encrypt the two names
-    msg_to_encr_len = strlen(filename)+BLANK_SPACE+strlen(new_filename);
 
-    ret = build_msg_2(&msg_to_encr, filename, strlen(filename),\
-                                    new_filename, strlen(new_filename));
+    msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
+                                                new_filename, strlen(new_filename)+1);
     if (ret == -1) exit_with_failure("Error during the building of the message", 1);
 
-    encr_msg = (unsigned char*) malloc((msg_to_encr_len+BLOCK_SIZE)*sizeof(unsigned char));
-    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
     // Create the hash
@@ -552,10 +547,10 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     // Compose the message
     sprintf(temp, "%d", encr_len); // Here we put the encryption length in string format
     msg_len = build_msg_5(&buffer, RENAME_REQUEST, strlen(RENAME_REQUEST),\
-                               temp, LEN_SIZE,\
-                               encr_msg, encr_len,\
-                               digest, HASH_LEN,\
-                               iv, IV_LEN);
+                                   temp, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
     if (msg_len == -1) exit_with_failure("Error during the building of a message", 1);
 
 
@@ -594,9 +589,11 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     printf("Received the server's response.\n");
     *nonce = *nonce+1;
 
-    bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char));
+    bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char)+1);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(RENAME_DENIED)); // denied or accepted same length
+    *(bufferSupp1+strlen(RENAME_DENIED)) = '\0';
+
 
     // Parse the message based on the server response
     if (strcmp((char*) bufferSupp1, RENAME_DENIED) == 0)
