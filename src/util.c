@@ -162,7 +162,7 @@ void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, u
     ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
-    *out = (char*) malloc((inl+BLOCK_SIZE)*sizeof(char));
+    *out = (unsigned char*) malloc((inl+BLOCK_SIZE)*sizeof(unsigned char));
     if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
@@ -191,7 +191,7 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
-    *out = (char*) malloc(inl*sizeof(char));
+    *out = (unsigned char*) malloc(inl*sizeof(unsigned char));
     if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
