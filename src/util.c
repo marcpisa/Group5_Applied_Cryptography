@@ -162,6 +162,9 @@ void encrypt_AES_128_CBC(unsigned char** out, int* out_len, unsigned char* in, u
     ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
+    *out = (char*) malloc((inl+BLOCK_SIZE)*sizeof(char));
+    if (!(*out)) exit_with_failure("Malloc out failed", 0);    
+
     ret = EVP_EncryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if (ret != 1) exit_with_failure("EncryptInit failed", 1);
     
@@ -187,6 +190,9 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
+
+    *out = (char*) malloc(inl*sizeof(char));
+    if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
     if (ret != 1) exit_with_failure("DecryptInit failed", 1);
@@ -529,8 +535,6 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     *nonce = *nonce + 1;
 
     // Encrypt the reason
-    ciphertext = (unsigned char*) malloc((strlen(reason)+BLOCK_SIZE)*sizeof(unsigned char));
-    if (!ciphertext) exit_with_failure("Malloc ciphertext failed", 1);
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
     // Calculate the hash
