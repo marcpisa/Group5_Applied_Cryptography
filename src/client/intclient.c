@@ -274,6 +274,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
     char** file_list;
 
 
@@ -385,13 +386,18 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         old_offset += HASH_LEN+BLANK_SPACE;
 
         memcpy(iv, &*(buffer+old_offset), IV_LEN); // iv
+
+        bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+        if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+        sprintf((char*)bufferSupp3, "%d", *nonce);
         
         // Check hash
         msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
-                                        bufferSupp1, encr_len,\
-                                        iv, IV_LEN,\
-                                        nonce, LEN_SIZE);
+                                                    bufferSupp1, encr_len,\
+                                                    iv, IV_LEN,\
+                                                    bufferSupp3, LEN_SIZE);
         if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+        free(bufferSupp3);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 

@@ -758,6 +758,8 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
     // Obtain the filenames from the plaintext and sanitize them
     // Filename
+    plaintext = (unsigned char*)malloc(encr_len*sizeof(unsigned char));
+    if (!plaintext) exit_with_failure("Malloc plaintext error", 1);
     offset = str_ssplit(plaintext, DELIM);
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 

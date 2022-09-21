@@ -1,6 +1,6 @@
 #include "util.h"
 
-static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-"};
+static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
 static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
 int username_sanitization(const char* username) {
@@ -37,12 +37,14 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
 
 int filename_sanitization(const char* file_name, const char* root_dir) {
 
-    char buf[BUF_LEN];
+    char* buf;
 
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
-    char *canon_file_name = realpath(file_name, buf);
+    /*char *canon_file_name = realpath(file_name, buf);
+    free(buf);
     if(!canon_file_name) return 0;
-    if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;
+    if(strncmp(canon_file_name, root_dir, strlen(root_dir)) != 0) return -1;*/
+
     return 1;
 }
 
