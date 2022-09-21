@@ -564,6 +564,9 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
     
     if (ret == -1) exit_with_failure("Send failed", 0);
+    else *nonce = *nonce + 1;
+
+    printf("Send %s\n", reason);
 }
 
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
@@ -614,6 +617,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     free_5(iv, buffer, msg_to_hash, digest, temp);
 
     if (ret == -1) exit_with_failure("Send failed", 1);
+    else *nonce = *nonce + 1;
 }
 
 
