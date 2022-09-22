@@ -664,7 +664,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (!temp) exit_with_failure("Malloc temp failed", 1);
     bufferSupp2 = (char*)malloc(sizeof(char)*LEN_SIZE);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    spintf(bufferSupp2, "%u", *nonce);
+    sprintf(bufferSupp2, "%u", *nonce);
 
     sprintf(temp, "%d", *nonce);
     msg_to_hash_len = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
