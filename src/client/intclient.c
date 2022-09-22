@@ -635,6 +635,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     char* temp; 
     unsigned char* buffer;   
     unsigned char* bufferSupp1;
+    char* bufferSupp2;
     
 
     // Generate the IV 
@@ -661,13 +662,17 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     // Create hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
+    bufferSupp2 = (char*)malloc(sizeof(char)*LEN_SIZE);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    spintf(bufferSupp2, "%u", *nonce);
 
     sprintf(temp, "%d", *nonce);
     msg_to_hash_len = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
                                                 encr_msg, encr_len,\
                                                 iv, IV_LEN,\
-                                                nonce, LEN_SIZE);
+                                                bufferSupp2, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+    free(bufferSupp2);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
 
