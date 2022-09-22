@@ -456,6 +456,10 @@ void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key
 
     EVP_MD_CTX_free(ctx);
 
+    *session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    *session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    if(!(*session_key1) || !(*session_key2)) exit_with_failure("Unable to allocate session keys", 1);
+
     memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
     memcpy(*session_key2, &*(digest+16), 16);
     

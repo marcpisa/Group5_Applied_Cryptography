@@ -183,11 +183,12 @@ int main(int argc, char* argv[])
                                 if(!session_key1 || !session_key2)
                                 {
                                     printf("Unable to allocate session keys...\n\n");
-                                    return -1;
+                                    exit_flag = 1;
+                                    break;
                                 }
                             }
                     
-                            ret = loginClient(&connectedSock, session_key1, session_key2, username, srv_addr, ca_store);
+                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, ca_store);
                             
                             if (ret == -1){
                                 printf("Login failed.\n\n");
@@ -217,8 +218,7 @@ int main(int argc, char* argv[])
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
 
-                                free(session_key1);
-                                free(session_key2);
+                                free_2(session_key1, session_key2);
                                 
                                 // CONFIGURATION OF THE SERVER INFO
                                 memset(&srv_addr, 0, sizeof(srv_addr));
@@ -388,8 +388,7 @@ int main(int argc, char* argv[])
                                     else printf("Logout failed.\n\n");
 
                                     
-                                    free(session_key1);
-                                    free(session_key2);
+                                    free_2(session_key1, session_key2);
                                 }
 
                                 printf("Exiting the program.\n");
