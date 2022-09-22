@@ -344,7 +344,7 @@ int loginServer(int sd, char* rec_mex)
 
             // DOWNLOAD MANAGER: SERVER SIDE
                             
-            ret = downloadServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);
+            ret = downloadServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client download request...\n\n");
@@ -426,7 +426,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
 
     // Check hash correctness
-    sprintf((char*)temp, "%d", *nonce);
+    sprintf((char*)temp, "%u", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), \
                                                 bufferSupp3, IV_LEN, \
                                                 temp, LEN_SIZE);
@@ -493,7 +493,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf((char*)temp, "%d", *nonce);
+    sprintf((char*)temp, "%u", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
                                                 iv, IV_LEN,\
                                                 temp, LEN_SIZE);
@@ -512,6 +512,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     }
 
     printf("List request message parsed successfully\n");
+    *nonce += 1;
 
 
 
@@ -575,10 +576,9 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         temp = (char*) malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        *nonce = *nonce + 1;
         
         sprintf(temp, "%d", num_file);
-        sprintf((char*)bufferSupp1, "%d", *nonce);
+        sprintf((char*)bufferSupp1, "%u", *nonce);
         msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
                                                     ciphertext, cipher_len,\
                                                     iv, IV_LEN,\
@@ -738,6 +738,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         free_6(bufferSupp1, bufferSupp2, temp, iv, msg_to_hash, digest);
         return -1;
     }
+    else printf("Hash of M1 is correct\n");
 
     decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
@@ -745,8 +746,6 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
     // Obtain the filenames from the plaintext and sanitize them
     // Filename
-    plaintext = (unsigned char*)malloc(encr_len*sizeof(unsigned char));
-    if (!plaintext) exit_with_failure("Malloc plaintext error", 1);
     offset = str_ssplit(plaintext, DELIM);
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 
@@ -757,9 +756,11 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         return -1;
     }
 
-    filename = (char*) malloc(len_fn*sizeof(char));
+    filename = (char*) malloc(len_fn*sizeof(char)+1);
     if (!filename) exit_with_failure("Malloc filename failed", 0);
-    memcpy(filename, plaintext, len_fn); 
+    memcpy(filename, plaintext, len_fn);
+    *(filename+len_fn) = '\0';
+    printf("The filename we should change is %s\n", filename);
 
     // New_filename
     old_offset = offset + BLANK_SPACE;
@@ -773,12 +774,14 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         return -1;
     } 
     
-    new_filename = (char*) malloc(len_newfn*sizeof(char));
+    new_filename = (char*) malloc(len_newfn*sizeof(char)+1);
     if (!new_filename) exit_with_failure("Malloc new_filename failed", 0);
     memcpy(new_filename, &*(plaintext+old_offset), len_newfn);
+    *(new_filename+len_newfn) = '\0';
+    printf("The new filename should be %s\n", new_filename);
                    
-    ret = filename_sanitization (filename, "/");
-    ret += filename_sanitization (new_filename, "/");
+    ret = filename_sanitization (filename);
+    ret += filename_sanitization (new_filename);
     if (ret <= 1) {
         operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, nonce);
 
@@ -788,7 +791,9 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     }
 
     // Execute the rename if possible, otherwise send failed message to client
+    chdir("documents");
     ret = rename(filename, new_filename);
+    chdir("..");
     if (ret == -1) {
         operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED, session_key1, session_key2, nonce);
 
@@ -797,6 +802,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     }
     
     free_3(plaintext, filename, new_filename);
+
 
     // Send success message to the client
     operation_succeed(sd, RENAME_ACCEPTED, session_key2, nonce);
@@ -901,7 +907,7 @@ int deleteServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonc
     memcpy(filename, plaintext, len_fn+1); 
 
     // Sanitize the filename
-    ret = filename_sanitization(filename, "/");
+    ret = filename_sanitization(filename);
     if (ret != 1) {
         operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, nonce);
 
@@ -938,7 +944,7 @@ int deleteServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonc
     return 1;
 }
 
-int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     unsigned char* iv;
@@ -963,7 +969,8 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
 
     char filename[MAX_LEN_FILENAME];
     struct stat st;
-    int i, j, nchunk, rest;
+    int i, j;
+    int nchunk, rest;
     FILE* fd;
 
     //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv)
@@ -1007,7 +1014,8 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
         printf("Wrong rename failed hash\n\n");
         ret = -1;
     } 
-    else printf("The MAC is been correctly compared!\n"); 
+    else printf("The MAC is been correctly compared!\n");
+    free(digest); 
 
     //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
     decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
@@ -1024,37 +1032,34 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     free(bufferSupp2);
     free(msg_to_hash);
     free(encr_msg);
+    free(plaintext);
     free(iv);
     free(buffer);
 
-    chdir(MAIN_FOLDER_SERVER);
-
-    ret = chdir(username);
-    if (ret == -1)
-    {
-        printf("Error: username doesn't exists...\n");
-        exit(1);
-    }
-    if (!(fd = fopen(filename, "r")))
+    chdir("documents");
+    fd = fopen(filename, "r");
+    if (!(fd))
     {
         printf("File %s doesn't exist...\n\n", filename);
+        chdir("..");
         return -1;
     }
     stat(filename, &st);
+    chdir("..");
     printf("The size of the file is %ld\n\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
+    bufferSupp1 = (unsigned char*)malloc((sizeof(unsigned char)*BUF_LEN));
     printf("The number of chunk is %i\n\n", nchunk);    
-    sprintf((char*)bufferSupp1, "%s %d %d", DOWNLOAD_ACCEPTED, nchunk, rest); 
+    sprintf((char*)bufferSupp1, "%s %i %i", DOWNLOAD_ACCEPTED, nchunk, rest); 
     printf("I'm sending %s\n\n", bufferSupp1);
+    free(bufferSupp1);
 
 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS DOWNLOAD_ACCEPTED NCHUNK REST HASH
     //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: DOWNLOAD_ACCEPTED NONCE NCHUNK REST
 
-    buffer = (unsigned char*)malloc(BUF_LEN);
-    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
     bufferSupp2 = (unsigned char*)malloc(REST_SIZE);
@@ -1063,8 +1068,8 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
-    sprintf((char*)bufferSupp1, "%u", nchunk); //nchunk is put on bufferSupp1 as a string
-    sprintf((char*)bufferSupp2, "%u", rest); //rest is put on bufferSUpp2 as a string
+    sprintf((char*)bufferSupp1, "%i", nchunk); //nchunk is put on bufferSupp1 as a string
+    sprintf((char*)bufferSupp2, "%i", rest); //rest is put on bufferSUpp2 as a string
     msg_to_hash_len = build_msg_3(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
                                                 temp, LEN_SIZE, \
                                                 bufferSupp1, LEN_SIZE);
@@ -1073,26 +1078,25 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     msg_len = build_msg_4(&buffer, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
-                                   bufferSupp1, LEN_SIZE, \
-                                   bufferSupp2, REST_SIZE, \
+                                   bufferSupp1, strlen((char*)bufferSupp1), \
+                                   bufferSupp2, strlen((char*)bufferSupp2), \
                                    digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
+    *(buffer+msg_len) = '\0';
+    printf("We are sending %s\n", (char*)buffer);
     
     ret = send(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
         printf("Send operation gone bad\n");
+        free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
         // Change this later to manage properly the session
         exit(1);
     }
     *nonce += 1;
 
-    free(buffer);
-    free(bufferSupp1);
-    free(bufferSupp2);
-    free(msg_to_hash);
-    free(temp);
-
+    free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
+    
     //NOW WE START TO SEND THE CHUNKS
     for (i = 0; i < nchunk; i++)
     {
@@ -1158,21 +1162,18 @@ int downloadServer(int sock, char* rec_mex, char* username, unsigned int* nonce,
             // Change this later to manage properly the session
             exit(1);
         }
-
+        printf("We are sending the chunk number %i\n", i);
         //NONCE MANAGEMENT
         *nonce += 1;
 
-        free(iv);
-        free(buffer);
-        free(bufferSupp1);
-        free(digest);
+        free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
         free(temp);
     }
     buffer = (unsigned char*)malloc(BUF_LEN*(sizeof(unsigned char)));
     ret = recv(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
-        printf("Send operation gone bad!\n\n");
+        printf("Receive operation gone bad!\n\n");
         exit(1);
     }
 

@@ -35,9 +35,7 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
     //SANIFICATION: username it is checked in the if block server side.
 }
 
-int filename_sanitization(const char* file_name, const char* root_dir) {
-
-    char* buf;
+int filename_sanitization(const char* file_name) {
 
     if(strspn(file_name, allowed_chars) < strlen(file_name)) return 0;
     /*char *canon_file_name = realpath(file_name, buf);
@@ -535,9 +533,6 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    // Increment nonce for new message
-    *nonce = *nonce + 1;
-
     // Encrypt the reason
     encrypt_AES_128_CBC(&ciphertext, &encr_len, (unsigned char*) reason, strlen(reason), iv, key1);
 
@@ -566,6 +561,8 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     ret = send(sock, buffer, BUF_LEN, 0);
     
     free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
+
+    *nonce +=1;
     
     if (ret == -1) exit_with_failure("Send failed", 0);
     else *nonce = *nonce + 1;
@@ -595,9 +592,6 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    // Increment nonce for new message
-    *nonce = *nonce + 1;
-
     // Calculate the hash
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
@@ -617,6 +611,8 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
     ret = send(sock, buffer, BUF_LEN, 0);
+
+    *nonce += 1;
     
     free_5(iv, buffer, msg_to_hash, digest, temp);
 
@@ -703,8 +699,10 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     {
         // Decrypt the reason (bufferSupp3)
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp3, encr_len, iv, session_key1);
-        reason = (char*) malloc(plain_len*sizeof(char));
+        reason = (char*) malloc((plain_len+1)*sizeof(char));
         if (!reason) exit_with_failure("Malloc reason failed", 1);
+        memcpy(reason, plaintext, plain_len);
+        memcpy(&*(reason+plain_len), "\0", 1);
 
         printf("The request has been denied: %s\n", reason);
             
