@@ -186,7 +186,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
 
     printf("I'm sending to the server the last message.\n");
-    ret = send(*sock, buffer, msg_len, 0); 
+    ret = send(*sock, buffer, BUF_LEN, 0); 
 
     free_6(path_pubkey, path_rsa_key, K, exp_digsig, signature, buffer);
 
@@ -564,7 +564,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
 
     printf("I'm sending to the server the rename message.\n");
-    ret = send(sock, buffer, msg_len, 0); 
+    ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free(iv);
@@ -807,7 +807,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     // The message in the buffer now is: DOWNLOAD_REQUEST, len_encr, encr, hash, iv. We can send it now
 
     printf("I'm sending to the server the download request.\n");
-    ret = send(sock, buffer, msg_len, 0); 
+    ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
     *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
@@ -907,7 +907,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-            ret = recv(sock, buffer, msg_len,0);
+            ret = recv(sock, buffer, BUF_LEN,0);
             if (ret == -1) exit_with_failure("Receive failed", 0);
             printf("Received the server's response.\n");
 
