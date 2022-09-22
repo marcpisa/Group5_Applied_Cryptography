@@ -1054,7 +1054,9 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     free(bufferSupp1);
 
 
-    /* ---- Send chunks to the client ---- */ 
+
+
+    /* ---- Send download_accepted to the client ---- */ 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS DOWNLOAD_ACCEPTED NCHUNK REST HASH
     //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: DOWNLOAD_ACCEPTED NONCE NCHUNK REST
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
@@ -1093,6 +1095,9 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
     free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
     
+
+
+    /* ---- Send chunks ---- */
     //NOW WE START TO SEND THE CHUNKS
     for (i = 0; i < nchunk; i++)
     {

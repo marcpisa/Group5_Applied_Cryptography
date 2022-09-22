@@ -814,6 +814,10 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free(iv);
 
+
+
+
+    /*--- Receiving server message ---- */
     //END OF THE COMMUNICATION OF THE FIRST MESSAGE, NOW WE SHOULD RECEIVE A RESPONSE FROM THE SERVER
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
@@ -831,7 +835,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
     {
-        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, nonce, session_key1, session_key2);
+        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, &nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking download_denied message...\n");
         else printf("Download denied frm the server...\n");
 
