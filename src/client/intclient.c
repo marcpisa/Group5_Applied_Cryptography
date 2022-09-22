@@ -535,7 +535,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
     // Encrypt the two names
     msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
-                                                new_filename, strlen(new_filename));
+                                                new_filename, (strlen(new_filename)+1));
     if (msg_to_encr_len == -1) exit_with_failure("Error during the building of the message", 1);
 
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
@@ -691,6 +691,9 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
 
     *nonce += 1;
+
+
+
     
     // Here we receive the reply of the server
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
@@ -767,44 +770,40 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-    /* first message M1: download_request, nonce, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv) ---- */
-    
+
+
+
+    /* first message M1: download_request, nonce, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv) ---- */    
     // Encrypt the two names
-    msg_to_encr_len = strlen(filename);
+    msg_to_encr_len = strlen(filename)+1;
     msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
     if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
 
-    memcpy(msg_to_encr, filename, strlen(filename)); //Now on msg_to_encr there is the string to encrypt
+    memcpy(msg_to_encr, filename, msg_to_encr_len); //Now on msg_to_encr there is the string to encrypt
 
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
     // Create the hash
-    msg_to_hash_len = strlen(DOWNLOAD_REQUEST) + BLANK_SPACE + encr_len + BLANK_SPACE + IV_LEN + BLANK_SPACE + LEN_SIZE; // LEN SIZE WHY?
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce); // Now in temp there is the string version of the nonce
-    
-    ret = build_msg_4(&msg_to_hash, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
-                                    encr_msg, encr_len,\
-                                    iv, IV_LEN,\
-                                    temp, LEN_SIZE);
-    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
+                                                encr_msg, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
     // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
-    msg_len = strlen(RENAME_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-
     sprintf(temp, "%d", encr_len); //DONT KNOW IF IT WORKS IN ANY CASE
-
-    ret = build_msg_5(&buffer, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
+    msg_len = build_msg_5(&buffer, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
                                temp, LEN_SIZE,\
                                encr_msg, encr_len,\
                                digest, HASH_LEN,\
                                iv, IV_LEN);
-    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+    if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
     // The message in the buffer now is: DOWNLOAD_REQUEST, len_encr, encr, hash, iv. We can send it now
 
     printf("I'm sending to the server the download request.\n");
@@ -812,36 +811,33 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     if (ret == -1) exit_with_failure("Send failed", 1);
     *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
-    free(temp);
-    free(buffer);
-    free(msg_to_hash);
-    free(digest);
-    free(msg_to_encr);
-    free(encr_msg);
+    free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free(iv);
 
     //END OF THE COMMUNICATION OF THE FIRST MESSAGE, NOW WE SHOULD RECEIVE A RESPONSE FROM THE SERVER
-    msg_len = strlen(DOWNLOAD_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
     buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
     printf("Received the server's response.\n");
-    printf("We received %s\n", (char*)buffer);
+    //printf("We received %s\n", (char*)buffer); HEAP OVERFLOW WITHOUT \0
 
     bufferSupp1 = (unsigned char*) malloc((strlen(DOWNLOAD_DENIED)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(DOWNLOAD_DENIED)); // denied or accepted same length
     memcpy(&*(bufferSupp1+strlen(DOWNLOAD_DENIED)), "\0", 1);
 
-
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
     {
-        // WAITING FOR TEO STUFFS
-        free(bufferSupp1);
-        free(buffer);
+        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, nonce, session_key1, session_key2);
+        if (ret == -1) printf("Something bad happened checking download_denied message...\n");
+        else printf("Download denied frm the server...\n");
+
+        free_2(bufferSupp1, buffer);
+        return -1;
+        
     }
     else if (strcmp((char*)bufferSupp1, DOWNLOAD_ACCEPTED) == 0)
     {        

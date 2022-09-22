@@ -24,11 +24,7 @@ int main()
     char* username;
 
     // Timeout varible for the select function
-    struct timeval tv;
-
-    // Cryptographic operation
-    unsigned char* session_key1;
-    unsigned char* session_key2;    
+    struct timeval tv;   
 
     // Recover the user list
     user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));

@@ -240,7 +240,7 @@ int main(int argc, char* argv[])
 
                             ret = listClient(connectedSock, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
-                            else printf("List succeeeded.\n\n");
+                            else printf("List succeeded.\n\n");
 
                             break;
                         
@@ -268,6 +268,7 @@ int main(int argc, char* argv[])
                             // Handle rename request
                             ret = renameClient(connectedSock, command2, command3, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
+                            else printf("Rename succeeded.\n\n");
                             break;
 
                         case 5: //*********** DELETE **********
@@ -293,7 +294,7 @@ int main(int argc, char* argv[])
 
                             ret = deleteClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
-
+                            else printf("Delete succeeded.\n\n");
 
                             break;
 
@@ -311,6 +312,7 @@ int main(int argc, char* argv[])
                                 printf("Error during the download operation request!\n\n");
                                 exit(1);
                             }
+                            else printf("Download succeeded.\n\n");
 
                             break;
 
