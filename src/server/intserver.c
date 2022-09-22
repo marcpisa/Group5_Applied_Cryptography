@@ -1101,7 +1101,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     //NOW WE START TO SEND THE CHUNKS
     for (i = 0; i < nchunk; i++)
     {
-        msg_to_encr_len = CHUNK_SIZE;
+        msg_to_encr_len = CHUNK_SIZE+1;
         msg_to_encr = (unsigned char*)malloc(msg_to_encr_len);
         if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
         if (i == nchunk-1)

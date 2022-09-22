@@ -86,7 +86,7 @@
 
 #define MAX_LEN_REQUEST 15
 #define LEN_SIZE 10
-#define REST_SIZE 3
+#define REST_SIZE 10
 #define MAX_CERT_LEN 2048
 
 #define DELIM ' '
