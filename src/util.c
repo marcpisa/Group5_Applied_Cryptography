@@ -454,6 +454,10 @@ void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key
 
     EVP_MD_CTX_free(ctx);
 
+    *session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    *session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    if(!(*session_key1) || !(*session_key2)) exit_with_failure("Unable to allocate session keys", 1);
+
     memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
     memcpy(*session_key2, &*(digest+16), 16);
     
@@ -561,6 +565,9 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     *nonce +=1;
     
     if (ret == -1) exit_with_failure("Send failed", 0);
+    else *nonce = *nonce + 1;
+
+    printf("Send %s\n", reason);
 }
 
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
@@ -610,6 +617,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     free_5(iv, buffer, msg_to_hash, digest, temp);
 
     if (ret == -1) exit_with_failure("Send failed", 1);
+    else *nonce = *nonce + 1;
 }
 
 

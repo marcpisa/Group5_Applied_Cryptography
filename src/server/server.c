@@ -29,10 +29,6 @@ int main()
     // Cryptographic operation
     unsigned char* session_key1;
     unsigned char* session_key2;    
-    
-    session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(session_key1 == NULL || session_key2 == NULL) exit_with_failure("Unable to allocate session keys", 1);
 
     // Recover the user list
     user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));
@@ -171,15 +167,15 @@ int main()
                             printf("\nA login request has came up...\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
-                            ret = loginServer(i, received_buffer, session_key1, session_key2);
+                            ret = loginServer(i, received_buffer);
                             if (ret == -1)
                             {
                                 printf("Something bad happened during the management of the client login request...\n\n");
                                 exit(1);
                             }
-                            else printf("I managed a login request and all was good!\n\n");
+                            else printf("The operation has been carried out and the user has logged out!\n");
 
-                            printf("End of login request management!\n\n");
+                            printf("Closing thread...!\n\n");
                             close(i);
                             exit(0);
                         }
@@ -204,8 +200,6 @@ int main()
     
     close(listenerTCP);
     
-    free(session_key1);
-    free(session_key2);
     free(user_list);
     free(username);
     

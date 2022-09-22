@@ -18,7 +18,7 @@ int createSocket()
     return sock;
 }
 
-int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned char* session_key2)
+int loginServer(int sd, char* rec_mex)
 {
     unsigned int nonce_cs = 0;
     
@@ -30,7 +30,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "cert.pem";
     char* path_rsa_key = "rsa_prvkey.pem";
+    char* path_documents = "./documents/";
     char* path_cert_client_rsa;
+    
     int ret;
     int msg_len;
     size_t offset, old_offset;
@@ -61,6 +63,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     char funcBuff[BUF_LEN];
     char funcSupp1[BUF_LEN];
 
+    unsigned char* session_key1;
+    unsigned char* session_key2;
+
     /*********************
      * END VARIABLES
      ********************/
@@ -85,7 +90,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
     /* ---- Parse the first message (login request message + username + DH pubkey) ---- */
-    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*MAX_LEN_USERNAME);
+    bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*(MAX_LEN_USERNAME+1));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*pubkey_len);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
@@ -95,34 +100,39 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
     // Parse the username
     offset = str_ssplit(&*((unsigned char*) rec_mex+old_offset), DELIM);
+    len_username = offset;
+    if(len_username > MAX_LEN_USERNAME)
+    {
+        free_3(username, bufferSupp1, bufferSupp2);
+        printf("Username too long.\n");
+        return -1;
+    }
     memcpy(bufferSupp1, &*(rec_mex+old_offset), offset); // username
     memcpy(&*(bufferSupp1+offset), "\0", 1);
-    len_username = offset;
     old_offset += offset+BLANK_SPACE;
 
     // Parse pubkey
     memcpy(bufferSupp2, &*(rec_mex+old_offset), pubkey_len); // dh pubkey
 
     // Sanitize and check username
-    if (len_username > MAX_LEN_USERNAME || !username_sanitization((char*) bufferSupp1))
+    if (!username_sanitization((char*) bufferSupp1))
     {
         free_3(username, bufferSupp1, bufferSupp2);
-        printf("Username too long or sanitization fails.\n");
+        printf("Username sanitization fails.\n");
         return -1;
     } 
 
     ret = chdir(MAIN_FOLDER_SERVER);
-    if (ret == -1) exit_with_failure("No such directory.\n", 0);
+    if (ret == -1) exit_with_failure("No such directory MAIN_FOLDER_SERVER.\n", 0);
     ret = chdir((char*) bufferSupp1);
     if (ret == -1) 
     {
         free_3(username, bufferSupp1, bufferSupp2);
-        printf("Username doesn't exists...\n");
+        printf("User folder doesn't exists...\n");
         return -1;
     }
 
-    memcpy(username, bufferSupp1, len_username);
-    memcpy(&*(username+len_username), "\0", 1);
+    memcpy(username, bufferSupp1, (len_username+1));
 
     // Retrieve the client pubkey (from the client cert., already owned by the server)
     path_cert_client_rsa = (char*) malloc(sizeof(char)*(5+len_username+4+1));
@@ -177,14 +187,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     if (msg_len == 1) exit_with_failure("Something bad happened building the message...", 0);
 
     printf("I'm sending to the client the response.\n");
-    ret = send(sd, buffer, msg_len, 0); 
+    ret = send(sd, buffer, BUF_LEN, 0); 
 
     free_6(bufferSupp2, temp, buffer, pubkey_byte, cert_byte, signature);
     EVP_PKEY_free(dh_pubkey);
 
     if (ret == -1)
     {
-        free_3(username, K, msg_to_sign);
+        free_5(username, K, msg_to_sign, session_key1, session_key2);
+        EVP_PKEY_free(pub_rsa_client);
         printf("Send failed.\n");
         return -1;
     } 
@@ -193,16 +204,17 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
 
 
     /* Parse the client message and verify the fields */
-    msg_len = SIGN_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
     bufferSupp1 = (unsigned char*) malloc(sizeof(unsigned char)*(SIGN_LEN+1));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
-    ret = recv(sd, buffer, msg_len, 0);
+    ret = recv(sd, buffer, BUF_LEN, 0);
     if (ret == -1) 
     {
-        free_5(buffer, username, K, msg_to_sign, bufferSupp1);
+        free_5(username, K, msg_to_sign, session_key1, session_key2);
+        free_2(buffer, bufferSupp1);
+        EVP_PKEY_free(pub_rsa_client);
         printf("Receive failed.\n");
         return -1;
     } 
@@ -219,7 +231,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
     
     if (ret != 1) 
     {
-        free(username);
+        free_3(username, session_key1, session_key2);
         printf("Signature verification failed.\n");
         return -1;
     }
@@ -229,8 +241,10 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
  
     // FUNCTIONAL PART
     // Now that we have the cryptographic elements to have a secure communication with the client we are able to receive function messages
-    
+    // Here we are at database/username/
+
     printf("I managed a login request and all was good!\n\n");
+
     
     //printf("Now the buffer contains %s\n\n", funcBuff);
     while (1)
@@ -240,7 +254,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
         if (ret < 0)
         {
             perror("Error during recv operation: ");
-            exit(-1);
+            break;
         }
         // We check the first keyword to understand what the Client wants us to do
         memset(funcSupp1, 0, BUF_LEN);
@@ -268,10 +282,9 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             }
             else
             {
-                printf("I managed a logout request and all was good!\n\n");
+                printf("I managed a logout request and all was good!\n");
                 printf("End of logout request management!\n\n");
-                close(sd);
-                exit(0);
+                break;
             }
         }
 
@@ -282,11 +295,11 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             printf("\nA list request has came up...\n\n");
             // LIST MANAGER: SERVER SIDE
         
-            ret = listServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);
+            ret = listServer(sd, funcBuff, path_documents, &nonce_cs, session_key1, session_key2);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client list request...\n\n");
-                exit(1);
+                break;
             }
             else printf("I managed a list request and all was good!\n\n");
         }
@@ -302,7 +315,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client rename request...\n\n");
-                exit(1);
+                break;
             }
             else printf("End of rename request management!\n\n");
         }
@@ -314,11 +327,11 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             printf("\nA delete request has came up...\n\n");
             // DELETE MANAGER: SERVER SIDE
                             
-            ret = deleteServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
+            ret = deleteServer(sd, funcBuff, path_documents, &nonce_cs, session_key1, session_key2);
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client delete request...\n\n");
-                exit(1);
+                break;
             }
             else printf("I managed a delete request and all was good!\n\n");
         }
@@ -335,7 +348,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client download request...\n\n");
-                exit(1);
+                break;
             }
             else printf("I managed a download request and all was good!\n\n");
         }
@@ -351,7 +364,7 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client upload request...\n\n");
-                exit(1);
+                break;
             }
             else printf("I managed an upload request and all was good!\n\n");
         }
@@ -367,13 +380,15 @@ int loginServer(int sd, char* rec_mex, unsigned char* session_key1, unsigned cha
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client share request...\n\n");
-                exit(1);
+                break;
             }
             else printf("I managed a share request and all was good!\n\n");
         }
 
         else printf("Unknown type of request by the Client...\n");  
     }
+
+    free_3(username, session_key1, session_key2);
     close(sd);
     
     return 1;
@@ -429,11 +444,10 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
     return 1;
 }
 
-int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     DIR* d;
     struct dirent *files;
-    char* path_documents;
 
     unsigned char* iv;
     int num_file;
@@ -464,13 +478,6 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
 
-    // Build path
-    path_documents = (char*) malloc((15+strlen(username)+11+1)*sizeof(char));
-    memcpy(path_documents, "../../database/", 15);
-    memcpy(&*(path_documents+15), username, strlen(username));
-    memcpy(&*(path_documents+15+strlen(username)), "/documents/\0", (11+1));
-
-
 
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
     bufferSupp1 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
@@ -488,8 +495,8 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
 
     sprintf((char*)temp, "%u", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
-                                    iv, IV_LEN,\
-                                    temp, LEN_SIZE);
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
@@ -500,7 +507,6 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
     
     if (ret == -1) // If the hash comparison failed
     {
-        free(path_documents);
         operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
@@ -599,7 +605,6 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         
         if (ret == -1) 
         {
-            free(path_documents);
             printf("Send failed.\n");
             return -1;
         }
@@ -609,14 +614,13 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
 
 
         /* ---- Check if the client succeed or failed ---- */
-        //msg_len = strlen(LIST_DENIED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
         ret = recv(sd, buffer, BUF_LEN,0);
         if (ret == -1)
         {
-            free_2(buffer, path_documents);
+            free(buffer);
             printf("Receive failed.\n");
             return -1;
         }
@@ -633,7 +637,7 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
             if (ret == -1) exit_with_failure("Error checking list denied message", 0);
             else 
             {
-                free_3(bufferSupp1, buffer, path_documents);
+                free_2(bufferSupp1, buffer);
                 printf("Received list denied message.\n");
                 return 1;
             }
@@ -648,12 +652,11 @@ int listServer(int sd, char* rec_mex, char* username, unsigned int* nonce, unsig
         else
         {
             printf("We don't know what the client said...\n\n");
-            free_3(bufferSupp1, buffer, path_documents);
+            free_2(bufferSupp1, buffer);
             return -1;
         }
     }
 
-    free(path_documents);
     return 1;
 }
 
@@ -687,8 +690,8 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    //ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    //if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+
 
 
     /* ---- Parse first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
@@ -717,14 +720,12 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     memcpy(iv, &*(rec_mex+offset), IV_LEN); // iv
     
     // Check hash
-    msg_to_hash_len = strlen(RENAME_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-    sprintf((char*)temp, "%u", *nonce);
-
-    ret = build_msg_4(&msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST),\
+    sprintf((char*)temp, "%d", *nonce);
+    msg_to_hash_len= build_msg_4(&msg_to_hash, RENAME_REQUEST, strlen(RENAME_REQUEST),\
                                     bufferSupp1, encr_len,\
                                     iv, IV_LEN,\
                                     temp, LEN_SIZE);
-    if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
 
     // If hash correct, decrypt
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
@@ -734,28 +735,14 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     {
         operation_denied(sd, "Wrong rename request hash", RENAME_DENIED, session_key1, session_key2, nonce);
         
-        free(bufferSupp1);
-        free(bufferSupp2);        
-        free(temp);
-        free(iv);
-        free(msg_to_hash);
-        free(digest);
-
+        free_6(bufferSupp1, bufferSupp2, temp, iv, msg_to_hash, digest);
         return -1;
     }
     else printf("Hash of M1 is correct\n");
 
     decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
 
-    printf("The plaintext is %s\n", plaintext);
-
-    free(bufferSupp1);
-    free(bufferSupp2);        
-    free(temp);
-    free(iv);
-    free(msg_to_hash);
-    free(digest);
-
+    free_6(bufferSupp1, bufferSupp2, temp, iv, msg_to_hash, digest);
 
     // Obtain the filenames from the plaintext and sanitize them
     // Filename
@@ -783,8 +770,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     {
         operation_denied(sd, "New_filename too long", RENAME_DENIED, session_key1, session_key2, nonce);
         
-        free(plaintext);
-        free(filename);
+        free_2(plaintext, filename);
         return -1;
     } 
     
@@ -800,9 +786,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, nonce);
 
         
-        free(plaintext);
-        free(filename);
-        free(new_filename);
+        free_3(plaintext, filename, new_filename);
         return -1;
     }
 
@@ -813,14 +797,11 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     if (ret == -1) {
         operation_denied(sd, "Something bad happened during the rename operation", RENAME_DENIED, session_key1, session_key2, nonce);
 
-        free(plaintext);
-        free(filename);
-        free(new_filename);
+        free_3(plaintext, filename, new_filename);
         return -1;
     }
-    free(plaintext);
-    free(filename);
-    free(new_filename);
+    
+    free_3(plaintext, filename, new_filename);
 
 
     // Send success message to the client
@@ -829,7 +810,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     return 1;
 }
 
-int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
+int deleteServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     size_t offset;
@@ -859,8 +840,6 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     //if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
     /* ---- Parse first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
-    *nonce = *nonce + 1;
-
     bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
@@ -882,14 +861,11 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     
     memcpy(iv, &*(rec_mex+offset), IV_LEN); // iv
 
-    msg_to_hash_len = strlen(DELETE_REQUEST)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE;
-
     sprintf((char*)temp, "%d", *nonce);
-
-    ret = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
-                                    bufferSupp1, encr_len,\
-                                    iv, IV_LEN,\
-                                    temp, LEN_SIZE);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
+                                                bufferSupp1, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
     if (ret == -1) exit_with_failure("Error during the building of the message", 1);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
@@ -926,9 +902,9 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         return -1;
     }
 
-    filename = (char*) malloc(len_fn*sizeof(char));
+    filename = (char*) malloc((len_fn+1)*sizeof(char));
     if (!filename) exit_with_failure("Malloc filename failed", 0);
-    memcpy(filename, plaintext, len_fn); 
+    memcpy(filename, plaintext, len_fn+1); 
 
     // Sanitize the filename
     ret = filename_sanitization(filename);
@@ -942,16 +918,23 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     }
 
     // Remove the file
+    ret = chdir("documents/");
+    if (ret == -1) exit_with_failure("Can't change directory to path_documents", 1);
     ret = remove(filename);
     if (ret == -1) {
         operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED, session_key1, session_key2, nonce);
-
+        ret = chdir("../");
+        if (ret == -1) exit_with_failure("Can't change directory", 1);
         
         free(plaintext);
         free(filename);
         return -1;
     }
     
+    ret = chdir("../");
+    if (ret == -1) exit_with_failure("Can't change directory", 1);
+
+
     free(plaintext);
     free(filename);
 
