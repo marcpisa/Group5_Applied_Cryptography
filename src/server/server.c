@@ -18,7 +18,7 @@ int main()
     struct sockaddr_in srv_addr, cl_addr;
     
     // Buffers
-    char received_buffer[4*BUF_LEN];
+    char received_buffer[BUF_LEN];
     char remote_comm[BUF_LEN];
     char local_comm[BUF_LEN];
     char* username;
@@ -132,9 +132,9 @@ int main()
                 }
                 else //Manager for the accepted communications
                 {
-                    memset(received_buffer, 0, 4*BUF_LEN); // ???
+                    memset(received_buffer, 0, BUF_LEN); // ???
                     //printf("Now the buffer contains %s\n\n", buffer);
-                    ret = recv(i, received_buffer, 4*BUF_LEN, 0);
+                    ret = recv(i, received_buffer, BUF_LEN, 0);
                     if (ret < 0)
                     {
                         perror("Error during recv operation: ");
