@@ -1101,7 +1101,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     //NOW WE START TO SEND THE CHUNKS
     for (i = 0; i < nchunk; i++)
     {
-        msg_to_encr_len = CHUNK_SIZE+1;
+        msg_to_encr_len = CHUNK_SIZE;
         msg_to_encr = (unsigned char*)malloc(msg_to_encr_len);
         if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
         if (i == nchunk-1)
@@ -1154,13 +1154,17 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         free(buffer);
         temp = (char*)malloc(LEN_SIZE*(sizeof(char)));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        sprintf((char*)temp, "%u", encr_len);
-        msg_len = build_msg_4(&buffer, temp, LEN_SIZE, encr_msg, encr_len, digest, HASH_LEN, iv, IV_LEN);
+        sprintf((char*)temp, "%i", encr_len);
+        msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
+                                       encr_msg, encr_len,\
+                                       digest, HASH_LEN,\
+                                       iv, IV_LEN);
         if (msg_len == -1) exit_with_failure("Error during the creation of the function", 1);
+        printf("The message len is %i\n", msg_len);
 
         printf("I'm sending %s", (char*)buffer);
 
-        ret = send(sock, buffer, BUF_LEN, 0);
+        ret = send(sock, (char*)buffer, BUF_LEN, 0);
         if (ret == -1)
         {
             printf("Send operation gone bad\n");
@@ -1170,12 +1174,14 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         printf("We are sending the chunk number %i\n", i);
         //NONCE MANAGEMENT
         *nonce += 1;
+        memset(buffer, 0, BUF_LEN);
 
         free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
         free(temp);
     }
     fclose(fd);
     buffer = (unsigned char*)malloc(BUF_LEN*(sizeof(unsigned char)));
+    if (!buffer) exit_with_failure("Malloc buffer failure", 1);
     ret = recv(sock, buffer, BUF_LEN, 0);
     if (ret == -1)
     {
@@ -1238,7 +1244,7 @@ int uploadServer(int sd, char* rec_mex)
         memset(bufferSupp2, 0, strlen(bufferSupp2));
         memset(bufferSupp1, 0, strlen(bufferSupp1));
         sprintf((char*)buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
-        printf("I'm sending %s\n\n", buffer);
+        //printf("I'm sending %s\n\n", buffer);
         ret = send(sd, buffer, strlen(buffer), 0);
         if (ret == -1)
         {
