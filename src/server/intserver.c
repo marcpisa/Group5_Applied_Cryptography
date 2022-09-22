@@ -1077,8 +1077,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     msg_len = build_msg_4(&buffer, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
-                                   bufferSupp1, strlen((char*)bufferSupp1), \
-                                   bufferSupp2, strlen((char*)bufferSupp2), \
+                                   bufferSupp1, LEN_SIZE, \
+                                   bufferSupp2, REST_SIZE, \
                                    digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
     *(buffer+msg_len) = '\0';
@@ -1136,12 +1136,13 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
         ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-        printf("I'm sending the chunk %s\n\n", (char*)msg_to_encr);
+        //printf("I'm sending the chunk %s\n\n", (char*)msg_to_encr);
 
         encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
         bufferSupp1 = (unsigned char*)malloc(LEN_SIZE); //nonce string;
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+        sprintf((char*)bufferSupp1, "%u", *nonce);
 
         //CREATE THE HASH
 
@@ -1156,6 +1157,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         sprintf((char*)temp, "%u", encr_len);
         msg_len = build_msg_4(&buffer, temp, LEN_SIZE, encr_msg, encr_len, digest, HASH_LEN, iv, IV_LEN);
         if (msg_len == -1) exit_with_failure("Error during the creation of the function", 1);
+
+        printf("I'm sending %s", (char*)buffer);
 
         ret = send(sock, buffer, BUF_LEN, 0);
         if (ret == -1)

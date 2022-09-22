@@ -909,17 +909,12 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         for (i = 0; i < nchunk; i++)
         {
             //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H(FILENAME, CHUNK, NONCE), iv
-            msg_len = LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
-            buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+            buffer = (unsigned char*) malloc(BUF_LEN);
             if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
             ret = recv(sock, buffer, BUF_LEN,0);
             if (ret == -1) exit_with_failure("Receive failed", 0);
-            printf("Received the server's response.\n");
-
-            iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-            if (!iv) exit_with_failure("Malloc iv failed", 1);
-            memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+BUF_LEN+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
+            printf("Received the server's response. It's %s\n", (char*)buffer);
 
             //Now we take the encr_len and the encrypted part to decrypt it later
             bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
@@ -929,6 +924,10 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             bufferSupp2 = (unsigned char*)malloc(encr_len);
             if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
             memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
+
+            iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+            if (!iv) exit_with_failure("Malloc iv failed", 1);
+            memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
             
             decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
             printf("The chunk we received is %s\n\n", (char*)plaintext);
