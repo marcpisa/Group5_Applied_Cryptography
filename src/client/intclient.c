@@ -931,6 +931,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
             
             decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
+            printf("The chunk we received is %s\n\n", (char*)plaintext);
 
             free(bufferSupp1);
 
@@ -961,7 +962,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
             free_5(digest, temp, msg_to_hash, bufferSupp2, bufferSupp3);
             free_2(buffer, iv);
-
+            printf("The rest is %i\n\n", rest);
             if (i == nchunk-1) for (j = 0; j < rest; j++) fprintf(f1, "%c", *(plaintext+j));
 	        else for (j = 0; j < CHUNK_SIZE; j++) fprintf(f1, "%c", *(plaintext+j));
             free(plaintext);
@@ -1006,13 +1007,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         if (ret == -1) exit_with_failure("Send failed", 1);
         *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
 
-        free(temp);
-        free(buffer);
-        free(msg_to_hash);
-        free(digest);
-        free(msg_to_encr);
-        free(encr_msg);
-        free(iv);
+        free_5(temp, buffer, msg_to_hash, digest, iv);
         return 1;
     }
     else
@@ -1039,11 +1034,7 @@ int uploadClient(int sock, char* username, char* filename)
     FILE* fd;
 
     // SANIFICATION FILENAME
-    if (chdir(MAIN_FOLDER_CLIENT) == -1)
-    {
-        printf("Main folder of the client unaccessible...\n\n");
-        return -1;
-    }
+    
     if ((fd = fopen(filename, "r")) == NULL)
     {
         //printf("The inserted filename is %s", filename);

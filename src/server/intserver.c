@@ -1136,6 +1136,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
         ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+        printf("I'm sending the chunk %s\n\n", (char*)msg_to_encr);
 
         encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
@@ -1170,6 +1171,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
         free(temp);
     }
+    fclose(fd);
     buffer = (unsigned char*)malloc(BUF_LEN*(sizeof(unsigned char)));
     ret = recv(sock, buffer, BUF_LEN, 0);
     if (ret == -1)

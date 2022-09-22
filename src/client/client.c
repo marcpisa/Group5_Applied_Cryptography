@@ -200,6 +200,11 @@ int main(int argc, char* argv[])
                                 printf("Login succedded.\n\n");
                                 connected = 1;
                             }
+                            if (chdir(MAIN_FOLDER_CLIENT) == -1)
+                            {
+                                printf("Main folder of the client unaccessible...\n\n");
+                                return -1;
+                            }
                         
                             break;
 
