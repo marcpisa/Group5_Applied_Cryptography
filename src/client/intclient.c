@@ -176,7 +176,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 
     /* ---- Generate last message for the server (digital signature) ---- */
     msg_len = SIGN_LEN;
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*msg_len);
+    buffer = (unsigned char*) malloc(BUF_LEN);
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     // Generate digital signature
@@ -507,7 +507,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
     unsigned char* msg_to_encr;
     unsigned char* encr_msg;
-    unsigned int msg_to_encr_len;
+    int msg_to_encr_len;
     int encr_len;
     
     unsigned char* msg_to_hash;
@@ -629,9 +629,9 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     unsigned int digest_len; 
     int msg_to_hash_len;
     
+    int msg_len;
     int ret;
     int len_fn;
-    int msg_len; 
     char* temp; 
     unsigned char* buffer;   
     unsigned char* bufferSupp1;
@@ -678,6 +678,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
                                    encr_msg, encr_len,\
                                    digest, HASH_LEN,\
                                    iv, IV_LEN);
+    if(msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
     printf("I'm sending to the server the delete request.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
@@ -835,7 +836,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
     {
-        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, &nonce, session_key1, session_key2);
+        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking download_denied message...\n");
         else printf("Download denied frm the server...\n");
 
