@@ -1159,6 +1159,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     memcpy(&*(bufferSupp1+strlen(UPLOAD_DENIED)), "\0", 1);
 
     printf("Upload started\n\n"); 
+    
+  
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0)
     {
@@ -1171,7 +1173,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         
     } 
     
-        else if (strcmp((char*)bufferSupp1, UPLOAD_ACCEPTED) == 0) {        
+        else if (strcmp((char*)bufferSupp1, UPLOAD_ACCEPTED) == 0) {     
+
 
         for (i = 0; i < nchunk; i++) {
         msg_to_encr_len = CHUNK_SIZE;
@@ -1192,7 +1195,6 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
             *(msg_to_encr+j) = ch;
         }
-
 
         //ENCRYPT THE MESSAGE SENT
         iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
@@ -1283,7 +1285,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
 
     free(buffer);
-    printf("We have completed successfully the Upload of the file!\n\n");
+    printf("File %s uploaded!\n\n", filename);
     *nonce += 1;
 
     return 1;
