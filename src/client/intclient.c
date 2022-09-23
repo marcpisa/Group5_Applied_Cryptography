@@ -1070,11 +1070,11 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
     stat(filename, &st);
     chdir("..");
-    printf("The size of the file is %ld\n", st.st_size);
+    //printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
-    printf("The number of chunk is %li\n", nchunk);
+    //printf("The number of chunk is %li\n", nchunk);
     //printf("The number of rest is %i\n", rest);
 
 
@@ -1131,7 +1131,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
     // The message in the buffer now is: DOWNLOAD_REQUEST, len_encr, encr, hash, iv. We can send it now
 
-    printf("I'm sending to the server the download request.\n");
+    //printf("I'm sending to the server the upload request.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
     *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
@@ -1150,7 +1150,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
     //printf("We received %s\n", (char*)buffer); HEAP OVERFLOW WITHOUT \0
 
     bufferSupp1 = (unsigned char*) malloc((strlen(UPLOAD_DENIED)+1)*sizeof(unsigned char));
@@ -1158,12 +1158,13 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     memcpy(bufferSupp1, buffer, strlen(UPLOAD_DENIED)); // denied or accepted same length
     memcpy(&*(bufferSupp1+strlen(UPLOAD_DENIED)), "\0", 1);
 
+    printf("Upload started\n\n"); 
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0)
     {
         ret = check_reqden_msg(UPLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking download_denied message...\n");
-        else printf("Download denied from the server...\n");
+        else printf("Upload denied by the server.\n");
 
         free_2(bufferSupp1, buffer);
         return 1;
@@ -1240,8 +1241,9 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
             return -1;
         }
         *nonce += 1;
-           
-        printf("We are sending the chunk number %i\n", i);
+        
+
+        //printf("We are sending the chunk number %i\n", i);
 
         free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
         free(temp);
@@ -1254,7 +1256,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
             printf("Receive operation gone bad\n");
             return -1;
         }
-        printf("Confirmed! %s\n", (char*)buffer);
+        //printf("Confirmed! %s\n", (char*)buffer);
         free(buffer);
     }
 
@@ -1272,16 +1274,16 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
 
     // DECRYPT THE BUFFER
-    ret = check_reqacc_msg(DOWNLOAD_FINISHED, buffer, *nonce, session_key2);
+    ret = check_reqacc_msg(UPLOAD_FINISHED, buffer, *nonce, session_key2);
     if (ret == -1)
     {
-        printf("Check download_finished gone bad.\n\n");
+        printf("Check UPLOAD_FINISHED gone bad.\n\n");
         free(buffer);
         return -1;
     }
 
     free(buffer);
-    printf("We have completed successfully the donwload operation!\n\n");
+    printf("We have completed successfully the Upload of the file!\n\n");
     *nonce += 1;
 
     return 1;

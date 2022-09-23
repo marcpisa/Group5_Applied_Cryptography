@@ -379,7 +379,7 @@ int main(int argc, char* argv[])
                             printf("Rename files: 'rename old_filename new_filename'\n"); 
                             printf("Delete file: 'delete filename'\n"); 
                             printf("Download file: 'download filename'\n");  
-                            printf("Upload file: 'upload file_location'\n");  
+                            printf("Upload file: 'upload filename'\n");  
                             printf("Share file with other user: 'share filename username'\n"); 
                             printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
                             break; 
