@@ -275,14 +275,9 @@ int loginServer(int sd, char* rec_mex)
             // LOGOUT MANAGER: SERVER SIDE
                             
             ret = logoutServer(funcBuff, &nonce_cs, session_key2);
-            if (ret == -1)
-            {
-                printf("Something bad happened during the management of the client logout request...\n\n");
-                printf("End of logout request management!\n\n");
-            }
+            if (ret == -1) printf("Something bad happened during the management of the client logout request...\n\n");
             else
             {
-                printf("I managed a logout request and all was good!\n");
                 printf("End of logout request management!\n\n");
                 break;
             }
@@ -301,7 +296,7 @@ int loginServer(int sd, char* rec_mex)
                 printf("Something bad happened during the management of the client list request...\n\n");
                 break;
             }
-            else printf("I managed a list request and all was good!\n\n");
+            else printf("End of list request management!\n\n");
         }
 
 
@@ -332,8 +327,7 @@ int loginServer(int sd, char* rec_mex)
             {
                 printf("Something bad happened during the management of the client delete request...\n\n");
                 break;
-            }
-            else printf("I managed a delete request and all was good!\n\n");
+            } else printf("End of delete request management!\n\n");
         }
 
         
@@ -349,8 +343,8 @@ int loginServer(int sd, char* rec_mex)
             {
                 printf("Something bad happened during the management of the client download request...\n\n");
                 break;
-            }
-            else printf("I managed a download request and all was good!\n\n");
+            } 
+            else printf("End of download request management!\n\n");
         }
 
 
@@ -366,7 +360,7 @@ int loginServer(int sd, char* rec_mex)
                 printf("Something bad happened during the management of the client upload request...\n\n");
                 break;
             }
-            else printf("I managed an upload request and all was good!\n\n");
+            else printf("End of upload request management!\n\n");
         }
 
 
@@ -382,7 +376,7 @@ int loginServer(int sd, char* rec_mex)
                 printf("Something bad happened during the management of the client share request...\n\n");
                 break;
             }
-            else printf("I managed a share request and all was good!\n\n");
+            else printf("End of share request management!\n\n");
         }
 
         else printf("Unknown type of request by the Client...\n");  
@@ -1039,9 +1033,10 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     fd = fopen(filename, "r");
     if (!(fd))
     {
-        printf("File %s doesn't exist...\n\n", filename);
+        printf("File %s doesn't exist...\n  ", filename);
+        operation_denied(sock, "The file doesn't exists", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
         chdir("..");
-        return -1;
+        return 1;
     }
     stat(filename, &st);
     chdir("..");

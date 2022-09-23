@@ -566,8 +566,6 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     
     if (ret == -1) exit_with_failure("Send failed", 0);
     else *nonce = *nonce + 1;
-
-    printf("Send %s\n", reason);
 }
 
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)

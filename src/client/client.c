@@ -254,8 +254,9 @@ int main(int argc, char* argv[])
                             }
 
                             ret = listClient(connectedSock, session_key1, session_key2, &nonce_cs);
-                            if (ret == -1) {printf("Something bad happened\n\n"); exit(1);}
-                            else printf("List succeeded.\n\n");
+                            
+                            if (ret == -1) printf("Error during the list request!\n\n");
+                            else printf("\n");
 
                             break;
                         
@@ -282,8 +283,10 @@ int main(int argc, char* argv[])
 
                             // Handle rename request
                             ret = renameClient(connectedSock, command2, command3, session_key1, session_key2, &nonce_cs);
-                            if (ret == -1) exit_with_failure("Error during the rename operation request!", 0);
-                            else printf("Rename succeeded.\n\n");
+                            
+                            if (ret == -1) printf("Error during the rename operation request!\n\n");
+                            else printf("\n");
+                            
                             break;
 
                         case 5: //*********** DELETE **********
@@ -308,8 +311,7 @@ int main(int argc, char* argv[])
                             }
 
                             ret = deleteClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
-                            if (ret == -1) exit_with_failure("Error during the delete operation request!", 0);
-                            else printf("Delete succeeded.\n\n");
+                            if (ret == -1) printf("Error during the delete operation request!\n\n");
 
                             break;
 
@@ -322,12 +324,8 @@ int main(int argc, char* argv[])
 
                             ret = downloadClient(connectedSock, command2, session_key1, session_key2, &nonce_cs); // format of the input given to the input stream: download filename
 
-                            if (ret == -1)
-                            {
-                                printf("Error during the download operation request!\n\n");
-                                exit(1);
-                            }
-                            else printf("Download succeeded.\n\n");
+                            if (ret == -1) printf("Error during the download operation request!\n\n");
+                            else printf("\n");
 
                             break;
 
@@ -353,11 +351,8 @@ int main(int argc, char* argv[])
 
                             ret = uploadClient(connectedSock, username, command2);
                             
-                            if (ret == -1)
-                            {
-                                printf("Error during the upload operation request!\n\n");
-                                exit(1);
-                            }
+                            if (ret == -1) printf("Error during the upload operation request!\n\n");
+                            else printf("\n");
 
                             break;
 
@@ -371,11 +366,8 @@ int main(int argc, char* argv[])
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
                             ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
 
-                            if (ret == -1)
-                            {
-                                printf("Error during the share operation request!\n\n");
-                                exit(1);
-                            }
+                            if (ret == -1) printf("Error during the share operation request!\n\n");
+                            else printf("\n");
 
                             break;
                         
@@ -417,6 +409,12 @@ int main(int argc, char* argv[])
                             break;
                     }
                     fflush(stdin);
+
+                    if (!session_key1 && !session_key2) 
+                    {
+                        free(session_key1);
+                        free(session_key2);
+                    }
                 }
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {

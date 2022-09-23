@@ -757,8 +757,8 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     
     FILE* f1;
 
-    int ret, i, j;
-    int rest, nchunk;
+    int ret, i;
+    int nchunk;
     int msg_len;
     char* temp;
     unsigned char* buffer;
@@ -845,7 +845,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         else printf("Download denied from the server...\n");
 
         free_2(bufferSupp1, buffer);
-        return -1;
+        return 1;
         
     }
     else if (strcmp((char*)bufferSupp1, DOWNLOAD_ACCEPTED) == 0)
@@ -866,7 +866,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         memcpy(bufferSupp1, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE), LEN_SIZE); //We put the nchunk value on bufferSupp1
         memcpy(temp, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE);
         nchunk = atoi((char*)bufferSupp1);
-        rest = atoi(temp);
+        //rest = atoi(temp);
         free(temp);
         if (nchunk == 0)
         {
@@ -907,10 +907,19 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         } 
         else printf("The download request has been accepted!\n\n");
     }
+    else if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
+    {
+        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
+        if (ret == -1) printf("Error checking download_denied message.\n");
+
+        free_2(bufferSupp1, buffer);
+        return -1;
+    }
     else
     {
         //We don't know what we received
         printf("We received an uncorrect message from the server...\n\n");
+        free_2(bufferSupp1, buffer);
         return -1;
     }
 
