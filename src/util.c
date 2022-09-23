@@ -191,7 +191,7 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
     *out = (unsigned char*) malloc(inl*sizeof(unsigned char));
-    printf("%d\n", inl);
+    //printf("%d\n", inl);
     if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);

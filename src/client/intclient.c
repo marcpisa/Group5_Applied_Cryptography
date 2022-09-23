@@ -934,7 +934,9 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         buffer = (unsigned char*)malloc(BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        ret = recv(sock, buffer, BUF_LEN, 0);
+        msg_len = LEN_SIZE+528+HASH_LEN+IV_LEN+(3*BLANK_SPACE);
+   
+        ret = recv(sock, buffer, msg_len, 0);
         if (ret == -1) exit_with_failure("Receive failed", 0);
         //*(buffer+BUF_LEN-1) = '\0';
         //printf("Received the server's response. It's %s\n", (char*)buffer);
@@ -943,8 +945,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
-        *(bufferSupp1+3) = '\0';
-        printf("Encr. len: %s\n", bufferSupp1);
         encr_len = atoi((char*)bufferSupp1);
 
         bufferSupp2 = (unsigned char*)malloc(encr_len);

@@ -1167,7 +1167,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         //printf("The message len is %i\n", msg_len);
         //printf("I'm sending %s", (char*)buffer);
 
-        ret = send(sock, buffer, BUF_LEN, 0);
+        ret = send(sock, buffer, msg_len, 0);
         if (ret == -1)
         {
             printf("Send operation gone bad\n");
