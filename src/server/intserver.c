@@ -1181,6 +1181,17 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
         free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
         free(temp);
+
+        buffer = (unsigned char*)malloc(BUF_LEN);
+        if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
+        ret = recv (sock, buffer, BUF_LEN, 0);
+        if (ret == -1)
+        {
+            printf("Receive operation gone bad\n");
+            return -1;
+        }
+        printf("Confirmed! %s\n", (char*)buffer);
+        free(buffer);
     }
     fclose(fd);
 
@@ -1216,147 +1227,342 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
 
 
-int uploadServer(int sd, char* rec_mex)
+int uploadServer(int sock, char* rec_mex,char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
 {
-    int ret, nchunk, i, j, k, r, position, rest;
-    char buffer[BUF_LEN];
-    FILE* f1;
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char filename[MAX_LEN_FILENAME];
-    char username[MAX_LEN_USERNAME];
 
-    printf("I received %s\n\n", rec_mex);
-    sscanf(rec_mex, "%s %s %s %s %s", bufferSupp1, username, filename, bufferSupp2, bufferSupp3);
+    int ret;
+    unsigned char* iv;
+
+    int encr_len;
+    unsigned int plain_len;
+    unsigned char* plaintext;
+    unsigned char* encr_msg;
+
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned int msg_to_encr_len;
+    unsigned char* msg_to_encr;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    int msg_len;
+    char* temp;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+
+    //char filename[MAX_LEN_FILENAME];
+    struct stat st;
+    int i, j;
+    int nchunk, rest;
+    FILE* fd;
+    FILE* f1; 
+
+
+
+        /* ---- Parsing the message ----*/
+    //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv)
+    bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE), LEN_SIZE);
+    encr_len = atoi((char*)bufferSupp1);
+
+    // HERE WE TAKE THE ENCRYPTED MESSAGE
+    encr_msg = (unsigned char*)malloc(sizeof(unsigned char)*encr_len);
+    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
+    memcpy(encr_msg, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len);
+
+    //HERE WE TAKE THE MAC
+    bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    memcpy(bufferSupp2, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
+
+    //HERE WE TAKE THE IV
+    iv = (unsigned char*)malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    memcpy(iv, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+
+    nchunk = (unsigned char*)malloc(sizeof(unsigned char)*nchunk);
+    if (!nchunk) exit_with_failure("Malloc iv failed", 1);
+    memcpy(nchunk, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN+BLANK_SPACE), nchunk);
+
+ 
+
+    // HERE WE TAKE THE NONCE IN STRING
+    buffer = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+    sprintf((char*)buffer, "%u", *nonce);
     
-    rest = atoi((char*)bufferSupp3);
-    nchunk = atoi((char*)bufferSupp2);
+    //Now we prepare the message to hash to compare it with the one we received
+    msg_to_hash_len = build_msg_5(&msg_to_hash, UPLOAD_REQUEST, strlen(UPLOAD_REQUEST), \
+                                                encr_msg, encr_len, \
+                                                iv, IV_LEN, \
+                                                buffer, LEN_SIZE, \
+                                                nchunk, nchunk);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
-    printf("The number of chunk of the file is %i", nchunk);
-
-    
-
-    // SANITIZATION OF THE USERNAME AND THE FILENAME
-
-    if (chdir(MAIN_FOLDER_SERVER) == -1)
-	{
-		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-        return -1;
-	}
-    if (chdir(username) == -1)
-    {
-        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-        return -1;
-    }
-    f1 = fopen(filename, "r");
-    if (f1 == NULL) 
-    {
-        printf("Starting the upload...\n\n");
-        memset(buffer, 0, strlen(buffer));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        sprintf((char*)buffer, "%s %s %s", UPLOAD_ACCEPTED, username, filename);
-        //printf("I'm sending %s\n\n", buffer);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1)
-        {
-          //  print("Some problem with send operation...\n\n");
-            return -1;
-        }
-    }
-    else
-    {
-        printf("File with this name already exists: refusing upload operation...\n\n");
-        fclose(f1);
-        printf("Filename already exists. Download request over...\n\n");
-        memset(buffer, 0, strlen(buffer));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        sprintf((char*)buffer, "%s %s %s", UPLOAD_DENIED, username, filename);
-        printf("I'm sending %s\n\n", buffer);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1) printf("Had some problem with the send operation...\n\n");
-        return -1;
-    }
-
-
-   f1 = fopen(filename, "w");
-    for (i = 0; i < nchunk; i++)
-    {
-        printf("We are receiving the chunk number %i...\n\n", i);
-        memset(buffer, 0, strlen(buffer));
-        // I'm receveing a message with this format: download_chunk n_chunk payload
-        ret = recv(sd, buffer, BUF_LEN, 0);
-        if (ret == -1)
-        {
-            printf("Receive operation gone bad\n");
-            // Change this later to manage properly the session
-            exit(1);
-        }
-        //sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3); // we receive: donwload_chunk filename payload
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
-        sscanf(buffer, "%s %s", bufferSupp1, bufferSupp2);
-        k = strlen(bufferSupp1);
-        r = strlen(bufferSupp2);
-        printf("In bufferSupp1 we have %s and the size of the field is %i, the bufferSupp2 contains %s and the size is %i\n\n", bufferSupp1, k, bufferSupp2, r);
-        position = strlen(bufferSupp1) + strlen(bufferSupp2) + 2;
-        printf("The position of the buffer where we start to take the payload is %i\n\n", position);
-	if (i == nchunk-1)
-	{
-	     for (j = 0; j < rest; j++)
-             {
-                 bufferSupp3[j] = buffer[position+j];
-             }
-	}
-	else
-	{
-	     for (j = 0; j < CHUNK_SIZE; j++)
-             {
-                 bufferSupp3[j] = buffer[position+j];
-             }
-	}
-        
-
-        printf("The payload received is %s\n\n", bufferSupp3);
-        
-        
-        // Now take the bufferSupp3 and append it to the file. When the loop is over we close the file and we got what we neededs
-        printf("Now we append %s to the file...\n\n", bufferSupp3);
-	if (i == nchunk-1)
-	{
-	      for (j = 0; j < rest; j++)
-              {
-                 fprintf(f1, "%c", bufferSupp3[j]);
-              }
-	}
-	else
-	{
-	      for (j = 0; j < CHUNK_SIZE; j++)
-              {
-                 fprintf(f1, "%c", bufferSupp3[j]);
-              }
-	}
-        //fwrite(bufferSupp3, 1, strlen(bufferSupp3), f1); //I append the payload to the file
-        memset(bufferSupp1, 0, strlen(bufferSupp1));
-        memset(bufferSupp2, 0, strlen(bufferSupp2));
-        memset(bufferSupp3, 0, strlen(bufferSupp3));
-    }
-    fclose(f1);
-    memset(buffer, 0, strlen(buffer));
-    sprintf((char*)buffer, "%s %s %s", DOWNLOAD_FINISHED, username, filename);
-    printf("I'm sending %s\n\n", buffer);
-    ret = send(sd, buffer, BUF_LEN, 0);
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
     if (ret == -1)
     {
-        printf("Send operation gone bad\n");
-        // Change this later to manage properly the session
-        exit(1);
+        printf("Wrong rename failed hash\n\n");
+        ret = -1;
+    } 
+    else printf("The MAC is been correctly compared!\n");
+    
+
+    //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
+    decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
+    if (plain_len > MAX_LEN_FILENAME)
+    {
+        free_6(bufferSupp1, bufferSupp2, encr_msg, iv, plaintext, buffer);
+        free_2(msg_to_hash, digest);
+        printf("The length of the filename is too big, download management terminated...\n\n");
+        return -1;
     }
-    printf("Download completed!\n\n");
-    return 1;
+    // HERE WE SHOULD SANITIZE THE FILENAME
+    memset(filename, 0, MAX_LEN_FILENAME);
+    memcpy(filename, plaintext, plain_len); 
+
+    free_6(bufferSupp1, bufferSupp2, msg_to_hash, encr_msg, plaintext, iv);
+    free_2(buffer, digest);
+
+    // FINISHED Preparation for message 2 --
+
+    // NOW WE PREPARE MESSAGE 2 to send UPLOAD_ACCEPTED TO CLIENT 
+
+
+
+
+
+
+    /* ---- Send download_accepted to the client ---- */ 
+    //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS DOWNLOAD_ACCEPTED NCHUNK REST HASH
+    //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: DOWNLOAD_ACCEPTED NONCE NCHUNK REST
+    bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
+    if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
+    //bufferSupp2 = (unsigned char*)malloc(REST_SIZE);
+   // if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    temp = (char*)malloc(LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
+    //sprintf((char*)bufferSupp1, "%i", nchunk); //nchunk is put on bufferSupp1 as a string
+    //sprintf((char*)bufferSupp2, "%i", rest); //rest is put on bufferSUpp2 as a string
+    msg_to_hash_len = build_msg_2(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+    msg_len = build_msg_2(&buffer, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
+                                   digest, HASH_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
+    *(buffer+msg_len) = '\0';
+    printf("We are sending %s\n", (char*)buffer);
+    
+    ret = send(sock, buffer, BUF_LEN, 0);
+    if (ret == -1)
+    {
+        printf("Send operation gone bad.\n");
+        free_5(buffer, bufferSupp1, msg_to_hash, temp, digest);
+        return -1;
+    }
+    *nonce += 1;
+
+    free_5(buffer, bufferSupp1, msg_to_hash, temp, digest);
+
+
+    // Finished message 3 
+
+    if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0) 
+    {
+
+
+
+        printf("Download denied frm the server...\n");
+        free_2(bufferSupp1, buffer);
+        return -1;
+
+    } 
+    else 
+        if(strcmp((char*)bufferSupp1, UPLOAD_ACCEPTED) == 0) 
+        {
+
+
+    
+
+            //HERE WE SHOULD CHECK THE HASH: the format of the message received should be: DOWNLOAD_ACCEPTED, nchunk, rest, hash
+            // Parse the message
+            bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+            if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+            memcpy(bufferSupp2, &*(buffer+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE), HASH_LEN); // hash
+
+            //SETTING OF THE NCHUNK AND THE REST VARIABLE RECEIVED BY THE SERVER
+            free(bufferSupp1);
+            bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE); // Here we save the nchunk value of the message
+            if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 for nchunk failed", 1);
+            temp = (char*)malloc(sizeof(char)*REST_SIZE); // Here we save the number of bytes of the last chunk
+            if (!temp) exit_with_failure("Malloc bufferSupp1 for nchunk failed", 1);
+            memcpy(bufferSupp1, &*(buffer+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE), LEN_SIZE); //We put the nchunk value on bufferSupp1
+            memcpy(temp, &*(buffer+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE);
+            nchunk = atoi((char*)bufferSupp1);
+            rest = atoi(temp);
+            free(temp);
+            if (nchunk == 0)
+            {
+                printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
+                return 1;
+            }
+
+            // Check hash on DOWNLOAD_ACCEPTED, NONCE, NCHUNK, REST
+            printf("I'm going to check the mac value!\n");
+            msg_to_hash_len = strlen(UPLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+LEN_SIZE+REST_SIZE;
+
+            temp = (char*) malloc(sizeof(char)*LEN_SIZE); //Here we save the nonce
+            if (!temp) exit_with_failure("Malloc temp failed", 1);
+            bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*REST_SIZE); // Here we save the rest value of the message
+            if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 for nchunk failed", 1);
+
+            sprintf(temp, "%d", *nonce); //nonce strring format
+            memcpy(bufferSupp3, &*(bufferSupp2+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE); //rest string format
+
+            ret = build_msg_4(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED),\
+                                            temp, LEN_SIZE, \
+                                            bufferSupp1, LEN_SIZE,\
+                                            bufferSupp3, REST_SIZE);
+            if (ret == -1) exit_with_failure("Error during the building of the message...", 1);
+
+            digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+            ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+            free_6(digest, temp, buffer, msg_to_hash, bufferSupp1, bufferSupp2);
+            free(bufferSupp3);
+
+             if (ret == -1)
+            {
+                printf("Wrong download accepted hash\n\n");
+                ret = -1;
+            }
+
+
+
+                //NOW WE CAN BEGIN DOWNLOAD THE CHUNKS
+            f1 = fopen(filename, "w");
+            for (i = 0; i < nchunk; i++)
+            {
+                //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H(FILENAME, CHUNK, NONCE), iv
+                buffer = (unsigned char*) malloc(BUF_LEN);
+                if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+                ret = recv(sock, buffer, BUF_LEN,0);
+                if (ret == -1) exit_with_failure("Receive failed", 0);
+                printf("Received the server's response. It's %s\n", (char*)buffer);
+
+                //Now we take the encr_len and the encrypted part to decrypt it later
+                bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
+                if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+                memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
+                encr_len = atoi((char*)bufferSupp1);
+                bufferSupp2 = (unsigned char*)malloc(encr_len);
+                if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+                memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
+
+                iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+                if (!iv) exit_with_failure("Malloc iv failed", 1);
+                memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
+
+                decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
+                printf("The chunk we received is %s\n\n", (char*)plaintext);
+
+                free(bufferSupp1);
+
+                //NOW WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
+                temp = (char*)malloc(sizeof(char)*LEN_SIZE);
+                if (!temp) exit_with_failure("Error during the malloc of temp", 1);
+                sprintf(temp, "%ls", nonce); //nonce string format
+                bufferSupp3 = (unsigned char*)malloc(HASH_LEN*sizeof(unsigned char*));
+                if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+                memcpy(bufferSupp3, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN); //Here we have the hash to compare
+                msg_to_hash_len = plain_len + BLANK_SPACE + LEN_SIZE + BLANK_SPACE + IV_LEN;
+
+                ret = build_msg_3(&msg_to_hash, bufferSupp2, encr_len,\
+                                                temp, LEN_SIZE,\
+                                                iv, IV_LEN);
+                if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+
+                digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+                ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
+                if (ret == -1)
+                {
+                    printf("Wrong download chunk hash\n\n");
+                    free_5(digest, temp, msg_to_hash, bufferSupp2, bufferSupp3);
+                    free_3(buffer, iv, plaintext);
+                    return -1;
+                }
+
+                free_5(digest, temp, msg_to_hash, bufferSupp2, bufferSupp3);
+                free_2(buffer, iv);
+                printf("The rest is %i\n\n", rest);
+                if (i == nchunk-1) for (j = 0; j < rest; j++) fprintf(f1, "%c", *(plaintext+j));
+	            else for (j = 0; j < CHUNK_SIZE; j++) fprintf(f1, "%c", *(plaintext+j));
+                free(plaintext);
+                printf("We received correctly the chunk number %i\n", i);
+            }
+            fclose(f1);
+            //Now we should send a message of download completed
+
+            // Initialization of IV
+            iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+            if (!iv) exit_with_failure("Malloc iv failed", 1);
+            ret = RAND_poll(); // Seed OpenSSL PRNG
+            if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+            ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+            if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+            // Create the hash
+            msg_to_hash_len = strlen(UPLOAD_FINISHED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+IV_LEN;
+            temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+            if (!temp) exit_with_failure("Malloc temp failed", 1);
+            sprintf(temp, "%d", *nonce); // Now in temp there is the string version of the nonce
+
+            ret = build_msg_3(&msg_to_hash, UPLOAD_FINISHED, strlen(UPLOAD_FINISHED),\
+                                            temp, LEN_SIZE,\
+                                            iv, IV_LEN);
+            if (ret == -1) exit_with_failure("Error during the building of the message", 1);
+
+            digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+            if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
+
+            // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
+            msg_len = strlen(UPLOAD_FINISHED)+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN;
+
+            ret = build_msg_3(&buffer, UPLOAD_FINISHED, strlen(UPLOAD_FINISHED),\
+                                       digest, HASH_LEN,\
+                                       iv, IV_LEN);
+            if (ret == -1) exit_with_failure("Error during the buildinf of the message", 1);
+            // The message in the buffer now is: DOWNLOAD_FINISHED, hash, iv. We can send it now
+
+            printf("I'm sending to the server the download request.\n");
+            ret = send(sock, buffer, BUF_LEN, 0); 
+            if (ret == -1) exit_with_failure("Send failed", 1);
+            *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
+
+            free_5(temp, buffer, msg_to_hash, digest, iv);
+            return 1;
+
+
+        }  
+        else 
+        {
+            //We don't know what we received
+            printf("We received an uncorrect message from the client...\n\n");
+            return -1;
+        }
+        return 1; 
 }
 
 int shareServer(int sd, char* rec_mex)
