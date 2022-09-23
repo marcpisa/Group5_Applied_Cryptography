@@ -965,6 +965,9 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     int nchunk, rest;
     FILE* fd;
 
+
+
+
     /* ---- Parsing the message ----*/
     //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv)
     bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
@@ -1127,10 +1130,11 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
 
         //ENCRYPT THE MESSAGE SENT
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
         if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+        //*(iv+IV_LEN) = '\0';        
         //printf("I'm sending the chunk %s\n\n", (char*)msg_to_encr);
 
         if (i == nchunk-1) encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, rest, iv, session_key1);
@@ -1150,9 +1154,10 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
         // CREATE THE MESSAGE
         free(buffer);
-        temp = (char*)malloc(LEN_SIZE*(sizeof(char)));
+        temp = (char*)malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
-        sprintf((char*)temp, "%i", encr_len);
+        
+        sprintf(temp, "%i", encr_len);
         msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
                                        encr_msg, encr_len,\
                                        digest, HASH_LEN,\
@@ -1171,7 +1176,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
             return -1;
         }
         *nonce += 1;
-
+           
         printf("We are sending the chunk number %i\n", i);
 
         free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);

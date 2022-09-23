@@ -1,5 +1,6 @@
 #include "util.h"
 
+
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
 static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
@@ -190,6 +191,7 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     if(!ctx) exit_with_failure("EVP_CIPHER_CTX_new failed", 1);
 
     *out = (unsigned char*) malloc(inl*sizeof(unsigned char));
+    printf("%d\n", inl);
     if (!(*out)) exit_with_failure("Malloc out failed", 0);    
 
     ret = EVP_DecryptInit(ctx, EVP_aes_128_cbc(), key, iv);
@@ -203,7 +205,11 @@ void decrypt_AES_128_CBC(unsigned char** out, unsigned int* out_len, unsigned ch
     total_len += update_len;
     
     ret = EVP_DecryptFinal(ctx, *out+total_len, &update_len);
-    if (ret != 1) exit_with_failure("DecryptFinal failed", 1);
+    if (ret != 1) 
+    {
+        ERR_print_errors_fp(stderr);
+        exit(1); 
+    }//exit_with_failure("DecryptFinal failed", 1);
     total_len += update_len;
     *out_len = total_len;
 

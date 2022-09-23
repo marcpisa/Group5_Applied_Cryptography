@@ -18,6 +18,7 @@
 #include <openssl/hmac.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <openssl/err.h>
 //#include <conio.h>
 
 

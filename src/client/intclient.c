@@ -943,15 +943,18 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         bufferSupp1 = (unsigned char*) malloc(LEN_SIZE);
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
+        *(bufferSupp1+3) = '\0';
+        printf("Encr. len: %s\n", bufferSupp1);
         encr_len = atoi((char*)bufferSupp1);
 
         bufferSupp2 = (unsigned char*)malloc(encr_len);
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
 
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
+        //*(iv+IV_LEN) = '\0';
 
         // WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
         bufferSupp3 = (unsigned char*)malloc(HASH_LEN*sizeof(unsigned char*));
@@ -984,7 +987,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
         // WRITE TO FILE
         fwrite(plaintext, sizeof(unsigned char), plain_len, f1);
-        
         
         free_4(bufferSupp1, bufferSupp2, iv, plaintext);
         printf("We received correctly the chunk number %i\n", i);
