@@ -1327,13 +1327,12 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     free_3(buffer, digest, bufferSupp3);
 
     //CHECK OF FILE NAME ALREADY EXISTS 
-
     ret = chdir("documents");
     if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
     fd = fopen(filename, "r");
     if (fd)
     {
-        printf("File %s already exist...\n  ", filename);
+        printf("File %s already exists...\n  ", filename);
         operation_denied(sock, "The file already exists", UPLOAD_DENIED, session_key1, session_key2, nonce);
         chdir("..");
         return 1;
@@ -1445,8 +1444,6 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         }
 
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
-        //printf("The chunk we received is %s\n\n", (char*)plaintext);
-
 
         // WRITE TO FILE
         fwrite(plaintext, sizeof(unsigned char), plain_len, fd);
@@ -1467,21 +1464,13 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         free(buffer);
     }
     fclose(fd);
-        
     
-
-
     /* ---- SEND DOWNLOAD FINISHED MESSAGE ---- */
     printf("Send download finished message.\n");
     operation_succeed(sock, DOWNLOAD_FINISHED, session_key2, nonce);
     chdir("..");
         
     return 1;
-
-
-
-
-
 }
 
 int shareServer(int sd, char* rec_mex)
