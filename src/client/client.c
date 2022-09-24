@@ -348,8 +348,7 @@ int main(int argc, char* argv[])
                                 printf("Filename sanitization failed.\n\n");
                                 break;
                             }
-
-                            ret = uploadClient(connectedSock, username, command2);
+                            ret = uploadClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
                             
                             if (ret == -1) printf("Error during the upload operation request!\n\n");
                             else printf("\n");
