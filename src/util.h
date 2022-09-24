@@ -30,7 +30,9 @@
 #define MAX_LEN_USERNAME 20
 #define COMM_NUMB 10
 #define PORT_SIZE 6
-#define CHUNK_SIZE 512
+#define CHUNK_SIZE 512 
+#define PADDING_LEN 16
+#define ENCR_CHUNK_LEN CHUNK_SIZE+PADDING_LEN // This is correct if CHUNK_SIZE is a multiple of 16
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
 #define MEX_TYPE_LEN 8

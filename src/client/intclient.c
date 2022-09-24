@@ -934,7 +934,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         buffer = (unsigned char*)malloc(BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        msg_len = LEN_SIZE+528+HASH_LEN+IV_LEN+(3*BLANK_SPACE);
+        msg_len = LEN_SIZE+ENCR_CHUNK_LEN+HASH_LEN+IV_LEN+(3*BLANK_SPACE);
    
         ret = recv(sock, buffer, msg_len, 0);
         if (ret == -1) exit_with_failure("Receive failed", 0);
@@ -1004,9 +1004,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         free(buffer);
     }
     fclose(f1);
-        
-    
-
 
     /* ---- SEND DOWNLOAD FINISHED MESSAGE ---- */
     printf("Send download finished message.\n");
@@ -1075,7 +1072,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
 
     //M1: Send message to request the upload. Message format: 
-    //UPLOAD_REQUEST nonce, nchunk, encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV 
+    //UPLOAD_REQUEST encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV, NCHUNK 
    
     msg_to_encr_len = strlen(filename)+1;
     msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
@@ -1226,9 +1223,9 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
             if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
             digest = hmac_sha256(session_key2, 16, buffer, msg_len, &digest_len);
+            free(buffer);
 
             // CREATE THE MESSAGE
-            free(buffer);
             temp = (char*)malloc(LEN_SIZE*sizeof(char));
             if (!temp) exit_with_failure("Malloc temp failed", 1);
 
