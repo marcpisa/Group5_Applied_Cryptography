@@ -10,5 +10,5 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce);
 int downloadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce);
 int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce);
-int shareClient(int sock, char* username, char* filename, char* peername);
-int shareReceivedClient(int sd, char* rec_mex);
+int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2);
+int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2);

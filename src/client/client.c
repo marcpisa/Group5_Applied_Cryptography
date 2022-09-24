@@ -21,6 +21,7 @@ int main(int argc, char* argv[])
 
     // Others
     unsigned int nonce_cs = 0;
+    unsigned int nonce_sc = 0;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
     BIO* bio_cert;
@@ -363,7 +364,19 @@ int main(int argc, char* argv[])
                             }
 
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
+
+                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3) > MAX_LEN_USERNAME)
+                            {
+                                printf("Input given is too long. Error.\n\n");
+                                break;
+                            }
+                            else if (!filename_sanitization(command2) || !username_sanitization(command3))
+                            {
+                                printf("Sanitization fails. Error.\n\n");
+                                break;
+                            }
+
+                            ret = shareClient(connectedSock, command2, command3, &nonce_cs, session_key1, session_key2);
 
                             if (ret == -1) printf("Error during the share operation request!\n\n");
                             else printf("\n");
@@ -435,7 +448,7 @@ int main(int argc, char* argv[])
                     {
                         close(listenerTCP);
                         //We are in the son part of code
-                        ret = shareReceivedClient(i, buffer);
+                        ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2);
                         if (ret == -1)
                         {
                             //printf("Error during received share request!\n\n");
