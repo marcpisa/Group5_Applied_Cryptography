@@ -1041,6 +1041,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     char* temp;
     unsigned char* buffer;
     unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
 
     // Initialization of IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
@@ -1154,7 +1155,34 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         return 1;    
     } 
     else if (strcmp((char*)bufferSupp1, UPLOAD_ACCEPTED) == 0) 
-    {        
+    {   
+
+        //HERE WE CHECK THE MAC
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
+        temp = (char*)malloc(LEN_SIZE);
+        if (!temp) exit_with_failure("Malloc temp failed", 1);
+        bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
+
+        memcpy(&iv, &*(buffer+strlen(UPLOAD_ACCEPTED)+HASH_LEN+BLANK_SPACE*2), IV_LEN);
+        memcpy(&bufferSupp2, &*(buffer+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE), HASH_LEN);
+        sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
+
+        msg_to_hash_len = build_msg_3(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
+                                                    iv, IV_LEN,\
+                                                    temp, LEN_SIZE);
+        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_len, &digest_len);
+
+        ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+        free_6(bufferSupp2, buffer, bufferSupp1, iv, temp, digest);
+        frere(msg_to_hash);
+        if (ret == -1)
+        {
+            printf("Wrong download chunk hash\n\n");
+            return -1;
+        } 
 
         for (i = 0; i < nchunk; i++) 
         {
@@ -1192,8 +1220,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
             sprintf((char*)bufferSupp1, "%u", *nonce);
             msg_to_hash_len = build_msg_3(&buffer, encr_msg, encr_len,\
-                                           iv, IV_LEN,\
-                                           bufferSupp1, LEN_SIZE);
+                                                   iv, IV_LEN,\
+                                                   bufferSupp1, LEN_SIZE);
             if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
             digest = hmac_sha256(session_key2, 16, buffer, msg_len, &digest_len);

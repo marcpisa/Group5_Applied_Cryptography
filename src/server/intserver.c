@@ -1389,7 +1389,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     free(iv);
     
 
-        /* ---- NOW WE CAN BEGIN DOWNLOAD THE CHUNKS ---- */
+    /* ---- NOW WE CAN BEGIN DOWNLOAD THE CHUNKS ---- */
     fd = fopen(filename, "w"); // Inside download ????
     for (i = 0; i < nchunk; i++)
     {
