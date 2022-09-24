@@ -1050,9 +1050,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-
     //Calculate number of chunks of the file! Figure out if file is present! 
-
     f1 = fopen(filename, "r");
     if (!(f1))
     {
@@ -1065,23 +1063,18 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
-    printf("The number of chunk is %li\n", nchunk);
+    //printf("The number of chunk is %li\n", nchunk);
     //printf("The number of rest is %i\n", rest);
 
-
-    //If FIle larger than 4GB refuse upload 
-
+    // If FIle larger than 4GB refuse upload 
     if(st.st_size > 4294967296) 
     {
         printf("File is more than 4 Gigabyte"); 
         return -1; 
     }
 
-
     //M1: Send message to request the upload. Message format: 
     //UPLOAD_REQUEST nonce, nchunk, encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV 
-   
-   
    
     msg_to_encr_len = strlen(filename)+1;
     msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
@@ -1163,121 +1156,117 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     else if (strcmp((char*)bufferSupp1, UPLOAD_ACCEPTED) == 0) 
     {        
 
-        for (i = 0; i < nchunk; i++) {
-        msg_to_encr_len = CHUNK_SIZE;
-        msg_to_encr = (unsigned char*)malloc(msg_to_encr_len);
-        if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
-        
-        if (i == nchunk-1) max = rest;
-        else max = CHUNK_SIZE; 
-
-        for (j = 0; j < max; j++)
+        for (i = 0; i < nchunk; i++) 
         {
-            if ((ch = getc(f1)) == EOF)
+            msg_to_encr_len = CHUNK_SIZE;
+            msg_to_encr = (unsigned char*)malloc(msg_to_encr_len);
+            if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
+
+            if (i == nchunk-1) max = rest;
+            else max = CHUNK_SIZE; 
+
+            for (j = 0; j < max; j++)
             {
-               *(msg_to_encr+j) = '\0';
-                printf("File over!");
-                break;
+                if ((ch = getc(f1)) == EOF)
+                {
+                   *(msg_to_encr+j) = '\0';
+                    printf("File over!");
+                    break;
+                }
+                *(msg_to_encr+j) = ch;
             }
-            *(msg_to_encr+j) = ch;
-        }
 
 
-        //ENCRYPT THE MESSAGE SENT
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
-        if (!iv) exit_with_failure("Malloc iv failed", 1);
-        ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-        if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+            //ENCRYPT THE MESSAGE SENT
+            iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
+            if (!iv) exit_with_failure("Malloc iv failed", 1);
+            ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+            if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-        if (i == nchunk-1) encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, rest, iv, session_key1);
-        else encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
+            if (i == nchunk-1) encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, rest, iv, session_key1);
+            else encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
-        //CREATE THE HASH
-        bufferSupp1 = (unsigned char*)malloc(LEN_SIZE); //nonce string;
-        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-        
-        sprintf((char*)bufferSupp1, "%u", *nonce);
-        msg_to_hash_len = build_msg_3(&buffer, encr_msg, encr_len,\
-                                       iv, IV_LEN,\
-                                       bufferSupp1, LEN_SIZE);
-        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+            //CREATE THE HASH
+            bufferSupp1 = (unsigned char*)malloc(LEN_SIZE); //nonce string;
+            if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
 
-        digest = hmac_sha256(session_key2, 16, buffer, msg_len, &digest_len);
+            sprintf((char*)bufferSupp1, "%u", *nonce);
+            msg_to_hash_len = build_msg_3(&buffer, encr_msg, encr_len,\
+                                           iv, IV_LEN,\
+                                           bufferSupp1, LEN_SIZE);
+            if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
-        // CREATE THE MESSAGE
-        free(buffer);
-        temp = (char*)malloc(LEN_SIZE*sizeof(char));
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-        
-        sprintf(temp, "%i", encr_len);
-        msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
-                                       encr_msg, encr_len,\
-                                       digest, HASH_LEN,\
-                                       iv, IV_LEN);
-        if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
-        
-        //printf("The message len is %i\n", msg_len);
-        //printf("I'm sending %s", (char*)buffer);
+            digest = hmac_sha256(session_key2, 16, buffer, msg_len, &digest_len);
 
-        ret = send(sock, buffer, msg_len, 0);
+            // CREATE THE MESSAGE
+            free(buffer);
+            temp = (char*)malloc(LEN_SIZE*sizeof(char));
+            if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+            sprintf(temp, "%i", encr_len);
+            msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
+                                           encr_msg, encr_len,\
+                                           digest, HASH_LEN,\
+                                           iv, IV_LEN);
+            if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
+
+            //printf("The message len is %i\n", msg_len);
+            //printf("I'm sending %s", (char*)buffer);
+
+            ret = send(sock, buffer, msg_len, 0);
+            if (ret == -1)
+            {
+                printf("Send operation gone bad\n");
+                free_6(buffer, temp, digest, iv, encr_msg, msg_to_encr);
+                free(bufferSupp1);
+                return -1;
+            }
+            *nonce += 1;
+
+            printf("We are sending the chunk number %i\n", i);
+
+            free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
+            free(temp);
+
+            buffer = (unsigned char*)malloc(BUF_LEN);
+            if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
+            ret = recv (sock, buffer, BUF_LEN, 0);
+            if (ret == -1)
+            {
+                printf("Receive operation gone bad\n");
+                return -1;
+            }
+            printf("Confirmed! %s\n", (char*)buffer);
+            free(buffer);
+        }   
+        fclose(f1);
+
+        /* ---- WE SENT ALL THE CHUNKS NOW WE WAIT FOR THE CLIENT OUTCOME ---- */
+        buffer = (unsigned char*)malloc(BUF_LEN*(sizeof(unsigned char)));
+        if (!buffer) exit_with_failure("Malloc buffer failure", 1);
+        ret = recv(sock, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
-            printf("Send operation gone bad\n");
-            free_6(buffer, temp, digest, iv, encr_msg, msg_to_encr);
-            free(bufferSupp1);
+            printf("Receive operation gone bad!\n\n");
+            free(buffer);
             return -1;
         }
+
+        // DECRYPT THE BUFFER
+        ret = check_reqacc_msg(DOWNLOAD_FINISHED, buffer, *nonce, session_key2);
+        if (ret == -1)
+        {
+            printf("Check download_finished gone bad.\n\n");
+            free(buffer);
+            return -1;
+        }
+
+        free(buffer);
+        printf("We have completed successfully the donwload operation!\n\n");
         *nonce += 1;
-           
-        printf("We are sending the chunk number %i\n", i);
 
-        free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
-        free(temp);
-
-        buffer = (unsigned char*)malloc(BUF_LEN);
-        if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
-        ret = recv (sock, buffer, BUF_LEN, 0);
-        if (ret == -1)
-        {
-            printf("Receive operation gone bad\n");
-            return -1;
-        }
-        printf("Confirmed! %s\n", (char*)buffer);
-        free(buffer);
+        return 1;
     }
-
-
-    fclose(f1);
-            /* ---- WE SENT ALL THE CHUNKS NOW WE WAIT FOR THE CLIENT OUTCOME ---- */
-    buffer = (unsigned char*)malloc(BUF_LEN*(sizeof(unsigned char)));
-    if (!buffer) exit_with_failure("Malloc buffer failure", 1);
-    ret = recv(sock, buffer, BUF_LEN, 0);
-    if (ret == -1)
-    {
-        printf("Receive operation gone bad!\n\n");
-        free(buffer);
-        return -1;
-    }
-
-    // DECRYPT THE BUFFER
-    ret = check_reqacc_msg(DOWNLOAD_FINISHED, buffer, *nonce, session_key2);
-    if (ret == -1)
-    {
-        printf("Check download_finished gone bad.\n\n");
-        free(buffer);
-        return -1;
-    }
-
-    free(buffer);
-    printf("We have completed successfully the donwload operation!\n\n");
-    *nonce += 1;
-
-    return 1;
-    }
-    
-
-
-
 }
 
 
