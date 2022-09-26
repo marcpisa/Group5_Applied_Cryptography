@@ -21,6 +21,7 @@ int createSocket()
 int loginServer(int sd, char* rec_mex)
 {
     unsigned int nonce_cs = 0;
+    unsigned int nonce_sc = 0;
     
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -32,6 +33,7 @@ int loginServer(int sd, char* rec_mex)
     char* path_rsa_key = "rsa_prvkey.pem";
     char* path_documents = "./documents/";
     char* path_cert_client_rsa;
+    char* path_temp;
     
     int ret;
     int msg_len;
@@ -65,6 +67,8 @@ int loginServer(int sd, char* rec_mex)
 
     unsigned char* session_key1;
     unsigned char* session_key2;
+
+    FILE* f1;
 
     /*********************
      * END VARIABLES
@@ -245,7 +249,31 @@ int loginServer(int sd, char* rec_mex)
 
     printf("I managed a login request and all was good!\n\n");
 
-    
+    /* ---- Update the user socket descriptor ---- */
+    path_temp = (char*) malloc((len_username+4+1)*sizeof(char));
+    if (!path_temp) exit_with_failure("Malloc path_temp failed", 1);
+    memcpy(path_temp, username, len_username);
+    memcpy(&*(path_temp+len_username), ".txt\0", 4+1);
+
+    ret = chdir("..");
+    if (ret == -1) exit_with_failure("Problem moving to parent directory...", 1);
+    ret = chdir("info");
+    if (ret == -1) exit_with_failure("Problem moving to \"info\" directory...", 1);
+
+    // Save the new sd
+    f1 = fopen(path_temp, "w");
+    if (!f1) exit_with_failure("Fopen path_temp failed", 1);
+    fprintf(f1, "%d", sd);
+    fclose(f1);
+
+    ret = chdir('..');
+    if (ret == -1) exit_with_failure("Problem moving to parent directory...", 1);
+    ret = chdir(username);
+    if (ret == -1) exit_with_failure("Problem moving to username directory...", 1);
+
+    free(path_temp);
+
+
     //printf("Now the buffer contains %s\n\n", funcBuff);
     while (1)
     {
@@ -1473,84 +1501,338 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     return 1;
 }
 
-int shareServer(int sd, char* rec_mex)
+int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned int* nonce_sc, unsigned char session_key1, unsigned char session_key2)
 {
-    int sock, ret, receiverport;
-    char buffer[BUF_LEN];
-    FILE* f1;
-    struct sockaddr_in rec_addr;
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char filename[MAX_LEN_FILENAME];
-    char sharername[MAX_LEN_USERNAME];
-    char receivername[MAX_LEN_USERNAME];
+    int ret;
+    int sd_peer;
+    int msg_len;
 
-    printf("I received %s\n\n", rec_mex);
-    sscanf(rec_mex, "%s %s %s %s", bufferSupp1, sharername, receivername, filename);
-    printf("The sharername is %s\n", sharername);
-    printf("The receivernane is %s\n", receivername);
-    printf("The filename is %s\n", filename);
+    unsigned int len_fn;
+    unsigned int len_pn;
+
+    int encr_len;
+    int msg_to_encr_len;
+    unsigned int plain_len;
+    unsigned char* plaintext;
+    unsigned char* encr_msg;
+    unsigned char* msg_to_encr;
+
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    char* temp;
+    char* path_temp;
+    unsigned char* iv;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+
+    FILE* f1;
+    FILE* src_fd;
+
+
     
-    // SANITIZATION OF FILENAME, USERNAMES
-    
-    if (chdir(MAIN_FOLDER_SERVER) == -1)
-	{
-		printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-        return -1;
-	}
-    if (chdir(sharername) == -1)
-    {
-        printf("I'm having some problem with the change directory to the main folder of the software...\n\n");
-        return -1;
-    }
-    printf("The filename is %s\n\n", filename);
-    f1 = fopen(filename, "r");
-    if (f1 == NULL)
-    {
-        printf("The sharer doesn't have any file called %s\n\n", filename);
-        memset(buffer, 0, strlen(buffer));
-        sprintf((char*)buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1)
+
+    /* ---- Parse file received ---- */
+    // receive, share_req encr_len encr(filename peername) hash(share_req encr iv nonce_cs) iv
+    // SHARE REQUEST ALREADY PARSED
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    iv = (unsigned char*) malloc(IV_LEN*sizeof(unsigned char));
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+
+    // PARSE ENCRYPTION LENGTH
+    memcpy(temp, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE), LEN_SIZE);
+    encr_len = atoi(temp);
+    if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
         {
-            printf("Something bad happened with the send function...\n\n");
+            free_3(temp, iv, bufferSupp2);
+            printf("Encryption length too high.\n");
             return -1;
         }
+
+    // PARSE ENCRYPTED MESSAGE
+    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE),\
+        encr_len);
+
+    // PARSE IV
+    memcpy(iv, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+HASH_LEN+\
+        BLANK_SPACE), IV_LEN);
+
+    // PARSE HASH AND CHECK IT
+    memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE),\
+        HASH_LEN);
+
+    sprintf(temp, "%u", *nonce_cs);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST),\
+                                               bufferSupp1, encr_len,\
+                                               iv, IV_LEN,\
+                                               temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+        
+    free_4(bufferSupp2, temp, msg_to_hash, digest);
+        
+    if (ret == -1)
+    {
+        printf("Wrong share_request hash.\n");
+        free_2(bufferSupp1, iv);
+        return -1;
+    }
+    *nonce_cs = *nonce_cs + 1;
+
+
+    // DECRYPT THE MESSAGE
+    decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
+    free_2(iv, bufferSupp1); 
+
+    len_fn = str_ssplit(plaintext, DELIM);
+    bufferSupp1 = (unsigned char*) malloc((len_fn+1)*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, plaintext, len_fn);
+    *(bufferSupp1+len_fn) = '\0';
+
+    len_pn = plain_len - len_fn - BLANK_SPACE;
+    bufferSupp2 = (unsigned char*) malloc((len_pn+1)*sizeof(unsigned char));
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    memcpy(bufferSupp2, &*(plaintext+len_fn+BLANK_SPACE), len_pn);
+    *(bufferSupp2+len_pn) = '\0';
+
+    // sanitize them ???
+
+
+    // NOW WE ARE INSIDE documents/username, we should try to move inside documents/peername
+    ret = chdir(".."); // documents/
+    if (ret == -1)
+    {
+        free_2(bufferSupp1, bufferSupp2);
+        printf("I'm having some problem moving to parent directory...\n");
+        return -1;
+    }
+    ret = chdir(bufferSupp2);
+    if (ret == -1)
+    {
+        free_2(bufferSupp1, bufferSupp2);
+        printf("I'm having some problem moving to peername's directory...\n");
+        return -1;
+    }
+    
+    // TRY TO OPEN PEERNAME'S FILE TO SHARE
+    f1 = fopen(bufferSupp1, "r");
+    if (f1 == NULL)
+    {
+        printf("The sharer doesn't have any file called \"%s\"\n", bufferSupp1);
+        // Send denied message to left party
+        operation_denied(sd, "No such file", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        free_2(bufferSupp1, bufferSupp2);
         return 1;
     }
     fclose(f1);
 
     // We should ask to the receiver whether it wants to allow the share operation
-    // Create a folder where you store all the information about the listeners of the users logged
+    // Save on database/info/peername.txt the socket descriptor of the peername
+    path_temp = (char*) malloc((len_pn+4+1)*sizeof(char));
+    if (!path_temp) exit_with_failure("Malloc path_temp failed", 1);
+    memcpy(path_temp, bufferSupp2, len_pn);
+    memcpy(&*(path_temp+len_pn), ".txt\0", 4+1);
 
-    if (chdir(INFO_FOLDER_SERVER) == -1)
+    f1 = fopen(path_temp, "r");
+    if (!f1) exit_with_failure("Problem opening path_temp...", 1);
+
+    ret = fscanf(f1, "%d", sd_peer);
+    if (ret == -1) exit_with_failure("Problem reading sd_peer...", 1);
+
+    fclose(f1);    
+    free(path_temp);
+
+
+
+
+    /* ---- Send share_perm to peer ---- */
+    // share_perm encr_len encr(filename peername) hash(share_perm encr iv nonce_sc) iv
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+    // GENERATE THE IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+
+    // CREATE ENCRYPTED MESSAGE
+    msg_to_encr_len = build_msg_2(&msg_to_encr, bufferSupp1, len_fn,\
+                                                bufferSupp2, len_pn);
+    if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);
+
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
+
+    // CREATE THE HASH
+    sprintf(temp, "%u", *nonce_sc);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
+                                                encr_msg, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+    // BUILD THE MESSAGE
+    sprintf(temp, "%d", encr_len);
+    msg_len = build_msg_5(&buffer, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
+                                   temp, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
+
+    ret = send(sd_peer, buffer, BUF_LEN, 0);
+    
+    free_6(iv, temp, msg_to_encr, encr_msg, msg_to_hash, digest);
+    free(buffer);
+
+    if (ret == -1)
     {
-		printf("I'm having some problem with the change directory to the info folder of the software...\n\n");
+        free_2(bufferSupp1, bufferSupp2);
+        operation_denied(sd, "Send peer failed", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        printf("Send peer failed.\n");
         return -1;
-	}
-    memset(buffer, 0, strlen(buffer));
-    sprintf((char*)buffer, "%s.txt", receivername);
-    if (!(f1 = fopen(buffer, "r")))
+    }
+    *nonce_sc = *nonce_sc + 1;
+
+
+
+
+    /* ---- Check peer response ---- */
+    // denied or accepted nonce_sc
+
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    ret = recv(sd_peer, buffer, BUF_LEN,0);
+    if (ret == -1)
     {
-        printf("The receiver %s is not online... Try it later\n\n", receivername);
-        memset(buffer, 0, strlen(buffer));
-        sprintf((char*)buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1)
+        free_3(buffer, bufferSupp1, bufferSupp2);
+        operation_denied(sd, "Receive peer failed", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        printf("Receive failed.\n");
+        return -1;
+    }
+    printf("Received the peer outcome.\n");
+
+    bufferSupp3 = (unsigned char*) malloc((strlen(SHARE_DENIED)+1)*sizeof(unsigned char));
+    if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+    memcpy(bufferSupp3, buffer, strlen(SHARE_DENIED)); // denied or accepted same length
+    memcpy(&*(bufferSupp3+strlen(SHARE_DENIED)), "\0", 1);
+
+
+    if (strcmp((char*) bufferSupp3, SHARE_DENIED) == 0)
+    {
+        ret = check_reqden_msg(SHARE_DENIED, buffer, *nonce_sc, session_key1, session_key2);
+        if (ret == -1) 
         {
-            printf("Something bad happened with the send function...\n\n");
+            printf("Error checking share denied message.\n");
+            operation_denied(sd, "Error checking share denied message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            ret = -1;
+        }
+        else 
+        {
+            printf("Share has been denied.\n");
+            operation_denied(sd, "Share has been denied", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            ret = 1;
+        }
+        
+        free_4(buffer, bufferSupp1, bufferSupp2, bufferSupp3);
+        return ret;
+    }
+    else if (strcmp((char*) bufferSupp1, SHARE_ACCEPTED) == 0)
+    {
+        ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce_sc, session_key2);
+        if (ret == -1) 
+        {
+            printf("Error checking share accepted message.\n");
+            operation_denied(sd, "Error checking share accepted message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            ret = -1;
+        }
+    }
+    else
+    {
+        printf("We don't know what the peer said...\n\n");
+        operation_denied(sd, "We don't know what the peer said", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        free_4(buffer, bufferSupp1, bufferSupp2, bufferSupp3);
+        return -1;
+    }
+
+    free_2(bufferSupp3, buffer);
+
+    // COPY THE FILE IN THE FOLDER OF THE REICEIVER, we are in database/username
+    printf("The receiver is allowing the share operation...\n");
+
+    path_temp = (char*) malloc((3+len_pn+1+len_fn+1)*sizeof(char));
+    memcpy(path_temp, "../", 3);
+    memcpy(&*(path_temp+3), bufferSupp2, len_pn);
+    memcpy(&*(path_temp+3+len_pn), "/", 1);
+    memcpy(&*(path_temp+3+len_pn+1), bufferSupp1, len_fn);
+    memcpy(&*(path_temp+3+len_pn+1+len_fn), "\0", 1);
+
+    src_fd = open(path_temp, 'r');
+    f1 = open(bufferSupp1, 'w');
+    if (!src_fd || !f1) 
+    {
+        free_3(path_temp, bufferSupp1, bufferSupp2);
+        printf("Can't open f1 or src_fd...", 1);
+        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        return -1;
+    } 
+
+    buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
+    while (1) {
+        ret = read(src_fd, buffer, BUF_LEN);
+        if (ret == -1) {
+            printf("Error reading file.\n");
+            free_4(path_temp, buffer, bufferSupp1, bufferSupp2);
+            operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return -1;
         }
-        return 1;
+    
+        if (ret == 0) break;
+
+        ret = write(f1, buffer, ret);
+        if (ret == -1) {
+            printf("Error writing to file.\n");
+            free_4(path_temp, buffer, bufferSupp1, bufferSupp2);
+            operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            return -1;
+        }
     }
-    memset(buffer, 0, strlen(buffer));
+
+    free_4(buffer, bufferSupp1, bufferSupp2, path_temp);
+    close(src_fd);
+    close(f1);
+
+
+    // Send outcome to left party
+    operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_cs);
+
+    /*
     ret = fread(buffer, PORT_SIZE, 1, f1);
     if (ret == -1)
     {
         printf("Problem during the reading of the file to downlaod... \n\n");
         return -1;
     }
+    
     receiverport = atoi((char*)buffer);
 
     memset(&rec_addr, 0, sizeof(rec_addr));
@@ -1573,61 +1855,7 @@ int shareServer(int sd, char* rec_mex)
         printf("Something bad happened with the send function...\n\n");
         return -1;
     }
-    memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
-    ret = recv(sock, buffer, BUF_LEN, 0);
-    if (ret == -1)
-    {
-        printf("Something bad happened with the receive function...\n\n");
-        return -1;
-    }
-    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
-    if (strcmp(bufferSupp1, SHARE_ACCEPTED)==0)
-    {
-        // COPY THE FILE IN THE FOLDER OF THE REICEIVER
-        printf("The receiver is allowing the share operation...\n\n");
+    */
 
-        memset(buffer, 0, strlen(buffer));
-        strcat(buffer, "cp "); 
-        strcat(buffer, MAIN_FOLDER_SERVER); 
-        strcat(buffer, "/"); 
-        strcat(buffer, sharername); 
-        strcat(buffer, "/"); 
-        strcat(buffer, filename); 
-        strcat(buffer, " "); 
-        strcat(buffer, MAIN_FOLDER_SERVER); 
-        strcat(buffer, "/"); 
-        strcat(buffer, receivername); 
-        system(buffer); 
-
-        memset(buffer, 0, strlen(buffer));
-        sprintf(buffer, "%s %s %s %s", SHARE_ACCEPTED, sharername, filename, receivername);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1)
-        {
-            printf("Something bad happened with the send function...\n\n");
-            return -1;
-        }
-        return 1;
-    }
-
-
-    if (strcmp(bufferSupp1, SHARE_DENIED)==0)
-    {
-        // THE SHARE OPERATION IS NOT ALLOWED, SEND A MESSAGE TO THE SHARER LETTING HIM KNOW IT
-        printf("The receiver is denying the share operation...\n\n");
-        memset(buffer, 0, strlen(buffer));
-        sprintf(buffer, "%s %s %s %s", SHARE_DENIED, sharername, filename, receivername);
-        ret = send(sd, buffer, strlen(buffer), 0);
-        if (ret == -1)
-        {
-            printf("Something bad happened with the send function...\n\n");
-            return -1;
-        }
-        return 1;
-    }
-
-    return -1;
+    return 1;
 }
