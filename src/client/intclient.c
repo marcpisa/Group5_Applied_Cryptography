@@ -1342,7 +1342,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
 
     // Build and encrypt the message
     msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
-                                                peername, strlen(peername));
+                                                peername, strlen(peername)+1);
     if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);
 
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
@@ -1402,12 +1402,12 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     memcpy(bufferSupp1, buffer, strlen(SHARE_DENIED)); // denied or accepted same length
     *(bufferSupp1+strlen(SHARE_DENIED)) = '\0';
 
-    if (strcmp(bufferSupp1, SHARE_DENIED) == 0)
+    if (strcmp((char*) bufferSupp1, SHARE_DENIED) == 0)
     {
         ret = check_reqden_msg(SHARE_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_denied...");
     }
-    else if (strcmp(bufferSupp1, SHARE_ACCEPTED) == 0)
+    else if (strcmp((char*) bufferSupp1, SHARE_ACCEPTED) == 0)
     {
         ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_accepted...");
@@ -1426,6 +1426,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 {
     int ret;
     char s;
+    char* c;
     unsigned int len_fn;
     unsigned int len_pn;
 
@@ -1440,7 +1441,6 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
     char* temp;
     unsigned char* iv;
-    unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
@@ -1449,13 +1449,15 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
 
     /* ---- Parse server message ---- */
+    printf("Share received, parsing message...\n");
+    
     // SHARE_PERM encr_len encr(filename, peername) hash(share_perm encr iv nonce_sc) iv
     bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_PERMISSION)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, rec_mex, strlen(SHARE_PERMISSION));
     *(bufferSupp1+strlen(SHARE_PERMISSION)) = '\0';
 
-    if (strcmp(bufferSupp1, SHARE_PERMISSION) == 0)
+    if (strcmp((char*) bufferSupp1, SHARE_PERMISSION) == 0)
     {
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
@@ -1488,7 +1490,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         memcpy(bufferSupp3, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
             BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
 
-        sprintf(temp, "%u", nonce_sc);
+        sprintf(temp, "%u", *nonce_sc);
         msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
                                                     bufferSupp2, encr_len,\
                                                     iv, IV_LEN,\
@@ -1531,8 +1533,8 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         // CHOOSE WHAT TO DO
         printf("The user \"%s\" has requested to share the file \"%s\". What do you choose (y/n)?",\
                 bufferSupp2, bufferSupp1);
-        ret = fgets(s, 1, stdin);
-        if (ret == EOF) exit_with_failure("Error when taken the choice of the user from input...", 1);
+        c = fgets(&s, 1, stdin);
+        if (c == NULL) exit_with_failure("Error when taken the choice of the user from input...", 1);
 
         free_2(bufferSupp1, bufferSupp2);
 
