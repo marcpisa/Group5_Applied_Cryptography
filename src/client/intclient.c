@@ -14,7 +14,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) 
+int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
 {
     /*********************
      * VARIABLES
@@ -43,6 +43,13 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     X509* serv_cert = NULL;
     EVP_PKEY* pub_rsa_key_serv;
     int cert_len;
+
+    int encr_len;
+    int msg_to_hash_len;
+    unsigned char* encr_msg;
+    unsigned char* iv;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
 
     int ret;
     char* temp;
@@ -196,6 +203,65 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         return -1;
     } 
  
+
+ 
+
+    /* ---- Send port to server ---- */
+    // Generate iv
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    temp = (char*) malloc(PORT_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%d", port);
+
+    // ENCRYPT PORT
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, (unsigned char*) temp, PORT_SIZE, iv, *session_key1);
+    free(temp);
+
+    // HASH OF ENCRYPTED PORT
+    msg_to_hash_len = build_msg_2(&msg_to_hash, encr_msg, encr_len,\
+                                                iv, IV_LEN);
+    if (msg_to_hash_len == -1)
+    {
+        free_4(iv ,temp, encr_msg, msg_to_hash);
+        printf("Problem building the hash...\n");
+        return -1;
+    }
+
+    digest = hmac_sha256(*session_key2, 16, msg_to_hash, msg_to_hash_len, NULL);    
+
+    // BUILD MSG
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%u", encr_len);
+    msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    free(temp);
+    if (msg_len == -1)
+    {
+        free_3(iv , encr_msg, msg_to_hash);
+        printf("Problem building the message...\n");
+        return -1;
+    }
+
+    printf("I'm sending to the server the port number.\n");
+    ret = send(*sock, buffer, BUF_LEN, 0); 
+    
+    free_5(buffer, msg_to_hash, digest, iv, encr_msg);
+    
+    if (ret == -1) 
+    {
+        printf("Send failed.\n");
+        return -1;   
+    }
+
     return 1;
 }
 
@@ -1421,12 +1487,11 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     return ret;
 }
 
-
 int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     char s;
-    char* c;
+    char line[2];
     unsigned int len_fn;
     unsigned int len_pn;
 
@@ -1533,28 +1598,31 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         // CHOOSE WHAT TO DO
         printf("The user \"%s\" has requested to share the file \"%s\". What do you choose (y/n)?",\
                 bufferSupp2, bufferSupp1);
-        c = fgets(&s, 1, stdin);
-        if (c == NULL) exit_with_failure("Error when taken the choice of the user from input...", 1);
 
         free_2(bufferSupp1, bufferSupp2);
 
-        // SEND CONFIRMATION OR NOT TO THE SERVER
-        if (s == 'y' || s == 'Y')
-        {
-            operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
-            ret = 1;
+        if (fgets(line, 2, stdin)) {
+            if (1 == sscanf(line, "%c", &s)) {
+                // SEND CONFIRMATION OR NOT TO THE SERVER
+                if (s == 'y' || s == 'Y')
+                {
+                    operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
+                    ret = 1;
+                }
+                else if (s == 'n' || s == 'N')
+                {
+                    operation_denied(sd, "The user hasn't accepted to share the file with you", SHARE_DENIED,\
+                        session_key1, session_key2, nonce_sc);
+                    ret = 1;
+                }
+                else
+                {
+                    printf("We don't know what the user said...\n\n");
+                    ret = -1;
+                }
+            }
         }
-        else if (s == 'n' || s == 'N')
-        {
-            operation_denied(sd, "The user hasn't accepted to share the file with you", SHARE_DENIED,\
-                session_key1, session_key2, nonce_sc);
-            ret = 1;
-        }
-        else
-        {
-            printf("We don't know what the server said...\n\n");
-            ret = -1;
-        }
+        
     }
     else
     {

@@ -189,7 +189,7 @@ int main(int argc, char* argv[])
                                 }
                             }
                     
-                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, ca_store);
+                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, port, ca_store);
                             
                             if (ret == -1){
                                 printf("Login failed.\n\n");
@@ -231,8 +231,7 @@ int main(int argc, char* argv[])
                                 // CONFIGURATION OF THE SERVER INFO
                                 memset(&srv_addr, 0, sizeof(srv_addr));
 	                            srv_addr.sin_family = AF_INET; // IPv4
-	                            port = SERVER_PORT;
-	                            srv_addr.sin_port = htons(port); // port to connect to
+	                            srv_addr.sin_port = htons(SERVER_PORT); // port to connect to
 	                            inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
 
                                 // Back to src/client folder (from download)
