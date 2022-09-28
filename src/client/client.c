@@ -21,6 +21,7 @@ int main(int argc, char* argv[])
 
     // Others
     unsigned int nonce_cs = 0;
+    unsigned int nonce_sc = 0;
     X509_STORE* ca_store;
     X509* cert_serv = NULL;;
     BIO* bio_cert;
@@ -188,7 +189,7 @@ int main(int argc, char* argv[])
                                 }
                             }
                     
-                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, ca_store);
+                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, port, ca_store);
                             
                             if (ret == -1){
                                 printf("Login failed.\n\n");
@@ -225,13 +226,16 @@ int main(int argc, char* argv[])
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
 
-                                free_2(session_key1, session_key2);
+                                if (!session_key1 && !session_key2) 
+                                {
+                                    free(session_key1);
+                                    free(session_key2);
+                                }
                                 
                                 // CONFIGURATION OF THE SERVER INFO
                                 memset(&srv_addr, 0, sizeof(srv_addr));
 	                            srv_addr.sin_family = AF_INET; // IPv4
-	                            port = SERVER_PORT;
-	                            srv_addr.sin_port = htons(port); // port to connect to
+	                            srv_addr.sin_port = htons(SERVER_PORT); // port to connect to
 	                            inet_pton(AF_INET, LOCALHOST, &srv_addr.sin_addr);
 
                                 // Back to src/client folder (from download)
@@ -363,7 +367,19 @@ int main(int argc, char* argv[])
                             }
 
                             printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
-                            ret = shareClient(connectedSock, username, command2, command3); //command2 = filename, command3 = peername
+
+                            if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3) > MAX_LEN_USERNAME)
+                            {
+                                printf("Input given is too long. Error.\n\n");
+                                break;
+                            }
+                            else if (!filename_sanitization(command2) || !username_sanitization(command3))
+                            {
+                                printf("Sanitization fails. Error.\n\n");
+                                break;
+                            }
+
+                            ret = shareClient(connectedSock, command2, command3, &nonce_cs, session_key1, session_key2);
 
                             if (ret == -1) printf("Error during the share operation request!\n\n");
                             else printf("\n");
@@ -401,6 +417,13 @@ int main(int argc, char* argv[])
 
                                 printf("Exiting the program.\n");
                                 exit_flag = 1;
+
+                                if (!session_key1 && !session_key2) 
+                                {
+                                    free(session_key1);
+                                    free(session_key2);
+                                }
+
                                 break;
 
                         default:
@@ -408,12 +431,6 @@ int main(int argc, char* argv[])
                             break;
                     }
                     fflush(stdin);
-
-                    if (!session_key1 && !session_key2) 
-                    {
-                        free(session_key1);
-                        free(session_key2);
-                    }
                 }
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
@@ -435,12 +452,19 @@ int main(int argc, char* argv[])
                     {
                         close(listenerTCP);
                         //We are in the son part of code
-                        ret = shareReceivedClient(i, buffer);
+                        ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2);
                         if (ret == -1)
                         {
-                            //printf("Error during received share request!\n\n");
+                            printf("Error during received share request!\n\n");
                             exit(1);
                         }
+
+                        if (!session_key1 && !session_key2) 
+                        {
+                            free(session_key1);
+                            free(session_key2);
+                        }
+
                         close(i);
                         exit(0);
                     }
@@ -449,6 +473,12 @@ int main(int argc, char* argv[])
                 }
             }
         }
+    }
+
+    if (!session_key1 && !session_key2) 
+    {
+        free(session_key1);
+        free(session_key2);
     }
 
     close(listenerTCP);

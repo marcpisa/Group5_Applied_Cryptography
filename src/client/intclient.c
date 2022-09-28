@@ -14,7 +14,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, X509_STORE* ca_store) 
+int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
 {
     /*********************
      * VARIABLES
@@ -43,6 +43,13 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     X509* serv_cert = NULL;
     EVP_PKEY* pub_rsa_key_serv;
     int cert_len;
+
+    int encr_len;
+    int msg_to_hash_len;
+    unsigned char* encr_msg;
+    unsigned char* iv;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
 
     int ret;
     char* temp;
@@ -196,6 +203,65 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         return -1;
     } 
  
+
+ 
+
+    /* ---- Send port to server ---- */
+    // Generate iv
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+    temp = (char*) malloc(PORT_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%d", port);
+
+    // ENCRYPT PORT
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, (unsigned char*) temp, PORT_SIZE, iv, *session_key1);
+    free(temp);
+
+    // HASH OF ENCRYPTED PORT
+    msg_to_hash_len = build_msg_2(&msg_to_hash, encr_msg, encr_len,\
+                                                iv, IV_LEN);
+    if (msg_to_hash_len == -1)
+    {
+        free_4(iv ,temp, encr_msg, msg_to_hash);
+        printf("Problem building the hash...\n");
+        return -1;
+    }
+
+    digest = hmac_sha256(*session_key2, 16, msg_to_hash, msg_to_hash_len, NULL);    
+
+    // BUILD MSG
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%u", encr_len);
+    msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    free(temp);
+    if (msg_len == -1)
+    {
+        free_3(iv , encr_msg, msg_to_hash);
+        printf("Problem building the message...\n");
+        return -1;
+    }
+
+    printf("I'm sending to the server the port number.\n");
+    ret = send(*sock, buffer, BUF_LEN, 0); 
+    
+    free_5(buffer, msg_to_hash, digest, iv, encr_msg);
+    
+    if (ret == -1) 
+    {
+        printf("Send failed.\n");
+        return -1;   
+    }
+
     return 1;
 }
 
@@ -1012,9 +1078,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     return 1;
 }
 
-
-
-
 int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce)
 {
     unsigned char* iv;
@@ -1301,124 +1364,271 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     return -1;    
 }
 
-
-int shareClient(int sock, char* username, char* filename, char* peername)
+int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
-    char buffer[BUF_LEN];
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
     int ret;
 
-    memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
+    int msg_to_encr_len;
+    int encr_len;
+    unsigned char* msg_to_encr;
+    unsigned char* encr_msg;
 
-    sprintf(buffer, "%s %s %s %s", SHARE_REQUEST, username, peername, filename);
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
 
-    printf("I'm sending %s to the server\n\n", buffer);
+    int msg_len;
 
-    // ENCRYPT THE BUFFER
+    char* temp;
+    unsigned char* iv;
+    unsigned char* buffer;
+    unsigned char* bufferSupp1;
 
-    ret = send(sock, buffer, strlen(buffer), 0);
+
+    // Generate the IV
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    ret = RAND_poll(); // Seed OpenSSL PRNG
+    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
+    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
+    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
+
+
+
+    /* ---- Build the message for the server ---- */
+    // (SHARE_REQ encr_len encr_msg(username, filename, peer_name) hash(req encr iv nonce_cs) iv)
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+
+
+    // Build and encrypt the message
+    msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
+                                                peername, strlen(peername)+1);
+    if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);
+
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
+
+
+    // Build and create the hash
+    sprintf(temp, "%u", *nonce);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST),\
+                                                encr_msg, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
+
+
+    // Build the message
+    sprintf(temp, "%d", encr_len);
+    msg_len = build_msg_5(&buffer, SHARE_REQUEST, strlen(SHARE_REQUEST),\
+                                   temp, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
+
+    ret = send(sock, buffer, BUF_LEN, 0);
+    
+    free_6(temp, msg_to_encr, encr_msg, msg_to_hash, digest, buffer);
+    free(iv);    
+
     if (ret == -1)
     {
-        printf("Error during send operation!\n\n");
+        printf("Send failed!\n");
         return -1;
     }
+    *nonce = *nonce+1;
 
-    memset(buffer, 0, strlen(buffer));
-    memset(bufferSupp1, 0, strlen(bufferSupp1));
-    memset(bufferSupp2, 0, strlen(bufferSupp2));
-    memset(bufferSupp3, 0, strlen(bufferSupp3));
+
+
+
+    /* ---- Parse server response (operation denied or accepted) ---- */
+    buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
+    if (!buffer) exit_with_failure("Malloc buffer failed", 1);
+
     ret = recv(sock, buffer, BUF_LEN,0);
-    if (ret == -1)
+    if (ret == -1) 
     {
-        printf("Error during receive operation!\n\n");
+        free(buffer);
+        printf("Receive failed.\n");
         return -1;
     }
+    printf("Received the server's response.\n");
+    
 
-    // DECRYPT THE BUFFER
+    bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_DENIED)+1)*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, buffer, strlen(SHARE_DENIED)); // denied or accepted same length
+    *(bufferSupp1+strlen(SHARE_DENIED)) = '\0';
 
-    sscanf(buffer, "%s %s %s", bufferSupp1, bufferSupp2, bufferSupp3);
-    if (strcmp(bufferSupp1, SHARE_ACCEPTED) == 0)
+    if (strcmp((char*) bufferSupp1, SHARE_DENIED) == 0)
     {
-        printf("Share operation accepted by the server!\n\n");
-        return 1;
+        ret = check_reqden_msg(SHARE_DENIED, buffer, *nonce, session_key1, session_key2);
+        if (ret == -1) printf("Something bad happened checking the share_denied...");
     }
-    else printf("Share operation denied by the server!\n\n");
-    return -1;
+    else if (strcmp((char*) bufferSupp1, SHARE_ACCEPTED) == 0)
+    {
+        ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce, session_key2);
+        if (ret == -1) printf("Something bad happened checking the share_accepted...");
+    }
+    else
+    {
+        printf("We don't know what the server said...\n\n");
+        ret = -1;
+    }
+
+    free_2(buffer, bufferSupp1);
+
+    return ret;
 }
 
-
-int shareReceivedClient(int sd, char* rec_mex)
+int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
-    char* p;
-    char buffer[BUF_LEN];
-    char bufferSupp1[BUF_LEN];
-    char bufferSupp2[BUF_LEN];
-    char bufferSupp3[BUF_LEN];
-    char filename[MAX_LEN_FILENAME];
-    char sharername[MAX_LEN_USERNAME];
+    char s;
+    char line[2];
+    unsigned int len_fn;
+    unsigned int len_pn;
 
-    //DECRYPT REC_MEX, SANITIZE THE INPUT
+    int encr_len;
+    unsigned int plain_len;
+    unsigned char* plaintext;
 
-    sscanf(rec_mex, "%s %s %s", bufferSupp1, sharername, filename);
-    if (strcmp(bufferSupp1, SHARE_PERMISSION) != 0)
+    int msg_to_hash_len;
+    unsigned int digest_len;
+    unsigned char* msg_to_hash;
+    unsigned char* digest;
+
+    char* temp;
+    unsigned char* iv;
+    unsigned char* bufferSupp1;
+    unsigned char* bufferSupp2;
+    unsigned char* bufferSupp3;
+
+
+
+
+    /* ---- Parse server message ---- */
+    printf("Share received, parsing message...\n");
+    
+    // SHARE_PERM encr_len encr(filename, peername) hash(share_perm encr iv nonce_sc) iv
+    bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_PERMISSION)+1)*sizeof(unsigned char));
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, rec_mex, strlen(SHARE_PERMISSION));
+    *(bufferSupp1+strlen(SHARE_PERMISSION)) = '\0';
+
+    if (strcmp((char*) bufferSupp1, SHARE_PERMISSION) == 0)
     {
-        //printf("The mex type is incorrect!\n\n");
-        return -1;
-    }
-    printf("We received a share request: the filename is %s from peer %s.\n Do you accept the share operation? [Y/N]\n\n", filename, sharername);
-    //sscanf(buffer, "%s", stdin); // REMEMBER TO CHANGE PROPERLY THIS COMMAND
-    while((strcmp(buffer, "Y")!=0) && (strcmp(buffer, "N")!=0))
-    {
-        if (fgets(buffer, BUF_LEN, stdin) == NULL)
+        temp = (char*) malloc(LEN_SIZE*sizeof(char));
+        if (!temp) exit_with_failure("Malloc temp failed", 1);
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
+
+        // TAKE ENCR LEN
+        memcpy(temp, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE), LEN_SIZE);
+        encr_len = atoi(temp);
+        if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
         {
-            printf("Some problem during the get function...\n\n");
+            free_3(bufferSupp1, temp, iv);
+            printf("Encryption length too high.\n");
             return -1;
         }
-        p = strchr(buffer, '\n');
-        if(p) {*p = '\0';}
 
-        printf("Given in input %s", buffer);
-        printf("\n"); 
-        if(strcmp(buffer, "Y") == 0)
+        // TAKE THE ENCRYPTED MESSAGE
+        bufferSupp2 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+        if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+        memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+\
+            LEN_SIZE+BLANK_SPACE), encr_len);
+
+        // TAKE THE IV
+        memcpy(iv, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
+            BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+
+        // TAKE AND CHECK THE HASH
+        bufferSupp3 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+        if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+        memcpy(bufferSupp3, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
+            BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
+
+        sprintf(temp, "%u", *nonce_sc);
+        msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
+                                                    bufferSupp2, encr_len,\
+                                                    iv, IV_LEN,\
+                                                    temp, LEN_SIZE);
+        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
+
+        ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
+        
+        free_5(bufferSupp1, bufferSupp3, temp, msg_to_hash, digest);
+        
+        if (ret == -1)
         {
-            memset(buffer, 0, strlen(buffer));
-            memset(bufferSupp1, 0, strlen(bufferSupp1));
-            memset(bufferSupp2, 0, strlen(bufferSupp2));
-            memset(bufferSupp2, 0, strlen(bufferSupp3));
-            sprintf(buffer, "%s %s %s", SHARE_ACCEPTED, sharername, filename);
-            ret = send(sd, buffer, strlen(buffer), 0);
-            if (ret == -1)
-            {
-                printf("Send operation gone bad.\n\n");
-                return -1;
-            }
-            return 1;
+            printf("Wrong share_permission hash.\n");
+            free_2(bufferSupp2, iv);
+            return -1;
         }
-        else if (strcmp(buffer, "N") == 0)
-        {
-            //test comment remove later not important just to test if git works for francesco
-            memset(buffer, 0, strlen(buffer));
-            memset(bufferSupp1, 0, strlen(bufferSupp1));
-            memset(bufferSupp2, 0, strlen(bufferSupp2));
-            memset(bufferSupp2, 0, strlen(bufferSupp3));
-            sprintf(buffer, "%s %s %s", SHARE_DENIED, sharername, filename);
-            ret = send(sd, buffer, strlen(buffer), 0);
-            if (ret == -1)
-            {
-                printf("Send operation gone bad.\n\n");
-                return -1;
+        *nonce_sc = *nonce_sc + 1;    
+    
+
+        // DECRYPT THE MESSAGE
+        decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
+        free_2(bufferSupp2, iv);
+
+        len_fn = str_ssplit(plaintext, DELIM);
+        bufferSupp1 = (unsigned char*) malloc((len_fn+1)*sizeof(unsigned char));
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+        memcpy(bufferSupp1, plaintext, len_fn);
+        *(bufferSupp1+len_fn) = '\0';
+
+        len_pn = plain_len - len_fn - BLANK_SPACE;
+        bufferSupp2 = (unsigned char*) malloc((len_pn+1)*sizeof(unsigned char));
+        if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+        memcpy(bufferSupp2, &*(plaintext+len_fn+BLANK_SPACE), len_pn);
+        *(bufferSupp2+len_pn) = '\0';
+
+        // sanitize them????
+
+        // CHOOSE WHAT TO DO
+        printf("The user \"%s\" has requested to share the file \"%s\". What do you choose (y/n)?",\
+                bufferSupp2, bufferSupp1);
+
+        free_3(bufferSupp1, bufferSupp2, plaintext);
+
+        if (fgets(line, 2, stdin)) {
+            if (1 == sscanf(line, "%c", &s)) {
+                // SEND CONFIRMATION OR NOT TO THE SERVER
+                if (s == 'y' || s == 'Y')
+                {
+                    operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
+                    ret = 1;
+                }
+                else if (s == 'n' || s == 'N')
+                {
+                    operation_denied(sd, "The user hasn't accepted to share the file with you", SHARE_DENIED,\
+                        session_key1, session_key2, nonce_sc);
+                    ret = 1;
+                }
+                else
+                {
+                    printf("We don't know what the user said...\n\n");
+                    ret = -1;
+                }
             }
-            return 1;
         }
-        else printf("Given a bad input. Retry!\n\n");
-        fflush(stdin);
+        
+    }
+    else
+    {
+        printf("We don't know what the server said...\n\n");
+        free(bufferSupp1);
+        ret = -1;
     }
 
-    return -1;
+    return ret;
 }
