@@ -2015,17 +2015,17 @@ int shareServer(int sd, char* rec_mex, unsigned int* nonce_cs, unsigned int* non
 
     free_2(bufferSupp3, buffer);
 
-    // COPY THE FILE IN THE FOLDER OF THE REICEIVER, we are in database/username
+    // COPY THE FILE IN THE FOLDER OF THE REICEIVER, we are in database/username/documents
     printf("The receiver is allowing the share operation...\n");
 
-    path_temp = (char*) malloc((3+len_pn+1+len_fn+1)*sizeof(char));
-    memcpy(path_temp, "../", 3);
-    memcpy(&*(path_temp+3), bufferSupp2, len_pn-1);
-    memcpy(&*(path_temp+3+len_pn-1), "/", 1);
-    memcpy(&*(path_temp+3+len_pn-1+1), bufferSupp1, len_fn);
-    memcpy(&*(path_temp+3+len_pn-1+1+len_fn), "\0", 1);
-
-    printf("%s\n%s\n", path_temp, bufferSupp1);
+    path_temp = (char*) malloc((6+(len_pn-1)+1+10+len_fn+1)*sizeof(char));
+    memcpy(path_temp, "../../", 6);
+    memcpy(&*(path_temp+6), bufferSupp2, len_pn-1);
+    memcpy(&*(path_temp+6+len_pn-1), "/", 1);
+    memcpy(&*(path_temp+6+len_pn-1+1), "documents/", 10);
+    memcpy(&*(path_temp+6+len_pn-1+1+10), bufferSupp1, len_fn);
+    memcpy(&*(path_temp+6+len_pn-1+1+10+len_fn), "\0", 1);
+    //printf("%s\n%s\n", path_temp, bufferSupp1);
 
     src_fd = fopen(path_temp, "r");
     f1 = fopen((char*) bufferSupp1, "w");
