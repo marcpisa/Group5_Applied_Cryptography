@@ -341,7 +341,7 @@ int loginServer(int sd, char* rec_mex)
     // DECRYPT AND SAVE PORT
     decrypt_AES_128_CBC(&bufferSupp2, &plain_len, (unsigned char*) temp, msg_len, bufferSupp1, session_key1); 
     port_client = atoi((char*) bufferSupp2);
-    free_3(bufferSupp1, bufferSupp3, temp);
+    free_5(buffer, bufferSupp2, bufferSupp1, bufferSupp3, temp);
 
 
     // Save session_key1, session_key2, port on local
@@ -547,7 +547,7 @@ int loginServer(int sd, char* rec_mex)
             printf("\nA share request has came up...\n\n");
             // SHARE MANAGER: SERVER SIDE
 
-            ret = shareServer(sd, funcBuff, &nonce_cs, &nonce_sc, session_key1, session_key2);            
+            ret = shareServer(sd, funcBuff, username, &nonce_cs, &nonce_sc, session_key1, session_key2);            
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client share request...\n\n");
@@ -1668,7 +1668,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     return 1;
 }
 
-int shareServer(int sd, char* rec_mex, unsigned int* nonce_cs, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
+int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     int sd_peer;
@@ -2015,20 +2015,20 @@ int shareServer(int sd, char* rec_mex, unsigned int* nonce_cs, unsigned int* non
 
     free_2(bufferSupp3, buffer);
 
-    // COPY THE FILE IN THE FOLDER OF THE REICEIVER, we are in database/username/documents
+    // COPY THE FILE IN THE FOLDER OF THE REICEIVER, we are in database/peername/documents
     printf("The receiver is allowing the share operation...\n");
 
     path_temp = (char*) malloc((6+(len_pn-1)+1+10+len_fn+1)*sizeof(char));
     memcpy(path_temp, "../../", 6);
-    memcpy(&*(path_temp+6), bufferSupp2, len_pn-1);
-    memcpy(&*(path_temp+6+len_pn-1), "/", 1);
-    memcpy(&*(path_temp+6+len_pn-1+1), "documents/", 10);
-    memcpy(&*(path_temp+6+len_pn-1+1+10), bufferSupp1, len_fn);
-    memcpy(&*(path_temp+6+len_pn-1+1+10+len_fn), "\0", 1);
-    //printf("%s\n%s\n", path_temp, bufferSupp1);
+    memcpy(&*(path_temp+6), username, strlen(username));
+    memcpy(&*(path_temp+6+strlen(username)), "/", 1);
+    memcpy(&*(path_temp+6+strlen(username)+1), "documents/", 10);
+    memcpy(&*(path_temp+6+strlen(username)+1+10), bufferSupp1, len_fn);
+    memcpy(&*(path_temp+6+strlen(username)+1+10+len_fn), "\0", 1);
+    printf("%s\n%s\n", path_temp, bufferSupp1);
 
-    src_fd = fopen(path_temp, "r");
-    f1 = fopen((char*) bufferSupp1, "w");
+    src_fd = fopen((char*) bufferSupp1, "r");
+    f1 = fopen(path_temp, "w");
     if (!src_fd || !f1) 
     {
         free_3(path_temp, bufferSupp1, bufferSupp2);

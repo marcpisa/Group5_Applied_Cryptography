@@ -226,7 +226,11 @@ int main(int argc, char* argv[])
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
 
-                                free_2(session_key1, session_key2);
+                                if (!session_key1 && !session_key2) 
+                                {
+                                    free(session_key1);
+                                    free(session_key2);
+                                }
                                 
                                 // CONFIGURATION OF THE SERVER INFO
                                 memset(&srv_addr, 0, sizeof(srv_addr));
@@ -413,6 +417,13 @@ int main(int argc, char* argv[])
 
                                 printf("Exiting the program.\n");
                                 exit_flag = 1;
+
+                                if (!session_key1 && !session_key2) 
+                                {
+                                    free(session_key1);
+                                    free(session_key2);
+                                }
+
                                 break;
 
                         default:
@@ -420,12 +431,6 @@ int main(int argc, char* argv[])
                             break;
                     }
                     fflush(stdin);
-
-                    if (!session_key1 && !session_key2) 
-                    {
-                        free(session_key1);
-                        free(session_key2);
-                    }
                 }
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
@@ -450,9 +455,16 @@ int main(int argc, char* argv[])
                         ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2);
                         if (ret == -1)
                         {
-                            //printf("Error during received share request!\n\n");
+                            printf("Error during received share request!\n\n");
                             exit(1);
                         }
+
+                        if (!session_key1 && !session_key2) 
+                        {
+                            free(session_key1);
+                            free(session_key2);
+                        }
+
                         close(i);
                         exit(0);
                     }
@@ -461,6 +473,12 @@ int main(int argc, char* argv[])
                 }
             }
         }
+    }
+
+    if (!session_key1 && !session_key2) 
+    {
+        free(session_key1);
+        free(session_key2);
     }
 
     close(listenerTCP);

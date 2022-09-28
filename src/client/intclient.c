@@ -1484,6 +1484,8 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
         ret = -1;
     }
 
+    free_2(buffer, bufferSupp1);
+
     return ret;
 }
 
@@ -1599,7 +1601,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         printf("The user \"%s\" has requested to share the file \"%s\". What do you choose (y/n)?",\
                 bufferSupp2, bufferSupp1);
 
-        free_2(bufferSupp1, bufferSupp2);
+        free_3(bufferSupp1, bufferSupp2, plaintext);
 
         if (fgets(line, 2, stdin)) {
             if (1 == sscanf(line, "%c", &s)) {
