@@ -1108,17 +1108,16 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     ret = chdir("documents/");
     if (ret == -1) exit_with_failure("Can't change directory to path_documents", 1);
     ret = remove(filename);
-    if (ret == -1) {
+    ret = chdir("../");
+    if (ret == -1) 
+    {
         operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED, session_key1, session_key2, nonce);
-        ret = chdir("../");
-        if (ret == -1) exit_with_failure("Can't change directory", 1);
         
         free(plaintext);
         free(filename);
         return -1;
     }
     
-    ret = chdir("../");
     if (ret == -1) exit_with_failure("Can't change directory", 1);
 
 
@@ -1229,15 +1228,14 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     ret = chdir("documents");
     if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
     fd = fopen(filename, "r");
+    chdir("..");
     if (!(fd))
     {
         printf("File %s doesn't exist...\n  ", filename);
         operation_denied(sock, "The file doesn't exists", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
-        chdir("..");
         return 1;
     }
     stat(filename, &st);
-    chdir("..");
     printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
@@ -1450,7 +1448,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     FILE* fd;
 
       /* ---- Parsing the message ----*/
-    //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: UPLOAD_REQUEST nonce, nchunk, encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV 
+    //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: UPLOAD_REQUEST encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV, nchunk 
     bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE), LEN_SIZE);
@@ -1503,6 +1501,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         return -1;
     } 
     else printf("The MAC is been correctly compared!\n");
+    *nonce += 1;
 
 
     //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
@@ -1525,11 +1524,11 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     ret = chdir("documents");
     if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
     fd = fopen(filename, "r");
+    chdir("..");
     if (fd)
     {
         printf("File %s already exists...\n  ", filename);
         operation_denied(sock, "The file already exists", UPLOAD_DENIED, session_key1, session_key2, nonce);
-        chdir("..");
         return 1;
     }
 
@@ -1546,12 +1545,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
+
     bufferSupp2 = (unsigned char*)malloc(REST_SIZE);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+
     temp = (char*)malloc(LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
@@ -1569,7 +1570,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
     
     ret = send(sock, buffer, BUF_LEN, 0);
-    printf("Send UPLOAD_ACCEPTED\n"); 
+    printf("Sending UPLOAD_ACCEPTED\n"); 
     if (ret == -1)
     {
         printf("Send operation gone bad.\n");
@@ -1584,14 +1585,22 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     
 
     /* ---- NOW WE CAN BEGIN DOWNLOAD THE CHUNKS ---- */
-    fd = fopen(filename, "w"); // Inside download ????
+    ret = chdir("documents");
+    if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
+    fd = fopen(filename, "w");
+    chdir("..");
+    if (!fd)
+    {
+        printf("Error during the operning of the file %s...\n  ", filename);
+        return -1;
+    }
     for (i = 0; i < nchunk; i++)
     {
-        //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H({CHUNK}K1, IV, NONCE), IV
+        //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H({CHUNK}K2, IV, NONCE), IV
         buffer = (unsigned char*)malloc(BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-        msg_len = LEN_SIZE+528+HASH_LEN+IV_LEN+(3*BLANK_SPACE);
+        msg_len = LEN_SIZE+ENCR_CHUNK_LEN+HASH_LEN+IV_LEN+(3*BLANK_SPACE);
    
         ret = recv(sock, buffer, msg_len, 0);
         if (ret == -1) exit_with_failure("Receive failed", 0);
@@ -1611,7 +1620,6 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
-        //*(iv+IV_LEN) = '\0';
 
         // WE SHOULD COMPARE THE TWO DIGEST TO AUTHENTICATE THE MESSAGE
         bufferSupp3 = (unsigned char*)malloc(HASH_LEN*sizeof(unsigned char*));
@@ -1637,6 +1645,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
             free_3(bufferSupp1, bufferSupp2, iv);
             return -1;
         }
+        *nonce += 1;
 
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
 
@@ -1663,7 +1672,6 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     /* ---- SEND DOWNLOAD FINISHED MESSAGE ---- */
     printf("Send download finished message.\n");
     operation_succeed(sock, DOWNLOAD_FINISHED, session_key2, nonce);
-    chdir("..");
         
     return 1;
 }
