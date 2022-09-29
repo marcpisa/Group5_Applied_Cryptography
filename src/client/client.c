@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     // Checking username length and sanitize it
     if (strlen(argv[1]) > MAX_LEN_USERNAME)
     {
-        printf("Username too long... max length %i\n", MAX_LEN_USERNAME);
+        printf("Username too long (MAX: %i)\n", MAX_LEN_USERNAME);
         exit(-1);
     }
     if (!username_sanitization(argv[1]))
@@ -396,7 +396,8 @@ int main(int argc, char* argv[])
                             printf("Download file: 'download filename'\n");  
                             printf("Upload file: 'upload file_location'\n");  
                             printf("Share file with other user: 'share filename username'\n"); 
-                            printf("Accept / Decline Share: 'yes / no'\n\n" RESET); 
+                            printf("Accept / Decline Share: 'yes / no'\n" RESET);
+                            printf("\n"); 
                             break; 
 
                         case 10:
