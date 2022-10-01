@@ -29,6 +29,7 @@ int loginServer(int sd, char* rec_mex)
     unsigned char* bufferSupp2;
     unsigned char* bufferSupp3;
     char* temp;
+    char* temp_2;
     char* path_pubkey = "../dh_server_pubkey.pem";
     char* path_cert_rsa = "cert.pem";
     char* path_rsa_key = "rsa_prvkey.pem";
@@ -316,12 +317,23 @@ int loginServer(int sd, char* rec_mex)
     memcpy(bufferSupp1, &*(buffer+LEN_SIZE+BLANK_SPACE+msg_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); 
 
     // CHECK HASH
-    msg_to_hash_len = build_msg_2(&msg_to_hash, temp, msg_len,\
-                                                bufferSupp1, IV_LEN);
-    if (msg_to_hash_len == -1)
+    temp_2 = (char*) malloc(LEN_SIZE*sizeof(char));
+    if(!temp)
     {
         free_6(bufferSupp1, bufferSupp2, bufferSupp3, username, session_key1, session_key2);
         free(temp);
+        printf("Temp_2 failed...\n");
+        return -1;
+    }
+
+    sprintf(temp_2, "%u", nonce_cs);
+    msg_to_hash_len = build_msg_3(&msg_to_hash, temp, msg_len,\
+                                                bufferSupp1, IV_LEN,\
+                                                temp_2, LEN_SIZE);
+    if (msg_to_hash_len == -1)
+    {
+        free_6(bufferSupp1, bufferSupp2, bufferSupp3, username, session_key1, session_key2);
+        free_2(temp, temp_2);
         printf("Building hash failed.\n");
         return -1;
     }
@@ -329,14 +341,15 @@ int loginServer(int sd, char* rec_mex)
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1)
+    if (ret != 0)
     {
         free_6(bufferSupp1, bufferSupp2, bufferSupp3, username, session_key1, session_key2);
-        free_3(temp, digest, msg_to_hash);
+        free_4(temp, digest, msg_to_hash, temp);
         printf("Checking hash failed.\n");
         return -1;
     }
-    free_3(bufferSupp2, digest, msg_to_hash);
+    free_4(bufferSupp2, digest, msg_to_hash, temp_2);
+    nonce_cs += 1;
 
     // DECRYPT AND SAVE PORT
     decrypt_AES_128_CBC(&bufferSupp2, &plain_len, (unsigned char*) temp, msg_len, bufferSupp1, session_key1); 
@@ -623,7 +636,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1) 
+    if (ret != 0) 
     {
         printf("Wrong logout request hash.\n");
         return -1;
@@ -694,7 +707,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     
     free_5(iv, bufferSupp1, msg_to_hash, digest, temp);
     
-    if (ret == -1) // If the hash comparison failed
+    if (ret != 0) // If the hash comparison failed
     {
         operation_denied(sd, "Hash incorrect", LIST_DENIED, session_key1, session_key2, nonce);
         return 1;
@@ -797,7 +810,8 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
             printf("Send failed.\n");
             return -1;
         }
-        else *nonce = *nonce+1;
+        
+        *nonce += 1;
 
         
 
@@ -822,21 +836,25 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
 
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {
+            printf("Nonce (denied): %u\n", *nonce);
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
             if (ret == -1) exit_with_failure("Error checking list denied message", 0);
             else 
             {
                 free_2(bufferSupp1, buffer);
                 printf("Received list denied message.\n");
+                *nonce += 1;
                 return 1;
             }
         }
         else if (strcmp((char*) bufferSupp1, LIST_ACCEPTED) == 0)
         {
+            printf("Nonce: %u\n", *nonce);
             ret = check_reqacc_msg(LIST_ACCEPTED, buffer, *nonce, session_key2);
             if (ret == -1) exit_with_failure("Error checking list accepted message", 0);
             if (num_file == 0) num_file = -1;
             free_2(buffer, bufferSupp1);
+            *nonce += 1;
         }
         else
         {
@@ -884,8 +902,6 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
 
     /* ---- Parse first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
-    *nonce = *nonce+1;
-
     bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
@@ -920,7 +936,9 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1) 
+    *nonce += 1;
+
+    if (ret != 0) 
     {
         operation_denied(sd, "Wrong rename request hash", RENAME_DENIED, session_key1, session_key2, nonce);
         
@@ -1058,13 +1076,14 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    *nonce += 1;
 
     free(bufferSupp2);        
     free(temp);
     free(msg_to_hash);
     free(digest);
 
-    if (ret == -1) 
+    if (ret != 0) 
     {
         operation_denied(sd, "Wrong delete request hash", DELETE_DENIED, session_key1, session_key2, nonce);
         
@@ -1199,14 +1218,17 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1)
+    if (ret != 0)
     {
         printf("Wrong rename failed hash\n\n");
         free_6(buffer, bufferSupp1, bufferSupp2, iv, encr_msg, msg_to_hash);
         free(digest);
         return -1;
     } 
-    else printf("The MAC is been correctly compared!\n");
+    else {
+        printf("The MAC is been correctly compared!\n");
+        *nonce += 1;
+    }
     
 
     //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
@@ -1418,7 +1440,6 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     return 1;
 }
 
-
 int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
 {
 
@@ -1447,7 +1468,9 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     int nchunk;
     FILE* fd;
 
-      /* ---- Parsing the message ----*/
+
+
+    /* ---- Parsing the message ----*/
     //THE FORMAT OF THE MESSAGE WE RECEIVED SHOULD BE M1: UPLOAD_REQUEST encr_len, encr{filename}, Hash(UPLOAD_REQUEST, filename, nchunk, nonce), IV, nchunk 
     bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -1493,7 +1516,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1)
+    if (ret != 0)
     {
         printf("Wrong rename failed hash\n\n");
         free_6(buffer, bufferSupp1, bufferSupp2, iv, encr_msg, msg_to_hash);
@@ -1537,7 +1560,10 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
 
     //NOW we send UPLOAD_ACCEPTED TO CLIENT 
  
-        /* ---- Send Upload_accepted to the client ---- */ 
+    
+    
+    
+    /* ---- Send Upload_accepted to the client ---- */ 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS UPLOAD_ACCEPTED  HASH IV
     //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: UPLOAD_ACCEPTED IV NONCE
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
@@ -1639,7 +1665,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
 
         ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
         free_5(buffer, bufferSupp3, temp, msg_to_hash, digest);
-        if (ret == -1)
+        if (ret != 0)
         {
             printf("Wrong download chunk hash\n\n");
             free_3(bufferSupp1, bufferSupp2, iv);
@@ -1763,14 +1789,17 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         
     free_4(bufferSupp2, temp, msg_to_hash, digest);
         
-    if (ret == -1)
+    if (ret != 0)
     {
         printf("Wrong share_request hash.\n");
         free_2(bufferSupp1, iv);
         return -1;
-    } else printf("Hash is correct.\n");
-    *nonce_cs = *nonce_cs + 1;
-
+    } 
+    else 
+    {
+        printf("Hash is correct.\n");
+        *nonce_cs = *nonce_cs + 1;
+    }
 
     // DECRYPT THE MESSAGE
     decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
@@ -1956,8 +1985,12 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         operation_denied(sd, "Send peer failed", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         printf("Send peer failed.\n");
         return -1;
-    } else printf("Sent share permission to peer.\n");
-    *nonce_sc = *nonce_sc + 1;
+    } 
+    else 
+    {
+        printf("Sent share permission to peer.\n");
+        *nonce_sc = *nonce_sc + 1;
+    }
 
 
 
@@ -1996,6 +2029,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         else 
         {
             printf("Share has been denied.\n");
+            *nonce_sc += 1;
             operation_denied(sd, "Share has been denied", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             ret = 1;
         }
@@ -2012,6 +2046,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
             operation_denied(sd, "Error checking share accepted message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return -1;
         }
+        *nonce_sc += 1;
     }
     else
     {

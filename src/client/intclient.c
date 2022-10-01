@@ -14,7 +14,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
+int loginClient(int *sock, unsigned int* nonce, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
 {
     /*********************
      * VARIABLES
@@ -224,8 +224,12 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     free(temp);
 
     // HASH OF ENCRYPTED PORT
-    msg_to_hash_len = build_msg_2(&msg_to_hash, encr_msg, encr_len,\
-                                                iv, IV_LEN);
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%u", *nonce);
+    msg_to_hash_len = build_msg_3(&msg_to_hash, encr_msg, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
     if (msg_to_hash_len == -1)
     {
         free_4(iv ,temp, encr_msg, msg_to_hash);
@@ -236,8 +240,6 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     digest = hmac_sha256(*session_key2, 16, msg_to_hash, msg_to_hash_len, NULL);    
 
     // BUILD MSG
-    temp = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
     sprintf(temp, "%u", encr_len);
     msg_len = build_msg_4(&buffer, temp, LEN_SIZE,\
                                    encr_msg, encr_len,\
@@ -261,6 +263,8 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Send failed.\n");
         return -1;   
     }
+
+    *nonce += 1;
 
     return 1;
 }
@@ -393,7 +397,8 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         printf("Send failed.\n");
         return -1;
     } 
-    else *nonce = *nonce + 1;
+    
+    *nonce += 1;
 
 
 
@@ -426,10 +431,15 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
-            if (ret == -1) printf("Error checking list denied message.\n");
-            else printf("List denied.\n"); 
-            
             free_2(bufferSupp1, buffer);
+            
+            if (ret == -1) printf("Error checking list denied message.\n");
+            else 
+            {
+                printf("List denied.\n"); 
+                *nonce += 1;
+            }
+
             return -1;
         }
 
@@ -478,7 +488,9 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        if (ret == -1)
+        *nonce += 1;
+        printf("Nonce: %u\n", *nonce);
+        if (ret != 0)
         {
             operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, nonce);
 
@@ -494,8 +506,6 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             free(digest);
             return -1;
         }
-
-        *nonce += 1;
 
         // Decrypt list
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
@@ -597,8 +607,6 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
 
     /* ---- Create the first message (request, len encr., encr(name + new_name), hash(request, encr, iv, nonce), iv) ---- */
-    *nonce = *nonce+1;
-
     // Encrypt the two names
     msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
                                                 new_filename, (strlen(new_filename)+1));
@@ -655,7 +663,6 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
         return -1;
     }
     printf("Received the server's response.\n");
-    *nonce = *nonce+1;
 
     bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char)+1);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -680,6 +687,8 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
 
     free(buffer);
     free(bufferSupp1);
+
+    if (ret != -1)  *nonce += 1;
 
     return ret;
 }
@@ -732,7 +741,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
     sprintf(bufferSupp2, "%u", *nonce);
 
-    sprintf(temp, "%d", *nonce);
+    sprintf(temp, "%u", *nonce);
     msg_to_hash_len = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
                                                 encr_msg, encr_len,\
                                                 iv, IV_LEN,\
@@ -800,7 +809,8 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     }
 
     free_2(buffer, bufferSupp1);
-    *nonce = *nonce + 1;
+
+    if (ret != -1)  *nonce += 1;
 
     return ret;
 }
@@ -880,7 +890,8 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     printf("I'm sending to the server the download request.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
+    
+    *nonce += 1; // message sent, nonce increased for the answer or for other messages
 
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free(iv);
@@ -908,7 +919,11 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     {
         ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking download_denied message...\n");
-        else printf("Download denied from the server...\n");
+        else 
+        {
+            printf("Download denied from the server...\n");
+            *nonce += 1;
+        }
 
         free_2(bufferSupp1, buffer);
         return 1;
@@ -966,20 +981,16 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
         free_6(digest, temp, buffer, msg_to_hash, bufferSupp1, bufferSupp2);
         free_2(bufferSupp3, iv);
-        if (ret == -1)
+        if (ret != 0)
         {
             printf("Wrong download accepted hash\n\n");
             return -1;
         } 
-        else printf("The download request has been accepted!\n\n");
-    }
-    else if (strcmp((char*)bufferSupp1, DOWNLOAD_DENIED) == 0)
-    {
-        ret = check_reqden_msg(DOWNLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
-        if (ret == -1) printf("Error checking download_denied message.\n");
-
-        free_2(bufferSupp1, buffer);
-        return -1;
+        else 
+        {
+            printf("The download request has been accepted!\n\n");
+            *nonce += 1;
+        }
     }
     else
     {
@@ -1040,12 +1051,14 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
         ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
         free_5(buffer, bufferSupp3, temp, msg_to_hash, digest);
-        if (ret == -1)
+        if (ret != 0)
         {
             printf("Wrong download chunk hash\n\n");
             free_3(bufferSupp1, bufferSupp2, iv);
             return -1;
         }
+
+        *nonce += 1;
 
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
         //printf("The chunk we received is %s\n\n", (char*)plaintext);
@@ -1061,13 +1074,13 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
         memcpy(buffer, "Ciao", 5);
         ret = send(sock, buffer, BUF_LEN, 0);
+        free(buffer);
         if (ret == -1)
         {
             printf("Receive operation gone bad\n");
             return -1;
         }
         printf("Confirmation sent!\n");
-        free(buffer);
     }
     fclose(f1);
 
@@ -1180,7 +1193,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     printf("I'm sending to the server the download request.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    *nonce = *nonce+1; // message sent, nonce increased for the answer or for other messages
+    
+    *nonce += 1; // message sent, nonce increased for the answer or for other messages
 
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free(iv);
@@ -1209,7 +1223,11 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     {
         ret = check_reqden_msg(UPLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking download_denied message...\n");
-        else printf("Download denied from the server...\n");
+        else 
+        {
+            printf("Download denied from the server...\n");
+            *nonce += 1;
+        }
 
         free_2(bufferSupp1, buffer);
         return 1;    
@@ -1238,7 +1256,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
         free_6(bufferSupp2, buffer, bufferSupp1, iv, temp, digest);
         free(msg_to_hash);
-        if (ret == -1)
+        if (ret != 0)
         {
             printf("Wrong download chunk hash\n\n");
             return -1;
@@ -1469,11 +1487,15 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     {
         ret = check_reqden_msg(SHARE_DENIED, buffer, *nonce, session_key1, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_denied...");
+
+        *nonce += 1;
     }
     else if (strcmp((char*) bufferSupp1, SHARE_ACCEPTED) == 0)
     {
         ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_accepted...");
+
+        *nonce += 1;
     }
     else
     {
@@ -1567,13 +1589,13 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         
         free_5(bufferSupp1, bufferSupp3, temp, msg_to_hash, digest);
         
-        if (ret == -1)
+        if (ret != 0)
         {
             printf("Wrong share_permission hash.\n");
             free_2(bufferSupp2, iv);
             return -1;
         }
-        *nonce_sc = *nonce_sc + 1;    
+        *nonce_sc += 1;    
     
 
         // DECRYPT THE MESSAGE

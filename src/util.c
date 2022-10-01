@@ -571,11 +571,10 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     ret = send(sock, buffer, BUF_LEN, 0);
     
     free_6(iv, ciphertext, msg_to_hash, temp, digest, buffer);
-
-    *nonce +=1;
     
     if (ret == -1) exit_with_failure("Send failed", 0);
-    else *nonce = *nonce + 1;
+    
+    *nonce += 1;
 }
 
 void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsigned int* nonce)
@@ -619,13 +618,12 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
     ret = send(sock, buffer, BUF_LEN, 0);
-
-    *nonce += 1;
     
     free_5(iv, buffer, msg_to_hash, digest, temp);
 
     if (ret == -1) exit_with_failure("Send failed", 1);
-    else *nonce = *nonce + 1;
+    
+    *nonce += 1;
 }
 
 
@@ -636,7 +634,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     unsigned char* bufferSupp3;
 
     unsigned char* msg_to_hash;
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
 
     unsigned char* digest;
     unsigned int digest_len;
@@ -680,27 +678,19 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     memcpy(iv, &*(msg+offset), IV_LEN); // iv
 
     // Check hash
-    msg_to_hash_len = strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-
-    sprintf(temp, "%d", nonce);
-    memcpy(msg_to_hash, req_denied, strlen(req_denied));  // delete den
-    memcpy(&*(msg_to_hash+strlen(req_denied)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE), bufferSupp3, encr_len); // encr
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_denied)+BLANK_SPACE+encr_len+BLANK_SPACE+IV_LEN+BLANK_SPACE), \
-    temp, LEN_SIZE); // nonce
-
+    sprintf(temp, "%u", nonce);
+    msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
+                                                bufferSupp3, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+    
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    if (digest_len != (unsigned int) HASH_LEN) exit_with_failure("Wrong digest len", 0);
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1)
+    if (ret != 0)
     {
-        printf("Wrong hash\n\n");
+        printf("Wrong hash\n");
         ret = -1;
     }
     else
@@ -716,7 +706,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
             
         free(plaintext);
         free(reason);
-
+    
         ret = 1;
     }
 
@@ -735,7 +725,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     unsigned char* bufferSupp2;
 
     unsigned char* msg_to_hash;
-    unsigned int msg_to_hash_len;
+    int msg_to_hash_len;
 
     unsigned char* digest;
     unsigned int digest_len;
@@ -763,23 +753,19 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     memcpy(iv, &*(msg+offset), IV_LEN); // iv    
         
     // Check hash
-    msg_to_hash_len = strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE+LEN_SIZE; 
-    msg_to_hash = (unsigned char*) malloc(msg_to_hash_len*sizeof(unsigned char));
-    if (!msg_to_hash) exit_with_failure("Malloc msg_to_hash failed", 1);
-
-    sprintf(temp, "%d", nonce);
-    memcpy(msg_to_hash, req_accepted, strlen(req_accepted));  // req acc
-    memcpy(&*(msg_to_hash+strlen(req_accepted)), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE), iv, IV_LEN); // iv
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN), " ", BLANK_SPACE);
-    memcpy(&*(msg_to_hash+strlen(req_accepted)+BLANK_SPACE+IV_LEN+BLANK_SPACE), temp, LEN_SIZE); // nonce
+    
+    sprintf(temp, "%u", nonce);
+    msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(key, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-    if (ret == -1)
+    if (ret != 0)
     {
-        printf("Wrong hash\n\n");
+        printf("Wrong hash\n");
         ret = -1;
     }
     else

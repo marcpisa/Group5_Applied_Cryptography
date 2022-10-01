@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
                             {
                                 session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
                                 session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-                                if(!session_key1 || !session_key2)
+                                if(session_key1 == NULL || session_key2 == NULL)
                                 {
                                     printf("Unable to allocate session keys...\n\n");
                                     exit_flag = 1;
@@ -189,12 +189,15 @@ int main(int argc, char* argv[])
                                 }
                             }
                     
-                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, port, ca_store);
+                            ret = loginClient(&connectedSock, &nonce_cs, &session_key1, &session_key2, username, srv_addr, port, ca_store);
                             
                             if (ret == -1){
                                 printf("Login failed.\n\n");
-                                free(session_key1);
-                                free(session_key2);
+                                if(session_key1 != NULL && session_key2 != NULL)
+                                {
+                                    free(session_key1);
+                                    free(session_key2);
+                                }
                             } 
                             else 
                             {
@@ -225,8 +228,10 @@ int main(int argc, char* argv[])
                             {
                                 printf("Logout succeeded.\n\n");
                                 connected = 0;
+                                nonce_cs = 0;
+                                nonce_sc = 0;
 
-                                if (!session_key1 && !session_key2) 
+                                if (session_key1 != NULL && session_key2 != NULL) 
                                 {
                                     free(session_key1);
                                     free(session_key2);
@@ -278,8 +283,13 @@ int main(int argc, char* argv[])
                                 break;
                             } 
                             ret = filename_sanitization (command2);
-                            ret += filename_sanitization (command3);
-                            if (ret <= 1) 
+                            if (ret == 0) 
+                            {
+                                printf("Filename sanitization failed.\n\n");
+                                break;
+                            }
+                            ret = filename_sanitization (command3);
+                            if (ret == 0) 
                             {
                                 printf("Filename sanitization failed.\n\n");
                                 break;
@@ -308,7 +318,7 @@ int main(int argc, char* argv[])
                                 break;
                             } 
                             ret = filename_sanitization (command2);
-                            if (ret == -1) 
+                            if (ret == 0) 
                             {
                                 printf("Filename sanitization failed.\n\n");
                                 break;
@@ -347,7 +357,7 @@ int main(int argc, char* argv[])
                                 break;
                             } 
                             ret = filename_sanitization (command2);
-                            if (ret == -1) 
+                            if (ret == 0) 
                             {
                                 printf("Filename sanitization failed.\n\n");
                                 break;
@@ -412,18 +422,15 @@ int main(int argc, char* argv[])
                                     }
                                     else printf("Logout failed.\n\n");
 
-                                    
-                                    free_2(session_key1, session_key2);
+                                    if (session_key1 != NULL && session_key2 != NULL) 
+                                    {
+                                        free(session_key1);
+                                        free(session_key2);
+                                    }
                                 }
 
                                 printf("Exiting the program.\n");
                                 exit_flag = 1;
-
-                                if (!session_key1 && !session_key2) 
-                                {
-                                    free(session_key1);
-                                    free(session_key2);
-                                }
 
                                 break;
 
@@ -460,7 +467,7 @@ int main(int argc, char* argv[])
                             exit(1);
                         }
 
-                        if (!session_key1 && !session_key2) 
+                        if (session_key1 != NULL && session_key2 != NULL) 
                         {
                             free(session_key1);
                             free(session_key2);
@@ -475,8 +482,8 @@ int main(int argc, char* argv[])
             }
         }
     }
-
-    if (!session_key1 && !session_key2) 
+    
+    if (session_key1 != NULL && session_key2 != NULL) 
     {
         free(session_key1);
         free(session_key2);
