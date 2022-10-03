@@ -177,19 +177,8 @@ int main(int argc, char* argv[])
                                 printf("Connection already established. Login impossible operation!\n\n");
                                 break;
                             }
-                            else 
-                            {
-                                session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-                                session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-                                if(session_key1 == NULL || session_key2 == NULL)
-                                {
-                                    printf("Unable to allocate session keys...\n\n");
-                                    exit_flag = 1;
-                                    break;
-                                }
-                            }
-                    
-                            ret = loginClient(&connectedSock, &nonce_cs, &session_key1, &session_key2, username, srv_addr, port, ca_store);
+
+                            ret = loginClient(&connectedSock, &session_key1, &session_key2, username, srv_addr, port, ca_store);
                             
                             if (ret == -1){
                                 printf("Login failed.\n\n");
@@ -326,7 +315,8 @@ int main(int argc, char* argv[])
 
                             ret = deleteClient(connectedSock, command2, session_key1, session_key2, &nonce_cs);
                             if (ret == -1) printf("Error during the delete operation request!\n\n");
-
+                            else printf("\n");
+                            
                             break;
 
                         case 6: //*********** DOWNLOAD ************
@@ -467,12 +457,6 @@ int main(int argc, char* argv[])
                             exit(1);
                         }
 
-                        if (session_key1 != NULL && session_key2 != NULL) 
-                        {
-                            free(session_key1);
-                            free(session_key2);
-                        }
-
                         close(i);
                         exit(0);
                     }
@@ -482,15 +466,8 @@ int main(int argc, char* argv[])
             }
         }
     }
-    
-    if (session_key1 != NULL && session_key2 != NULL) 
-    {
-        free(session_key1);
-        free(session_key2);
-    }
 
     close(listenerTCP);
-    
     X509_STORE_free(ca_store);
     
     return 0;

@@ -14,7 +14,7 @@ int createSocket()
     return sock;
 }
 
-int loginClient(int *sock, unsigned int* nonce, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
+int loginClient(int *sock, unsigned char** session_key1, unsigned char** session_key2, char* username, struct sockaddr_in srv_addr, int port, X509_STORE* ca_store) 
 {
     /*********************
      * VARIABLES
@@ -226,10 +226,8 @@ int loginClient(int *sock, unsigned int* nonce, unsigned char** session_key1, un
     // HASH OF ENCRYPTED PORT
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-    sprintf(temp, "%u", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, encr_msg, encr_len,\
-                                                iv, IV_LEN,\
-                                                temp, LEN_SIZE);
+    msg_to_hash_len = build_msg_2(&msg_to_hash, encr_msg, encr_len,\
+                                                iv, IV_LEN);
     if (msg_to_hash_len == -1)
     {
         free_4(iv ,temp, encr_msg, msg_to_hash);
@@ -263,8 +261,6 @@ int loginClient(int *sock, unsigned int* nonce, unsigned char** session_key1, un
         printf("Send failed.\n");
         return -1;   
     }
-
-    *nonce += 1;
 
     return 1;
 }
@@ -348,6 +344,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     int ret;
     int msg_len;
     char* temp;
+    char* temp2;
     char *token;
     char** new_file_list;
     unsigned char* buffer;
@@ -449,6 +446,8 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         // No operation denied, let's obtain the list
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
+        temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
+        if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
         bufferSupp1 = (unsigned char*) malloc(2*CHUNK_SIZE*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
@@ -461,8 +460,8 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         num_file = atoi(temp);
         old_offset = LEN_SIZE+BLANK_SPACE;
 
-        memcpy(temp, &*(buffer+old_offset), LEN_SIZE); // encr. len.
-        encr_len = atoi(temp);
+        memcpy(temp2, &*(buffer+old_offset), LEN_SIZE); // encr. len.
+        encr_len = atoi(temp2);
         old_offset += LEN_SIZE+BLANK_SPACE;
 
         memcpy(bufferSupp1, &*(buffer+old_offset), encr_len); // encr. list
@@ -475,37 +474,36 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
 
         bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
-        sprintf((char*)bufferSupp3, "%d", *nonce);
+        sprintf((char*)bufferSupp3, "%u", *nonce);
         
         // Check hash
         msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
                                                     bufferSupp1, encr_len,\
                                                     iv, IV_LEN,\
                                                     bufferSupp3, LEN_SIZE);
+
         if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-        free(bufferSupp3);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
-
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        *nonce += 1;
-        printf("Nonce: %u\n", *nonce);
+
+        free_3(bufferSupp3, temp, temp2);
+
         if (ret != 0)
         {
             operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, nonce);
 
-            free_6(buffer, temp, bufferSupp1, bufferSupp2, iv, msg_to_hash);
-            free(digest);
+            free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             return -1;
         }
         else if (num_file < 0 || num_file >= CHUNK_SIZE)
         {
             operation_denied(sock, "Incorrect num_file", LIST_DENIED, session_key1, session_key2, nonce);
 
-            free_6(buffer, temp, bufferSupp1, bufferSupp2, iv, msg_to_hash);
-            free(digest);
+            free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             return -1;
         }
+        *nonce += 1;
 
         // Decrypt list
         decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
@@ -570,7 +568,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         // Send success message
         operation_succeed(sock, LIST_ACCEPTED, session_key2, nonce);
 
-        free_6(temp, iv, buffer, bufferSupp1, bufferSupp2, msg_to_hash);
+        free_5(iv, buffer, bufferSupp1, bufferSupp2, msg_to_hash);
         free_2(digest, plaintext);
     }
 
@@ -594,6 +592,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     int ret;
     int msg_len;
     char* temp;
+    char* temp2;
     unsigned char* buffer;
     unsigned char* bufferSupp1;
 
@@ -628,9 +627,12 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
     // Compose the message
-    sprintf(temp, "%d", encr_len); // Here we put the encryption length in string format
+    temp2 = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
+
+    sprintf(temp2, "%d", encr_len); // Here we put the encryption length in string format
     msg_len = build_msg_5(&buffer, RENAME_REQUEST, strlen(RENAME_REQUEST),\
-                                   temp, LEN_SIZE,\
+                                   temp2, LEN_SIZE,\
                                    encr_msg, encr_len,\
                                    digest, HASH_LEN,\
                                    iv, IV_LEN);
@@ -641,7 +643,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
-    free(iv);
+    free_2(temp2, iv);
     
     if (ret == -1) {
         printf("Send failed.\n");
@@ -739,15 +741,13 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (!temp) exit_with_failure("Malloc temp failed", 1);
     bufferSupp2 = (char*)malloc(sizeof(char)*LEN_SIZE);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+ 
     sprintf(bufferSupp2, "%u", *nonce);
-
-    sprintf(temp, "%u", *nonce);
     msg_to_hash_len = build_msg_4(&msg_to_hash, DELETE_REQUEST, strlen(DELETE_REQUEST),\
                                                 encr_msg, encr_len,\
                                                 iv, IV_LEN,\
                                                 bufferSupp2, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-    free(bufferSupp2);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
 
@@ -764,6 +764,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, encr_msg, iv);
+    free(bufferSupp2);
 
     if (ret == -1)
     {
@@ -837,6 +838,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     int nchunk;
     int msg_len;
     char* temp;
+    char* temp2;
     unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
@@ -867,8 +869,11 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     // Create the hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-
-    sprintf(temp, "%d", *nonce); // Now in temp there is the string version of the nonce
+    temp2 = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
+    
+    
+    sprintf(temp, "%u", *nonce); // Now in temp there is the string version of the nonce
     msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
                                                 encr_msg, encr_len,\
                                                 iv, IV_LEN,\
@@ -878,9 +883,9 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
 
     // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
-    sprintf(temp, "%d", encr_len); //DONT KNOW IF IT WORKS IN ANY CASE
+    sprintf(temp2, "%d", encr_len); //DONT KNOW IF IT WORKS IN ANY CASE
     msg_len = build_msg_5(&buffer, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
-                                   temp, LEN_SIZE,\
+                                   temp2, LEN_SIZE,\
                                    encr_msg, encr_len,\
                                    digest, HASH_LEN,\
                                    iv, IV_LEN);
@@ -894,7 +899,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     *nonce += 1; // message sent, nonce increased for the answer or for other messages
 
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
-    free(iv);
+    free_2(temp2, iv);
 
 
 
@@ -1112,6 +1117,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     long nchunk, rest;
     int msg_len;
     char* temp;
+    char* temp2;
     unsigned char* buffer;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
@@ -1160,12 +1166,14 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         // Create the hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
+    temp2 = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
 
 
 
-    sprintf(temp, "%d", *nonce); // Now in temp there is the string version of the nonce
+    sprintf(temp, "%u", *nonce); // Now in temp there is the string version of the nonce
     sprintf((char*)bufferSupp1, "%li", nchunk); //
     //printf("%s", bufferSupp1); 
 
@@ -1180,9 +1188,9 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
 
 
-    sprintf(temp, "%d", encr_len); //DONT KNOW IF IT WORKS IN ANY CASE
+    sprintf(temp2, "%d", encr_len); //DONT KNOW IF IT WORKS IN ANY CASE
     msg_len = build_msg_6(&buffer, UPLOAD_REQUEST, strlen(UPLOAD_REQUEST),\
-                                   temp, LEN_SIZE,\
+                                   temp2, LEN_SIZE,\
                                    encr_msg, encr_len,\
                                    digest, HASH_LEN,\
                                    iv, IV_LEN,\
@@ -1197,8 +1205,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     *nonce += 1; // message sent, nonce increased for the answer or for other messages
 
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
-    free(iv);
-    free(bufferSupp1); 
+    free_3(iv, temp2, bufferSupp1);
 
     //END OF FIRST MESSAGE 
 
@@ -1399,6 +1406,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     int msg_len;
 
     char* temp;
+    char* temp2;
     unsigned char* iv;
     unsigned char* buffer;
     unsigned char* bufferSupp1;
@@ -1419,6 +1427,8 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     // (SHARE_REQ encr_len encr_msg(username, filename, peer_name) hash(req encr iv nonce_cs) iv)
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
+    temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
 
 
     // Build and encrypt the message
@@ -1441,9 +1451,9 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
 
 
     // Build the message
-    sprintf(temp, "%d", encr_len);
+    sprintf(temp2, "%d", encr_len);
     msg_len = build_msg_5(&buffer, SHARE_REQUEST, strlen(SHARE_REQUEST),\
-                                   temp, LEN_SIZE,\
+                                   temp2, LEN_SIZE,\
                                    encr_msg, encr_len,\
                                    digest, HASH_LEN,\
                                    iv, IV_LEN);
@@ -1452,7 +1462,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     ret = send(sock, buffer, BUF_LEN, 0);
     
     free_6(temp, msg_to_encr, encr_msg, msg_to_hash, digest, buffer);
-    free(iv);    
+    free_2(temp2, iv);    
 
     if (ret == -1)
     {
