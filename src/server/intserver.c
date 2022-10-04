@@ -1233,7 +1233,6 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     ret = chdir("documents");
     if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
     fd = fopen(filename, "r");
-    chdir("..");
     if (!(fd))
     {
         printf("File %s doesn't exist...\n  ", filename);
@@ -1241,6 +1240,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         return 1;
     }
     stat(filename, &st);
+    chdir("..");
+    printf("The filename is %s\n", filename);
     printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
