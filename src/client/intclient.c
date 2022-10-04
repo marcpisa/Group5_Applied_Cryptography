@@ -872,7 +872,6 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     temp2 = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
     
-    
     sprintf(temp, "%u", *nonce); // Now in temp there is the string version of the nonce
     msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_REQUEST, strlen(DOWNLOAD_REQUEST),\
                                                 encr_msg, encr_len,\
@@ -971,7 +970,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*REST_SIZE); // Here we save the rest value of the message
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 for nchunk failed", 1);
 
-        sprintf(temp, "%d", *nonce); //nonce strring format
+        sprintf(temp, "%u", *nonce); //nonce strring format
         memcpy(bufferSupp3, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE); //rest string format
 
         msg_to_hash_len = build_msg_5(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED),\
@@ -1029,7 +1028,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         memcpy(bufferSupp1, buffer, LEN_SIZE); // Here we have len_enc
         encr_len = atoi((char*)bufferSupp1);
 
-        bufferSupp2 = (unsigned char*)malloc(encr_len);
+        bufferSupp2 = (unsigned char*) malloc(encr_len);
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
 
@@ -1046,10 +1045,11 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         temp = (char*)malloc(sizeof(char)*LEN_SIZE);
         if (!temp) exit_with_failure("Malloc of temp failed", 1);
         
-        sprintf(temp, "%u", *nonce); //nonce string format
+        sprintf(temp, "%u", *nonce);
         msg_to_hash_len = build_msg_3(&msg_to_hash, bufferSupp2, encr_len,\
                                                     iv, IV_LEN,\
                                                     temp, LEN_SIZE);
+
         if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
