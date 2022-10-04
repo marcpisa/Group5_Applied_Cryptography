@@ -550,7 +550,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
-    sprintf(temp, "%d", *nonce);
+    sprintf(temp, "%u", *nonce);
     msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
                                                 ciphertext, encr_len,\
                                                 iv, IV_LEN,\
@@ -603,7 +603,7 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
-    sprintf(temp, "%d", *nonce);
+    sprintf(temp, "%u", *nonce);
     msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
                                                 iv, IV_LEN,\
                                                 temp, LEN_SIZE);
@@ -664,8 +664,8 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     offset = strlen(req_denied)+BLANK_SPACE;
     memcpy(temp, &*(msg+offset), LEN_SIZE); // len. encr.
     offset += LEN_SIZE+BLANK_SPACE;
-        
     encr_len = atoi(temp);
+
     bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*encr_len);
     if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
 
@@ -684,7 +684,7 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
                                                 iv, IV_LEN,\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-    
+
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
