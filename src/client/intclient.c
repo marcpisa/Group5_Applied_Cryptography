@@ -1138,7 +1138,6 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         return 1;
     }
     stat(filename, &st);
-    chdir("..");
     printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk

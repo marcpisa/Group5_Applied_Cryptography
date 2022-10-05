@@ -1536,6 +1536,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (fd)
     {
         printf("File %s already exists...\n  ", filename);
+        close(fd);
         operation_denied(sock, "The file already exists", UPLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
@@ -1605,6 +1606,8 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         printf("Error during the operning of the file %s...\n  ", filename);
         return -1;
     }
+    ret = chdir("documents");
+    if (ret == -1) exit_with_failure("Can't open directory documents...", 1);
     for (i = 0; i < nchunk; i++)
     {
         //THE FORMAT OF THE CHUNK MESSAGE IS LEN_ENC, {CHUNK}K1, H({CHUNK}K2, IV, NONCE), IV
