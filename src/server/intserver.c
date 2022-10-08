@@ -1511,6 +1511,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (fd)
     {
         printf("File %s already exists...\n  ", filename);
+        close(fd);
         operation_denied(sock, "The file already exists", UPLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
