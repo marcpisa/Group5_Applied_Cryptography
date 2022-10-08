@@ -113,23 +113,6 @@ EVP_PKEY* pubkey_to_PKEY(unsigned char* public_key, int len)
     return pk;
 }
 
-X509* cert_to_X509(unsigned char* cert, int cert_len)
-{
-    X509* crt = NULL;
-    BIO* mbio = NULL;
-    
-    mbio = BIO_new(BIO_s_mem());
-    if (!mbio) exit_with_failure("BIO_new failed", 1);
-    BIO_write(mbio, cert, cert_len);
-
-    crt = PEM_read_bio_X509(mbio, NULL, NULL, NULL);
-    if (!crt) exit_with_failure("PEM_read_bio_X509 failed", 1);
-
-    BIO_free(mbio);
-
-    return crt;
-}
-
 EVP_PKEY* save_read_PUBKEY(char* path_pubkey, EVP_PKEY* my_prvkey)
 {
     int ret;
@@ -389,10 +372,11 @@ unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey, size_t* s
     return K;
 }
 
-unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** dh_pubkey, int* pubkey_len)
+unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, int* pubkey_len)
 {
     int ret;
     EVP_PKEY* dh_params;
+    EVP_PKEY* dh_pubkey;
     EVP_PKEY_CTX* ctx;
     unsigned char* pubkey_byte;
     DH* params;
@@ -411,12 +395,11 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, EVP_PKEY** d
     if (ret != 1 || (!(*my_prvkey))) exit_with_failure("keygen failed", 1);
 
     // Save DH key in PEM format and retrieve the public key
-    *dh_pubkey = save_read_PUBKEY(path_pubkey, *my_prvkey);
-
-    //if (!dh_pubkey) exit_with_failure("save_read_PUBKEY failed", 0);
-    pubkey_byte = pubkey_to_byte(*dh_pubkey, pubkey_len);
+    dh_pubkey = save_read_PUBKEY(path_pubkey, *my_prvkey);
+    pubkey_byte = pubkey_to_byte(dh_pubkey, pubkey_len);
     if (!pubkey_byte) exit_with_failure("pubkey_to_byte failed", 0);
 
+    EVP_PKEY_free(dh_pubkey);
     EVP_PKEY_CTX_free(ctx);
     EVP_PKEY_free(dh_params);
     DH_free(params);
@@ -474,21 +457,34 @@ void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key
     free(digest);
 }
 
-EVP_PKEY* get_ver_server_pubkey(X509* serv_cert, X509_STORE* ca_store)
+EVP_PKEY* get_ver_server_pubkey(unsigned char* cert, int cert_len, X509_STORE* ca_store)
 {
     int ret;
     X509_STORE_CTX* ctx;
     EVP_PKEY* pub_rsa_key_serv;
+    X509* crt = NULL;
+    BIO* mbio = NULL;
+    
+    // Obtain the X509 certificate
+    mbio = BIO_new(BIO_s_mem());
+    if (!mbio) exit_with_failure("BIO_new failed", 1);
+    BIO_write(mbio, cert, cert_len);
 
-    pub_rsa_key_serv = X509_get_pubkey(serv_cert);
+    crt = PEM_read_bio_X509(mbio, NULL, NULL, NULL);
+    if (!crt) exit_with_failure("PEM_read_bio_X509 failed", 1);
+
+    // Extract and verify the rsa key
+    pub_rsa_key_serv = X509_get_pubkey(crt);
     
     ctx = X509_STORE_CTX_new();
     if (!ctx) exit_with_failure("X509_STORE_CTX_new failed", 1);
-    ret = X509_STORE_CTX_init(ctx, ca_store, serv_cert, NULL);
+    ret = X509_STORE_CTX_init(ctx, ca_store, crt, NULL);
     if (ret != 1) exit_with_failure("X509_STORE_CTX_init failed", 1);
     ret = X509_verify_cert(ctx);
     if (ret != 1) exit_with_failure("X509_verify_cert failed", 1);
 
+    BIO_free(mbio);
+    X509_free(crt);
     X509_STORE_CTX_free(ctx);
 
     return pub_rsa_key_serv;
@@ -802,7 +798,6 @@ int build_msg_2(unsigned char** buffer, void* param1, unsigned int param1_len, v
     return buff_len;
 }
 
-
 int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len)
 {
     int buff_len;
@@ -898,6 +893,177 @@ int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, v
     
     return buff_len;
 }
+
+/* The format of the message is:
+ *  Type | Len. payload | Payload | Hash | IV
+ * 
+ * where the Len and Payload fields can be NULL, wheras the others are always not NULL.
+ * 
+ * This functions takes as argument a buffer in which store the msg, and all the
+ * message fields with the corresponding length.
+ * 
+ * It returns the buffer length or -1 in case of some errors.
+ */
+int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv)
+{
+    int buff_len;
+    char n_buff[LEN_SIZE];
+    unsigned char* p;
+
+    if (len_payload == -1)
+        buff_len = strlen(type)+HASH_LEN+IV_LEN+(BLANK_SPACE*2);
+    else
+        buff_len = strlen(type)+LEN_SIZE+len_payload+HASH_LEN+IV_LEN+(BLANK_SPACE*4);
+
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if(!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+
+    p = *buffer;
+    memcpy(p, type, strlen(type));
+    p += strlen(type);
+    memcpy(p, " ", BLANK_SPACE);
+    p += BLANK_SPACE;
+
+    if (len_payload != -1) 
+    {
+        memset(n_buff, 0, LEN_SIZE);
+        sprintf(n_buff, "%d", len_payload); // len payload
+        memcpy(p, n_buff, LEN_SIZE);
+        p += LEN_SIZE;
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+        memcpy(p, payload, len_payload); // payload
+        p += len_payload;
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+    }
+
+    memcpy(p, hash, HASH_LEN);
+    p += HASH_LEN;
+    memcpy(p, " ", BLANK_SPACE);
+    p += BLANK_SPACE;
+    memcpy(p, iv, IV_LEN);
+    
+    return buff_len;
+}
+
+/* The format of the message is:
+ *  Type | Len. payload | Payload | Hash | IV
+ * 
+ * where the Len and Payload fields can be -1/NULL, wheras the others are always not NULL.
+ * 
+ * This functions takes as argument a buffer in which the msg is stored, and all the
+ * buffer where the message fields will be saved to. 
+ * 
+ * Return -1 in case of errors, 0 otherwise
+ */
+int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv)
+{
+    unsigned char* p;
+    char len[LEN_SIZE];
+
+    p = rec_msg;
+    memcpy(type, p, TYPE_LEN);
+    p += TYPE_LEN+BLANK_SPACE;
+
+    if ((*len_payload) != -1)
+    {
+        memcpy(len, p, LEN_SIZE);
+        p += LEN_SIZE+BLANK_SPACE;
+        (*len_payload) = atoi(len);
+
+        if ((*len_payload) < 0 || (*len_payload) > (len_msg-TYPE_LEN-LEN_SIZE-HASH_LEN-IV_LEN))
+        {
+            printf("Wrong payload len.\n");
+            return -1;
+        }
+
+        *payload = (unsigned char*) malloc((*len_payload)*sizeof(unsigned char));
+        if (!(*payload))
+        {
+            printf("Malloc payload failed.\n");
+            return -1;
+        }
+        memcpy(*payload, p, *len_payload);
+        p += (*len_payload)+BLANK_SPACE;
+    }
+
+    memcpy(hash, p, HASH_LEN);
+    p += HASH_LEN+BLANK_SPACE;
+
+    memcpy(iv, p, IV_LEN);
+
+    return 0;
+}
+
+int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len)
+{
+    int buff_len = 0;
+    char temp_buff[BUF_LEN];
+
+    memset(temp_buff, 0, BUF_LEN);
+    memcpy(temp_buff, "\0", 1);
+    if (param1 != NULL)
+    {
+        strncat(temp_buff, param1, param1_len);
+        buff_len += param1_len;
+    }
+    if (param2 != NULL)
+    {
+        strcat(temp_buff, " ");
+        strncat(temp_buff, param2, param2_len);
+        buff_len += 1+param2_len;
+    }
+    if (param3 != NULL)
+    {
+        strcat(temp_buff, " ");
+        strncat(temp_buff, param3, param3_len);
+        buff_len += 1+param3_len;
+    }
+    if (param4 != NULL)
+    {
+        strcat(temp_buff, " ");
+        strncat(temp_buff, param4, param4_len);
+        buff_len += 1+param4_len;
+    }
+    if (param5 != NULL)
+    {
+        strcat(temp_buff, " ");
+        strncat(temp_buff, param5, param5_len);
+        buff_len += 1+param5_len;
+    }
+    
+    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    if (!(*buffer))
+    {
+        printf("Malloc buffer failed.\n");
+        return -1;
+    }
+    memcpy(*buffer, temp_buff, buff_len);
+
+    return buff_len;
+}
+
+void free_n(int n,...)
+{
+    va_list ap;
+    unsigned char* f;
+
+    va_start(ap, n);
+
+    for (int i = 0; i < n; i++)
+    {
+        f = va_arg(ap, unsigned char*);
+        free(f);
+    }
+
+    va_end(ap);
+}
+
 
 void free_2(void* param1, void* param2)
 {

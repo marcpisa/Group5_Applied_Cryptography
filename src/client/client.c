@@ -28,8 +28,8 @@ int main(int argc, char* argv[])
     char* path_cert_serv = "../cert.pem";
 
     // Cryptographic operation
-    unsigned char* session_key1;
-    unsigned char* session_key2;
+    unsigned char* session_key1 = NULL;
+    unsigned char* session_key2 = NULL;
     
     //********* END VARIABLES *********
 

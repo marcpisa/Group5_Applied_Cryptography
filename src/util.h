@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
@@ -21,8 +22,6 @@
 #include <openssl/err.h>
 //#include <conio.h>
 
-
-#define SELECT_SEC_TO_WAIT 5
 #define MAX_LEN_CMD 100
 #define BUF_LEN 3*1024
 #define COM_LEN 16
@@ -30,14 +29,24 @@
 #define MAX_LEN_USERNAME 20
 #define COMM_NUMB 10
 #define PORT_SIZE 6
+
 #define CHUNK_SIZE 512 
-#define PADDING_LEN 16
-#define ENCR_CHUNK_LEN CHUNK_SIZE+PADDING_LEN // This is correct if CHUNK_SIZE is a multiple of 16
+#define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc()) 
+#define ENCR_CHUNK_LEN CHUNK_SIZE+BLOCK_SIZE // This is correct if CHUNK_SIZE is a multiple of 16
+#define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
+#define HASH_LEN EVP_MD_size(EVP_sha256())
+#define SIGN_LEN 256
+
 #define SERVER_PORT 25020
 #define LOCALHOST "127.0.0.1"
-#define MEX_TYPE_LEN 8
 
+#define TYPE_LEN 8
+#define DH_PUBKEY_SIZE 654
 #define NUM_USER 4
+#define LEN_SIZE 10
+#define REST_SIZE 10
+#define MAX_CERT_LEN 2048
+#define BLANK_SPACE 1
 
 #define MAIN_FOLDER_SERVER "../../database/"
 #define MAIN_FOLDER_CLIENT "../../download/"
@@ -55,6 +64,7 @@
 #define EXIT "exit"
 
 #define LOGIN_REQUEST "logi_req"
+#define SEND_PORT "snd_port"
 #define LOGOUT_REQUEST "logo_req"
 #define LOGOUT_DENIED "logo_den"
 #define LOGOUT_ACCEPTED "logo_acc"
@@ -83,22 +93,12 @@
 #define SHARE_PERMISSION "shre_per"
 #define SHARE_DENIED "shre_den"
 
+
 #define RED "\x1B[31m"
 #define GRN "\x1B[32m"
 #define RESET "\x1B[0m"
 
-#define MAX_LEN_REQUEST 15
-#define LEN_SIZE 10
-#define REST_SIZE 10
-#define MAX_CERT_LEN 2048
-
 #define DELIM ' '
-
-#define IV_LEN EVP_CIPHER_iv_length(EVP_aes_128_cbc())
-#define HASH_LEN EVP_MD_size(EVP_sha256())
-#define SIGN_LEN 256
-#define BLANK_SPACE 1
-#define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cbc())
 
 int username_sanitization(const char *username);
 int input_sanitization_commands(const char *input);
@@ -108,7 +108,6 @@ void exit_with_failure(char *err, int perror_enable);
 size_t str_ssplit(unsigned char *a_str, const unsigned char a_delim);
 unsigned char *pubkey_to_byte(EVP_PKEY *pub_key, int *pub_key_len);
 EVP_PKEY *pubkey_to_PKEY(unsigned char *public_key, int len);
-X509 *cert_to_X509(unsigned char *cert, int cert_len);
 EVP_PKEY *save_read_PUBKEY(char *path_pubkey, EVP_PKEY *my_prvkey);
 void encrypt_AES_128_CBC(unsigned char **out, int *out_len, unsigned char *in, unsigned int inl, unsigned char *iv, unsigned char *key);
 void decrypt_AES_128_CBC(unsigned char **out, unsigned int *out_len, unsigned char *in, unsigned int inl, unsigned char *iv, unsigned char *key);
@@ -118,10 +117,10 @@ int verify_signature(unsigned char *exp_digsig, int len_exp_digsig, unsigned cha
 unsigned char *cert_to_byte(X509 *cert, int *cert_len);
 unsigned char *key_derivation(EVP_PKEY *prvkey, EVP_PKEY *peer_pubkey, size_t *secretlen);
 unsigned char *read_cert(char *path_cert, int *cert_len);
-unsigned char *gen_dh_keys(char *path_pubkey, EVP_PKEY **my_prvkey, EVP_PKEY **dh_pubkey, int *pubkey_len);
+unsigned char *gen_dh_keys(char *path_pubkey, EVP_PKEY **my_prvkey, int *pubkey_len);
 EVP_PKEY *get_client_pubkey(char *path_cert_client_rsa);
 void issue_session_keys(unsigned char *K, int K_len, unsigned char **session_key1, unsigned char **session_key2);
-EVP_PKEY *get_ver_server_pubkey(X509 *serv_cert, X509_STORE *ca_store);
+EVP_PKEY* get_ver_server_pubkey(unsigned char* cert, int cert_len, X509_STORE* ca_store);
 unsigned char *hmac_sha256(unsigned char *key, int keylen, unsigned char *msg, int msg_len, unsigned int *out_len);
 
 void operation_denied(int sock, char* reason, char* req_denied, unsigned char* key1, unsigned char* key2, unsigned int* nonce);
@@ -134,6 +133,12 @@ int build_msg_3(unsigned char** buffer, void* param1, unsigned int param1_len, v
 int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len);
 int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
 int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len);
+
+void free_n(int n, ...);
+int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv);
+int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv);
+int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
+
 
 void free_2(void* param1, void* param2);
 void free_3(void* param1, void* param2, void* param3);
