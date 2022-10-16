@@ -310,8 +310,9 @@ unsigned char* read_cert(char* path_cert, int* cert_len)
     *cert_len = BIO_get_mem_data(bio, &cert_byte);
     if((*cert_len) < 0) exit_with_failure("BIO_get_mem_data failed", 1);
 
-    unsigned char* result = (unsigned char*) malloc((*cert_len)*sizeof(unsigned char));
+    unsigned char* result = (unsigned char*) malloc(((*cert_len)+1)*sizeof(unsigned char));
     memcpy(result, cert_byte, *cert_len);
+    memcpy(result+(*cert_len), "\0", 1);
 
     // Free
     //free(cert_byte);
@@ -344,32 +345,138 @@ unsigned char* cert_to_byte(X509* cert, int* cert_len)
     return c;
 }
 
-unsigned char* key_derivation(EVP_PKEY* prvkey, EVP_PKEY* peer_pubkey, size_t* secretlen)
+int issue_session_keys(EVP_PKEY* prvkey, unsigned char* pk_buff, int pk_len, unsigned char** session_key1, unsigned char** session_key2)
 {
     int ret;
     unsigned char* K;
+    size_t K_len;
+    EVP_PKEY* peer_pubkey;
 
+
+    // Convert the peer pubkey buff in PKEY
+    peer_pubkey = pubkey_to_PKEY(pk_buff, pk_len);
+
+    // Create context
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new(prvkey, NULL);
-    if (!ctx) exit_with_failure("EVP_PKEY_CTX_new failed", 1);
+    if (!ctx) 
+    {
+        EVP_PKEY_free(peer_pubkey);
+        printf("EVP_PKEY_CTX_new failed\n");
+        return -1;
+    }
     
+    // Init the environment context
     ret = EVP_PKEY_derive_init(ctx);
-    if (ret != 1) exit_with_failure("PKEY_derive_init failed", 1);
+    if (ret != 1)
+    {
+        EVP_PKEY_free(peer_pubkey);
+        EVP_PKEY_CTX_free(ctx);
+        printf("PKEY_derive_init failed\n");
+        return -1;
+    }
     ret = EVP_PKEY_derive_set_peer(ctx, peer_pubkey);
-    if (ret != 1) exit_with_failure("PKEY_derive_set_peer failed", 1);
-    ret = EVP_PKEY_derive(ctx, NULL, secretlen);
-    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
+    if (ret != 1) 
+    {
+        EVP_PKEY_free(peer_pubkey);
+        EVP_PKEY_CTX_free(ctx);
+        printf("PKEY_derive_set_peer failed\n");
+        return -1;
+    }
+    ret = EVP_PKEY_derive(ctx, NULL, &K_len);
+    if (ret != 1) 
+    {
+        EVP_PKEY_free(peer_pubkey);
+        EVP_PKEY_CTX_free(ctx);
+        printf("PKEY_derive failed\n");
+        return -1;
+    }
 
     // Deriving shared secret K = g^a^b mod p
-    K = (unsigned char*)malloc(*secretlen); // 128 byte = 1024 bit
-    if (!K) exit_with_failure("Malloc K failed", 1);
+    K = (unsigned char*)malloc(K_len); // 128 byte = 1024 bit
+    if (!K)
+    {
+        EVP_PKEY_free(peer_pubkey);
+        EVP_PKEY_CTX_free(ctx);
+        printf("Malloc K failed\n");
+        return -1;
+    }
 
-    ret = EVP_PKEY_derive(ctx, K, secretlen);
-    if (ret != 1) exit_with_failure("PKEY_derive failed", 1);
+    ret = EVP_PKEY_derive(ctx, K, &K_len);
+    if (ret != 1)
+    {
+        EVP_PKEY_free(peer_pubkey);
+        EVP_PKEY_CTX_free(ctx);
+        free(K);
+        printf("PKEY_derive failed\n");
+        return -1;
+    }
 
     // Free
+    EVP_PKEY_free(peer_pubkey);
     EVP_PKEY_CTX_free(ctx);
 
-    return K;
+
+    // When K is derived we can issue the session keys
+    unsigned char* digest = (unsigned char*) malloc(EVP_MD_size(EVP_sha256()));
+    if (!digest) 
+    {
+        free(K);
+        printf("Malloc digest failed\n");
+        return -1;
+    }
+
+    EVP_MD_CTX* ctx_md = EVP_MD_CTX_new();
+    if (!ctx_md) 
+    {
+        free_n(2, K, digest);
+        printf("EVP_MD_CTX_new failed\n");
+        return -1;
+    }
+
+    ret = EVP_DigestInit(ctx_md, EVP_sha256());
+    if (ret != 1)
+    {
+        free_n(2, K, digest);
+        EVP_MD_CTX_free(ctx_md);
+        printf("DigestInit failed\n");
+        return -1;
+    }
+    ret = EVP_DigestUpdate(ctx_md, K, K_len);
+    if (ret != 1) 
+    {
+        free_n(2, K, digest);
+        EVP_MD_CTX_free(ctx_md);
+        printf("DigestUpdate failed\n");
+        return -1;
+    }
+    ret = EVP_DigestFinal(ctx_md, digest, NULL);
+    if (ret != 1)
+    {
+        free_n(2, K, digest);
+        EVP_MD_CTX_free(ctx_md);
+        printf("DigestFinal failed\n");
+        return -1;
+    }
+
+    // Free
+    EVP_MD_CTX_free(ctx_md);
+
+    *session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    *session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
+    if(!(*session_key1) || !(*session_key2)) 
+    {
+        free_n(2, K, digest);
+        printf("Unable to allocate session keys\n");
+        return -1;
+    }
+
+    memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
+    memcpy(*session_key2, &*(digest+16), 16);
+    
+    // Free
+    free_n(2, K, digest);
+
+    return 0;
 }
 
 unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, int* pubkey_len)
@@ -407,10 +514,17 @@ unsigned char* gen_dh_keys(char* path_pubkey, EVP_PKEY** my_prvkey, int* pubkey_
     return pubkey_byte;
 }
 
-EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa)
+EVP_PKEY* get_client_pubkey(char* username)
 {
     EVP_PKEY* pub_rsa_client;
     X509* client_cert;
+    char path_cert_client_rsa[5+MAX_LEN_USERNAME+4+1];
+    
+    memset(path_cert_client_rsa, 0, 5+MAX_LEN_USERNAME+4+1);
+    memcpy(path_cert_client_rsa, "\0", 1);
+    strcat(path_cert_client_rsa, "cert_");
+    strncat(path_cert_client_rsa, username, strlen(username));
+    strcat(path_cert_client_rsa, ".pem");
 
     FILE* file_cert_rsa = fopen(path_cert_client_rsa, "r");
     if (!file_cert_rsa) exit_with_failure("Fopen failed", 1);
@@ -427,34 +541,6 @@ EVP_PKEY* get_client_pubkey(char* path_cert_client_rsa)
     X509_free(client_cert);
 
     return pub_rsa_client;
-}
-
-void issue_session_keys(unsigned char* K, int K_len, unsigned char** session_key1, unsigned char** session_key2)
-{
-    int ret;
-    EVP_MD_CTX* ctx;
-    unsigned char* digest = (unsigned char*) malloc(EVP_MD_size(EVP_sha256()));
-    if (!digest) exit_with_failure("Malloc digest failed", 1);
-
-    ctx = EVP_MD_CTX_new();
-    if (!ctx) exit_with_failure("EVP_MD_CTX_new failed", 1);
-    ret = EVP_DigestInit(ctx, EVP_sha256());
-    if (ret != 1) exit_with_failure("DigestInit failed", 1);
-    ret = EVP_DigestUpdate(ctx, K, K_len);
-    if (ret != 1) exit_with_failure("DigestUpdate failed", 1);
-    ret = EVP_DigestFinal(ctx, digest, NULL);
-    if (ret != 1) exit_with_failure("DigestFinal failed", 1);
-
-    EVP_MD_CTX_free(ctx);
-
-    *session_key1 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    *session_key2 = (unsigned char*) malloc(16*sizeof(unsigned char)); // 128 bit
-    if(!(*session_key1) || !(*session_key2)) exit_with_failure("Unable to allocate session keys", 1);
-
-    memcpy(*session_key1, digest, 16); // 16 byte = 128 bit
-    memcpy(*session_key2, &*(digest+16), 16);
-    
-    free(digest);
 }
 
 EVP_PKEY* get_ver_server_pubkey(unsigned char* cert, int cert_len, X509_STORE* ca_store)
@@ -483,7 +569,7 @@ EVP_PKEY* get_ver_server_pubkey(unsigned char* cert, int cert_len, X509_STORE* c
     ret = X509_verify_cert(ctx);
     if (ret != 1) exit_with_failure("X509_verify_cert failed", 1);
 
-    BIO_free(mbio);
+    //BIO_free(mbio);
     X509_free(crt);
     X509_STORE_CTX_free(ctx);
 
@@ -904,13 +990,13 @@ int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, v
  * 
  * It returns the buffer length or -1 in case of some errors.
  */
-int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv)
+int build_msg(unsigned char** buffer, char* type, unsigned int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv)
 {
     int buff_len;
     char n_buff[LEN_SIZE];
     unsigned char* p;
 
-    if (len_payload == -1)
+    if (len_payload == 0)
         buff_len = strlen(type)+HASH_LEN+IV_LEN+(BLANK_SPACE*2);
     else
         buff_len = strlen(type)+LEN_SIZE+len_payload+HASH_LEN+IV_LEN+(BLANK_SPACE*4);
@@ -928,7 +1014,7 @@ int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char
     memcpy(p, " ", BLANK_SPACE);
     p += BLANK_SPACE;
 
-    if (len_payload != -1) 
+    if (len_payload != 0) 
     {
         memset(n_buff, 0, LEN_SIZE);
         sprintf(n_buff, "%d", len_payload); // len payload
@@ -961,7 +1047,7 @@ int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char
  * 
  * Return -1 in case of errors, 0 otherwise
  */
-int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv)
+int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv)
 {
     unsigned char* p;
     char len[LEN_SIZE];
@@ -970,13 +1056,13 @@ int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload,
     memcpy(type, p, TYPE_LEN);
     p += TYPE_LEN+BLANK_SPACE;
 
-    if ((*len_payload) != -1)
+    if ((*len_payload) != 0)
     {
         memcpy(len, p, LEN_SIZE);
         p += LEN_SIZE+BLANK_SPACE;
         (*len_payload) = atoi(len);
 
-        if ((*len_payload) < 0 || (*len_payload) > (len_msg-TYPE_LEN-LEN_SIZE-HASH_LEN-IV_LEN))
+        if ((*len_payload) > (len_msg-TYPE_LEN-LEN_SIZE-HASH_LEN-IV_LEN))
         {
             printf("Wrong payload len.\n");
             return -1;
@@ -1002,67 +1088,120 @@ int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload,
 
 int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len)
 {
-    int buff_len = 0;
-    char temp_buff[BUF_LEN];
+    int buff_len = 1;
+    unsigned char* temp_buff;
+    unsigned char* p;
 
-    memset(temp_buff, 0, BUF_LEN);
-    memcpy(temp_buff, "\0", 1);
+    temp_buff = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if (!temp_buff) 
+    {
+        printf("Malloc temp_buff failed.\n");
+        return -1;
+    } 
+    p = temp_buff;
+
     if (param1 != NULL)
     {
-        strncat(temp_buff, param1, param1_len);
+        memcpy(p, param1, param1_len);
         buff_len += param1_len;
+        p += param1_len;
     }
     if (param2 != NULL)
     {
-        strcat(temp_buff, " ");
-        strncat(temp_buff, param2, param2_len);
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+        memcpy(p, param2, param2_len);
+        p += param2_len;
         buff_len += 1+param2_len;
     }
     if (param3 != NULL)
     {
-        strcat(temp_buff, " ");
-        strncat(temp_buff, param3, param3_len);
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+        memcpy(p, param3, param3_len);
+        p += param3_len;
         buff_len += 1+param3_len;
     }
     if (param4 != NULL)
     {
-        strcat(temp_buff, " ");
-        strncat(temp_buff, param4, param4_len);
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+        memcpy(p, param4, param4_len);
+        p += param4_len;
         buff_len += 1+param4_len;
     }
     if (param5 != NULL)
     {
-        strcat(temp_buff, " ");
-        strncat(temp_buff, param5, param5_len);
+        memcpy(p, " ", BLANK_SPACE);
+        p += BLANK_SPACE;
+        memcpy(p, param5, param5_len);
+        p += param5_len;
         buff_len += 1+param5_len;
     }
     
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc((buff_len+1)*sizeof(unsigned char));
     if (!(*buffer))
     {
         printf("Malloc buffer failed.\n");
         return -1;
     }
     memcpy(*buffer, temp_buff, buff_len);
+    memcpy((*buffer)+buff_len, "\0", 1);
 
     return buff_len;
 }
 
+/* This functions takes n arguments (unsigned char*) and freed them */
 void free_n(int n,...)
 {
     va_list ap;
     unsigned char* f;
 
     va_start(ap, n);
-
     for (int i = 0; i < n; i++)
     {
         f = va_arg(ap, unsigned char*);
         free(f);
     }
-
     va_end(ap);
 }
+
+/* This functions takes n arguments (unsigned char*) and calls n times 
+ * chdir on these strings 
+ * 
+ * Return -1 in case of errors, 0 otherwise
+ * */
+int chdir_n(int n, ...)
+{
+    va_list ap;
+    char* d;
+
+    va_start(ap, n);
+    for(int i = 0; i < n; i++)
+    {
+        d = va_arg(ap, char*);
+        if(chdir(d) == -1)
+        {
+            printf("Problem moving to %s.\n", d);
+            return -1;
+        }
+    }
+    va_end(ap);
+
+    return 0;
+}
+
+void print_debug(unsigned char* buff, unsigned int len) 
+{
+    if (DEBUG == 1)
+    {
+        printf(GRN"***----------------------------------------------------***\n");
+        for(unsigned int i = 0; i < len; i++) printf("%c", *(buff+i));
+        printf("***----------------------------------------------------***\n\n"RESET);
+    }
+}
+
+
 
 
 void free_2(void* param1, void* param2)

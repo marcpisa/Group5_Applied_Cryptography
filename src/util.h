@@ -93,7 +93,7 @@
 #define SHARE_PERMISSION "shre_per"
 #define SHARE_DENIED "shre_den"
 
-
+#define DEBUG 1
 #define RED "\x1B[31m"
 #define GRN "\x1B[32m"
 #define RESET "\x1B[0m"
@@ -115,11 +115,11 @@ unsigned char *hash_SHA256(char *msg);
 unsigned char *sign_msg(char *path_key, unsigned char *msg_to_sign, int msg_len, unsigned int *signature_len, int server);
 int verify_signature(unsigned char *exp_digsig, int len_exp_digsig, unsigned char *msg_to_ver, int len_msg_ver, EVP_PKEY *pub_rsa_key);
 unsigned char *cert_to_byte(X509 *cert, int *cert_len);
-unsigned char *key_derivation(EVP_PKEY *prvkey, EVP_PKEY *peer_pubkey, size_t *secretlen);
 unsigned char *read_cert(char *path_cert, int *cert_len);
 unsigned char *gen_dh_keys(char *path_pubkey, EVP_PKEY **my_prvkey, int *pubkey_len);
-EVP_PKEY *get_client_pubkey(char *path_cert_client_rsa);
-void issue_session_keys(unsigned char *K, int K_len, unsigned char **session_key1, unsigned char **session_key2);
+EVP_PKEY *get_client_pubkey(char *username);
+int issue_session_keys(EVP_PKEY* prvkey, unsigned char* pk_buff, int pk_len, unsigned char** session_key1, unsigned char** session_key2);
+
 EVP_PKEY* get_ver_server_pubkey(unsigned char* cert, int cert_len, X509_STORE* ca_store);
 unsigned char *hmac_sha256(unsigned char *key, int keylen, unsigned char *msg, int msg_len, unsigned int *out_len);
 
@@ -135,10 +135,11 @@ int build_msg_5(unsigned char** buffer, void* param1, unsigned int param1_len, v
 int build_msg_6(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len, void* param6, unsigned int param6_len);
 
 void free_n(int n, ...);
-int build_msg(unsigned char** buffer, char* type, int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv);
-int parse_msg(unsigned char* rec_msg, int len_msg, char* type, int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv);
+int chdir_n(int n, ...);
+int build_msg(unsigned char** buffer, char* type, unsigned int len_payload, unsigned char* payload, unsigned char* hash, unsigned char* iv);
+int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv);
 int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
-
+void print_debug(unsigned char* buff, unsigned int len);
 
 void free_2(void* param1, void* param2);
 void free_3(void* param1, void* param2, void* param3);

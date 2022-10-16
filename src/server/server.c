@@ -26,6 +26,8 @@ int main()
     // Timeout varible for the select function
     struct timeval tv;   
 
+    int en = 1;
+
     // Recover the user list
     user_list = (user_stat*) malloc(NUM_USER*sizeof(user_stat));
     fp = fopen("../user_list.txt", "r");
@@ -65,6 +67,8 @@ int main()
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_port = htons(SERVER_PORT);
     srv_addr.sin_addr.s_addr = INADDR_ANY;
+
+    setsockopt(listenerTCP, SOL_SOCKET, SO_REUSEADDR, &en, sizeof(int));
 
     // BIND PHASE OF THE SOCKET
     addrlen = sizeof(srv_addr);

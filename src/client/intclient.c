@@ -24,10 +24,10 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     int msg_len;
     unsigned char* p;
     unsigned char* buffer;
-    char n_buff[LEN_SIZE];
     char port_buff[PORT_SIZE];
-    unsigned char pk_buff[DH_PUBKEY_SIZE];
-    unsigned char sgn_buff[SIGN_LEN];
+    unsigned char* pk_buff;
+    unsigned char* sgn_buff;
+    char* n_buff;
     
     // Paths
     char path_pubkey[15+MAX_LEN_USERNAME+15];
@@ -39,13 +39,9 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     int expected_len;
     unsigned int signature_len;
 
-    size_t K_len;
-
 
     // Diffie-Hellman
     EVP_PKEY* my_prvkey = NULL;
-    EVP_PKEY* peer_pubkey;
-    unsigned char* K;
     unsigned char* pubkey_byte = NULL;
     int pubkey_len = 0;
     
@@ -104,6 +100,8 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     p += BLANK_SPACE;
     memcpy(p, (char*)pubkey_byte, pubkey_len);
 
+
+    print_debug(buffer, msg_len);
     ret = send(*sock, buffer, msg_len, 0);
     
     free(buffer);
@@ -121,7 +119,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 
     /* ---- Obtain and parse response server (DH pubkey, signature, len. cert. and cert.) ----*/
     // Receive the message
-    buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
+    buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     ret = recv(*sock, buffer, BUF_LEN, 0);
@@ -133,27 +131,34 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         return -1;
     } 
     else printf("#2 Server response received.\n");
+    print_debug(buffer, ret);
     msg_len = ret;
 
-
     // Parse the server response
-    p = buffer; // set the pointer
-    memset(pk_buff, 0, DH_PUBKEY_SIZE);
-    memcpy(pk_buff, p, pubkey_len); // g^b
-    p += pubkey_len+BLANK_SPACE; // move pointer
+    pk_buff = (unsigned char*) malloc(DH_PUBKEY_SIZE*sizeof(unsigned char)); 
+    sgn_buff = (unsigned char*) malloc(SIGN_LEN*sizeof(unsigned char));
+    n_buff = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!pk_buff || !sgn_buff || !n_buff) exit_with_failure("Malloc failed", 1);
 
-    memset(sgn_buff, 0, SIGN_LEN);
+    p = buffer; // set the pointer
+    printf("P:%c%c%c\n", p[0], p[1], p[2]);
+    memcpy(pk_buff, p, DH_PUBKEY_SIZE); // g^b
+    p += DH_PUBKEY_SIZE+BLANK_SPACE; // move pointer
+    printf("P:%c%c%c\n", p[0], p[1], p[2]);
+
     memcpy(sgn_buff, p, SIGN_LEN); // dig.sig.
     p += SIGN_LEN+BLANK_SPACE;
+    printf("P:%c%c%c\n", p[0], p[1], p[2]);
 
-    memset(n_buff, 0, LEN_SIZE);
     memcpy(n_buff, p, LEN_SIZE); // len cert
     cert_len = atoi(n_buff);
     p += LEN_SIZE+BLANK_SPACE;
+    printf("P:%c%c%c\n", p[0], p[1], p[2]);
 
-    if (cert_len <= 0 || cert_len > (msg_len-LEN_SIZE-DH_PUBKEY_SIZE-SIGN_LEN)) 
+    free(n_buff);
+    if (cert_len <= 0 || cert_len > (msg_len-LEN_SIZE-DH_PUBKEY_SIZE-SIGN_LEN-(3*BLANK_SPACE))) 
     {
-        free_n(2, buffer, pubkey_byte);
+        free_n(4, buffer, pubkey_byte, pk_buff, sgn_buff);
         EVP_PKEY_free(my_prvkey);
         printf("Incorrect certificate length.\n");
         return -1;
@@ -164,15 +169,13 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     memcpy(cert_buff, p, cert_len); // cert
 
 
-    // Derive the established key and obtain the session keys
-    peer_pubkey = pubkey_to_PKEY(pk_buff, pubkey_len);
-    K = key_derivation(my_prvkey, peer_pubkey, &K_len);
-    issue_session_keys(K, K_len, session_key1, session_key2);
-   
+    // Obtain the session keys
+    ret = issue_session_keys(my_prvkey, pk_buff, pubkey_len, session_key1, session_key2);
+    if (ret == -1) return -1;
+
     // Obtain the (verified) RSA public key
     pub_rsa_key_serv = get_ver_server_pubkey(cert_buff, cert_len, ca_store);
     
-
     // Generate the digital signature expected and verify it
     expected_len = (pubkey_len*2)+BLANK_SPACE;
     exp_digsig = (unsigned char*) malloc(expected_len*sizeof(unsigned char));
@@ -188,15 +191,14 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     ret = verify_signature(exp_digsig, expected_len, sgn_buff, SIGN_LEN, pub_rsa_key_serv);
       
 
-    free_n(3, buffer, pubkey_byte, cert_buff);
+    free_n(5, buffer, pubkey_byte, cert_buff, pk_buff, sgn_buff);
     X509_free(serv_cert);
     EVP_PKEY_free(pub_rsa_key_serv);
     EVP_PKEY_free(my_prvkey);
-    EVP_PKEY_free(peer_pubkey);
     
     if (ret != 1) 
     {
-        free_n(2, K, exp_digsig);
+        free(exp_digsig);
         printf("Signature verification failed.\n");
         return -1;    
     }
@@ -215,9 +217,10 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
 
+    print_debug(buffer, msg_len);
     ret = send(*sock, buffer, msg_len, 0); 
 
-    free_n(4, K, exp_digsig, signature, buffer);
+    free_n(3, exp_digsig, signature, buffer);
     if (ret == -1)
     {
         printf("Send failed.\n");
