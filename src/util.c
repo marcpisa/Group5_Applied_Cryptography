@@ -1040,7 +1040,9 @@ int build_msg(unsigned char** buffer, char* type, unsigned int len_payload, unsi
 /* The format of the message is:
  *  Type | Len. payload | Payload | Hash | IV
  * 
- * where the Len and Payload fields can be -1/NULL, wheras the others are always not NULL.
+ * where the Len and Payload fields can be 0/NULL, wheras the others are always not NULL.
+ * 
+ * If len_payload is 0 the payload and its length are not parsed.
  * 
  * This functions takes as argument a buffer in which the msg is stored, and all the
  * buffer where the message fields will be saved to. 
@@ -1053,7 +1055,7 @@ int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned
     char len[LEN_SIZE];
 
     p = rec_msg;
-    memcpy(type, p, TYPE_LEN);
+    if(type != NULL) memcpy(type, p, TYPE_LEN);
     p += TYPE_LEN+BLANK_SPACE;
 
     if ((*len_payload) != 0)
@@ -1068,7 +1070,7 @@ int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned
             return -1;
         }
 
-        *payload = (unsigned char*) malloc((*len_payload)*sizeof(unsigned char));
+        *payload = (unsigned char*) malloc(((*len_payload)+1)*sizeof(unsigned char));
         if (!(*payload))
         {
             printf("Malloc payload failed.\n");
@@ -1076,19 +1078,20 @@ int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned
         }
         memcpy(*payload, p, *len_payload);
         p += (*len_payload)+BLANK_SPACE;
+        memcpy((*payload)+(*len_payload), "\0", 1);
     }
 
-    memcpy(hash, p, HASH_LEN);
+    if(hash != NULL) memcpy(hash, p, HASH_LEN);
     p += HASH_LEN+BLANK_SPACE;
 
-    memcpy(iv, p, IV_LEN);
+    if(iv != NULL) memcpy(iv, p, IV_LEN);
 
     return 0;
 }
 
 int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len)
 {
-    int buff_len = 1;
+    int buff_len = 0;
     unsigned char* temp_buff;
     unsigned char* p;
 
@@ -1112,7 +1115,7 @@ int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void
         p += BLANK_SPACE;
         memcpy(p, param2, param2_len);
         p += param2_len;
-        buff_len += 1+param2_len;
+        buff_len += BLANK_SPACE+param2_len;
     }
     if (param3 != NULL)
     {
@@ -1120,7 +1123,7 @@ int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void
         p += BLANK_SPACE;
         memcpy(p, param3, param3_len);
         p += param3_len;
-        buff_len += 1+param3_len;
+        buff_len += BLANK_SPACE+param3_len;
     }
     if (param4 != NULL)
     {
@@ -1128,7 +1131,7 @@ int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void
         p += BLANK_SPACE;
         memcpy(p, param4, param4_len);
         p += param4_len;
-        buff_len += 1+param4_len;
+        buff_len += BLANK_SPACE+param4_len;
     }
     if (param5 != NULL)
     {
@@ -1136,7 +1139,7 @@ int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void
         p += BLANK_SPACE;
         memcpy(p, param5, param5_len);
         p += param5_len;
-        buff_len += 1+param5_len;
+        buff_len += BLANK_SPACE+param5_len;
     }
     
     *buffer = (unsigned char*) malloc((buff_len+1)*sizeof(unsigned char));
@@ -1147,6 +1150,7 @@ int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void
     }
     memcpy(*buffer, temp_buff, buff_len);
     memcpy((*buffer)+buff_len, "\0", 1);
+    free(temp_buff);
 
     return buff_len;
 }
@@ -1242,4 +1246,170 @@ void free_6(void* param1, void* param2, void* param3, void* param4, void* param5
     free(param4);
     free(param5);
     free(param6);
+}
+
+
+
+
+int build_file_list(DIR* d, unsigned int* tot_num_file, unsigned char* buffer)
+{
+    struct dirent *files;
+    unsigned int len_filename, offset = 0, n_file = 0;
+
+    // If this is the second list of filenames, reset the pointer to the prev. position
+    for (int i = 0; i < *tot_num_file; i++) files = readdir(d);
+
+    while((files = readdir(d)) != NULL)
+    {
+        len_filename = strlen(files->d_name);
+        // The filename fits the list length
+        if ((offset+len_filename+BLANK_SPACE) <= CHUNK_SIZE)
+        { 
+            memcpy(buffer+offset, files->d_name, len_filename);
+            offset += len_filename;
+            memcpy(buffer+offset, " ", BLANK_SPACE);
+            offset += BLANK_SPACE;
+            n_file += 1;
+        }
+    }
+
+    if (offset == 0)
+    {
+        memcpy(buffer, "empty", strlen("empty"));
+        offset += strlen("empty");
+    }
+    memcpy(buffer+offset, "\0", 1);
+
+    *tot_num_file += n_file;
+    return n_file;
+}
+
+
+
+
+int rcv_port(int sd, unsigned char* session_key1, unsigned char* session_key2, char* username)
+{
+    unsigned char* buffer, *h_buff, *iv_buff, *payload, *digest;
+    char* path_temp;
+    unsigned int len;
+    int ret, msg_len, port_client;
+    FILE* fd;
+    char p_buff[PORT_SIZE];
+
+    buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
+    if (!buffer) 
+    {
+       printf("Malloc buffer failed.\n");
+       return -1; 
+    } 
+
+    ret = recv(sd, buffer, BUF_LEN, 0);
+    if (ret == -1)
+    {
+        free(buffer);
+        printf("Receive failed...\n");
+        return -1;
+    }
+    else printf("#4 Port received by the client.\n");
+
+
+    // Parse the message
+    h_buff = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    if (!h_buff) exit_with_failure("Malloc h_buff failed", 1);
+    iv_buff = (unsigned char*) malloc(IV_LEN*sizeof(unsigned char));
+    if (!iv_buff) exit_with_failure("Malloc iv_buff failed", 1);
+    len = 1;
+    
+    ret = parse_msg(buffer, (unsigned int)ret, NULL, &len, &payload, h_buff, iv_buff);
+    
+    free(buffer);
+    if (ret == -1)
+    {
+        free_n(2, h_buff, iv_buff);
+        return -1;
+    }
+
+
+    // Check the hash
+    msg_len = concat_5(&buffer, payload, len,\
+                                iv_buff, IV_LEN, NULL, 0, NULL, 0, NULL, 0);
+    if (msg_len == -1)
+    {
+        free_n(3, h_buff, iv_buff, payload);
+        return -1;
+    }
+
+    digest = hmac_sha256(session_key2, 16, buffer, msg_len, NULL); 
+    ret = CRYPTO_memcmp(digest, h_buff, HASH_LEN);
+    
+    free_n(3, h_buff, digest, buffer);
+    if (ret != 0)
+    {
+        free_n(2, iv_buff, payload);
+        printf("Checking hash failed.\n");
+        return -1;
+    }
+
+
+    // Decrypt the message and save the port
+    decrypt_AES_128_CBC(&buffer, &len, payload, len, iv_buff, session_key1); 
+    port_client = atoi((char*) buffer);
+    free_n(3, iv_buff, buffer, payload);
+
+
+    // Serialize session_key1, session_key2 and port
+    ret = chdir_n(2, "..", "info");
+    if (ret == -1) return -1;
+
+    path_temp = (char*) malloc((strlen(username)+4+1)*sizeof(char));
+    if (!path_temp)
+    {
+        printf("Malloc path_temp failed.\n");
+        return -1;
+    }
+    memcpy(path_temp, "\0", 1);
+    strncat(path_temp, username, strlen(username));
+    strcat(path_temp, ".txt\0");
+
+    fd = fopen(path_temp, "w");
+    if (!fd)
+    {
+        printf("Can't open path_temp...\n");
+        free(path_temp);
+        return -1;
+    }
+
+    // Write port, session_key1 and session_key2 to file
+    memset(p_buff, 0, PORT_SIZE);
+    sprintf(p_buff, "%d", port_client);
+    ret = fwrite(p_buff, sizeof(char), PORT_SIZE, fd);
+    if (ret == -1) 
+    {
+        printf("Fwrite failed.\n");
+        free(path_temp);
+        return -1;
+    }
+    ret = fwrite(session_key1, sizeof(unsigned char), 16, fd);
+    if (ret == -1) 
+    {
+        printf("Fwrite failed.\n");
+        free(path_temp);
+        return -1;
+    }
+    ret = fwrite(session_key2, sizeof(unsigned char), 16, fd);
+    if (ret == -1) 
+    {
+        printf("Fwrite failed.\n");
+        free(path_temp);
+        return -1; 
+    }
+
+    free(path_temp);
+    fclose(fd);
+
+    // Going back to the main directory
+    ret = chdir_n(2, "..", username);
+    if (ret == -1) return -1; 
+
+    return 0;
 }

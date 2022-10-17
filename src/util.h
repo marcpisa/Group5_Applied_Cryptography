@@ -70,6 +70,7 @@
 #define LOGOUT_ACCEPTED "logo_acc"
 #define LIST_REQUEST "list_req"
 #define LIST_RESPONSE "list_res"
+#define LIST_MESSAGE "list_msg"
 #define LIST_DENIED "list_den"
 #define LIST_ACCEPTED "list_acc"
 #define RENAME_REQUEST "renm_req"
@@ -93,7 +94,7 @@
 #define SHARE_PERMISSION "shre_per"
 #define SHARE_DENIED "shre_den"
 
-#define DEBUG 1
+#define DEBUG 0
 #define RED "\x1B[31m"
 #define GRN "\x1B[32m"
 #define RESET "\x1B[0m"
@@ -140,6 +141,7 @@ int build_msg(unsigned char** buffer, char* type, unsigned int len_payload, unsi
 int parse_msg(unsigned char* rec_msg, unsigned int len_msg, char* type, unsigned int* len_payload, unsigned char** payload, unsigned char* hash, unsigned char* iv);
 int concat_5(unsigned char** buffer, void* param1, unsigned int param1_len, void* param2, unsigned int param2_len, void* param3, unsigned int param3_len, void* param4, unsigned int param4_len, void* param5, unsigned int param5_len);
 void print_debug(unsigned char* buff, unsigned int len);
+int rcv_port(int sd, unsigned char* session_key1, unsigned char* session_key2, char* username);
 
 void free_2(void* param1, void* param2);
 void free_3(void* param1, void* param2, void* param3);

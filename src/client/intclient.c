@@ -24,7 +24,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     int msg_len;
     unsigned char* p;
     unsigned char* buffer;
-    char port_buff[PORT_SIZE];
+    char* port_buff;
     unsigned char* pk_buff;
     unsigned char* sgn_buff;
     char* n_buff;
@@ -130,9 +130,12 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Receive failed.\n");
         return -1;
     } 
-    else printf("#2 Server response received.\n");
-    print_debug(buffer, ret);
-    msg_len = ret;
+    else 
+    {
+        printf("#2 Server response received.\n");
+        print_debug(buffer, ret);
+        msg_len = ret;
+    }
 
     // Parse the server response
     pk_buff = (unsigned char*) malloc(DH_PUBKEY_SIZE*sizeof(unsigned char)); 
@@ -141,19 +144,15 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     if (!pk_buff || !sgn_buff || !n_buff) exit_with_failure("Malloc failed", 1);
 
     p = buffer; // set the pointer
-    printf("P:%c%c%c\n", p[0], p[1], p[2]);
     memcpy(pk_buff, p, DH_PUBKEY_SIZE); // g^b
     p += DH_PUBKEY_SIZE+BLANK_SPACE; // move pointer
-    printf("P:%c%c%c\n", p[0], p[1], p[2]);
 
     memcpy(sgn_buff, p, SIGN_LEN); // dig.sig.
     p += SIGN_LEN+BLANK_SPACE;
-    printf("P:%c%c%c\n", p[0], p[1], p[2]);
 
     memcpy(n_buff, p, LEN_SIZE); // len cert
     cert_len = atoi(n_buff);
     p += LEN_SIZE+BLANK_SPACE;
-    printf("P:%c%c%c\n", p[0], p[1], p[2]);
 
     free(n_buff);
     if (cert_len <= 0 || cert_len > (msg_len-LEN_SIZE-DH_PUBKEY_SIZE-SIGN_LEN-(3*BLANK_SPACE))) 
@@ -178,7 +177,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     
     // Generate the digital signature expected and verify it
     expected_len = (pubkey_len*2)+BLANK_SPACE;
-    exp_digsig = (unsigned char*) malloc(expected_len*sizeof(unsigned char));
+    exp_digsig = (unsigned char*) malloc((expected_len+1)*sizeof(unsigned char));
     if (!exp_digsig) exit_with_failure("Malloc exp_digsig failed", 1);
 
     p = exp_digsig;
@@ -187,7 +186,9 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     memcpy(p, " ", BLANK_SPACE);
     p += BLANK_SPACE;
     memcpy(p, pk_buff, pubkey_len);
-
+    p += pubkey_len;
+    memcpy(p, "\0", 1);
+    
     ret = verify_signature(exp_digsig, expected_len, sgn_buff, SIGN_LEN, pub_rsa_key_serv);
       
 
@@ -240,14 +241,16 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
+    port_buff = (char*) malloc(PORT_SIZE*sizeof(char));
+    if (!port_buff) exit_with_failure("Malloc port_buff failed", 1);
 
     // Encrypt port and hash it
-    memset(port_buff, 0, PORT_SIZE);
     sprintf(port_buff, "%d", port);
     encrypt_AES_128_CBC(&encr_msg, &encr_len, (unsigned char*) port_buff, PORT_SIZE, iv, *session_key1);
+    free(port_buff);
 
-    msg_to_hash_len = concat_5(&msg_to_hash, encr_msg, encr_len, iv, IV_LEN, NULL, -1, NULL, -1, NULL, -1);
+    msg_to_hash_len = concat_5(&msg_to_hash, encr_msg, encr_len, 
+                                             iv, IV_LEN, NULL, 0, NULL, 0, NULL, 0);
     if (msg_to_hash_len == -1)
     {
         free_n(3, iv , encr_msg, msg_to_hash);
@@ -276,7 +279,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Send failed.\n");
         return -1;   
     }
-    else printf("4# Port sent to the server.\n");
+    else printf("#4 Port sent to the server.\n");
 
     return 1;
 }
@@ -284,16 +287,9 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
 {
     unsigned int digest_len;
-    int ret;
-    int msg_len;
-    int msg_to_hash_len;
-
+    int ret, msg_len;
     char* temp;
-    unsigned char* buffer;
-    unsigned char* msg_to_hash;
-    unsigned char* digest;
-    unsigned char* iv;    
-
+    unsigned char* buffer, *msg_to_hash, *digest, *iv;
 
     // Generate the IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
@@ -304,32 +300,36 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
 
-
-
     /* ---- Create the first message (request + hash + iv) ---- */
-    // Generating the hash of the request and the nonce
+    // Generate hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
-                                                iv, IV_LEN,\
-                                                temp, LEN_SIZE);
-    if(msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+    msg_len = concat_5(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
+                                             iv, IV_LEN,\
+                                             temp, LEN_SIZE, NULL, 0, NULL, 0);
+    if(msg_len == -1) 
+    {
+        free_n(2, iv, temp);
+        return -1;
+    }
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_len, &digest_len);    
+    free_n(2, temp, msg_to_hash);
 
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
-    
     // Compose the message
-    msg_len = build_msg_3(&buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
-                                   digest, HASH_LEN,\
-                                   iv, IV_LEN);
-    if(msg_len== -1) exit_with_failure("Something bad happened building the message...", 0);
+    msg_len = build_msg(&buffer, LOGOUT_REQUEST, 0, NULL, digest, iv);
+    if(msg_len == -1) 
+    {
+        free_n(2, iv, digest);
+        return -1;
+    }
 
+    // Send the message
     printf("I'm sending to the server the logout message.\n");
-    ret = send(sock, buffer, BUF_LEN, 0); 
+    ret = send(sock, buffer, msg_len, 0); 
     
-    free_n(5, temp, buffer, msg_to_hash, digest, iv);
-    
+    free_n(3, buffer, digest, iv);
     if (ret == -1) 
     {
         printf("Send failed.\n");
@@ -370,49 +370,48 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     char** file_list;
 
 
-    // Generate the IV
+    /* ---- Create the first message (req., hash(req, iv, nonce), iv) ---- */
+    // Create the hash
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
     ret = RAND_poll(); // Seed OpenSSL PRNG
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
-
-
-
-    /* ---- Create the first message (req., hash(req, iv, nonce), iv) ---- */
-    // Create the hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    sprintf(temp, "%d", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
-                                                iv, IV_LEN,\
-                                                temp, LEN_SIZE);
-    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
-    
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
+    sprintf(temp, "%u", *nonce);
+    msg_len = concat_5(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
+                                     iv, IV_LEN,\
+                                     temp, LEN_SIZE, NULL, 0, NULL, 0);
+    if (msg_len == -1) 
+    {
+        free_n(2, iv, temp);
+        return -1;
+    }
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_len, &digest_len);  
+    free(msg_to_hash); 
 
     // Compose the message
-    msg_len = build_msg_3(&buffer, LIST_REQUEST, strlen(LIST_REQUEST),
-                                   digest, HASH_LEN,
-                                   iv, IV_LEN);
-    if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
+    msg_len = build_msg(&buffer, LIST_REQUEST, 0, NULL, digest, iv);
+    if (msg_len == -1)
+    {
+        free_n(3, iv, temp, digest);
+        return -1;
+    }
 
+    // Send message
     printf("I'm sending to the server the list message.\n");
-    ret = send(sock, buffer, BUF_LEN, 0); 
+    ret = send(sock, buffer, msg_len, 0); 
 
-    free_5(temp, buffer, msg_to_hash, digest, iv);
-
+    free_n(4, temp, buffer, digest, iv);
     if (ret == -1)
     {
         printf("Send failed.\n");
         return -1;
     } 
-    
     *nonce += 1;
-
 
 
 
@@ -422,6 +421,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     index = -1;
     while (num_file != -1) 
     {
+        // Receive message
         buffer = (unsigned char*) malloc(sizeof(unsigned char)*BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
@@ -433,18 +433,18 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             return -1;
         }
         printf("Received chunk of filenames.\n");
+        msg_len = ret;
 
         // Check if something failed server-side
-        bufferSupp1 = (unsigned char*) malloc((strlen(LIST_DENIED)+1)*sizeof(unsigned char));
+        bufferSupp1 = (unsigned char*) malloc((TYPE_LEN+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1); 
-
-        memcpy(bufferSupp1, buffer, strlen(LIST_DENIED));
-        memcpy(&*(bufferSupp1+strlen(LIST_DENIED)), "\0", 1);
+        memcpy(bufferSupp1, buffer, TYPE_LEN);
+        memcpy(bufferSupp1+TYPE_LEN, "\0", 1);
 
         if (strcmp((char*) bufferSupp1, LIST_DENIED) == 0)
         {
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
-            free_2(bufferSupp1, buffer);
+            free_n(2, bufferSupp1, buffer);
             
             if (ret == -1) printf("Error checking list denied message.\n");
             else 
@@ -455,68 +455,61 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
 
             return -1;
         }
-
         free(bufferSupp1);
 
 
-        // No operation denied, let's obtain the list
+        // Parsing, let's obtain the list
         temp = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp) exit_with_failure("Malloc temp failed", 1);
         temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
         if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
-        bufferSupp1 = (unsigned char*) malloc(2*CHUNK_SIZE*sizeof(unsigned char));
-        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
         bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
         if (!iv) exit_with_failure("Malloc iv failed", 1);
-
-        // Parsing
-        memcpy(temp, buffer, LEN_SIZE); // num_file
-        num_file = atoi(temp);
-        old_offset = LEN_SIZE+BLANK_SPACE;
-
-        memcpy(temp2, &*(buffer+old_offset), LEN_SIZE); // encr. len.
-        encr_len = atoi(temp2);
-        old_offset += LEN_SIZE+BLANK_SPACE;
-
-        memcpy(bufferSupp1, &*(buffer+old_offset), encr_len); // encr. list
-        old_offset += encr_len+BLANK_SPACE;
-
-        memcpy(bufferSupp2, &*(buffer+old_offset), HASH_LEN); // hash
-        old_offset += HASH_LEN+BLANK_SPACE;
-
-        memcpy(iv, &*(buffer+old_offset), IV_LEN); // iv
-
         bufferSupp3 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
-        sprintf((char*)bufferSupp3, "%u", *nonce);
-        
+
+        ret = parse_msg(buffer, (unsigned int)msg_len, NULL, temp, &bufferSupp1, bufferSupp2, iv);
+        free(buffer);
+        if (ret == -1)
+        {
+            free_n(5, temp, temp2, iv, bufferSupp2, bufferSupp3);
+            return -1;
+        }
+
+        if((ret = str_ssplit(bufferSupp1, DELIM)) != 0)
+        {
+            encr_len = atoi(temp);
+            memcpy(temp2, bufferSupp1, ret);
+            num_file = atoi(temp2);
+            memcpy(bufferSupp1, bufferSupp1+ret+1, encr_len-ret-1);
+        }
+
         // Check hash
-        msg_to_hash_len = build_msg_4(&msg_to_hash, temp, LEN_SIZE,\
-                                                    bufferSupp1, encr_len,\
-                                                    iv, IV_LEN,\
-                                                    bufferSupp3, LEN_SIZE);
-
-        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-
-        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
+        sprintf((char*)bufferSupp3, "%u", *nonce);
+        msg_len = concat_5(&msg_to_hash, temp, LEN_SIZE,\
+                                         bufferSupp1, encr_len,\
+                                         iv, IV_LEN,\
+                                         bufferSupp3, LEN_SIZE, NULL, 0);
+        free_n(3, temp, temp2, bufferSupp3);
+        if (msg_len == -1)
+        {
+            free_n(3, bufferSupp2, iv, bufferSupp1);
+            return -1;
+        }
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_len, &digest_len); 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
 
-        free_3(bufferSupp3, temp, temp2);
-
+        free_n(5, iv, bufferSupp1, msg_to_hash, bufferSupp2, digest);
         if (ret != 0)
         {
             operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, nonce);
-
-            free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             return -1;
         }
         else if (num_file < 0 || num_file >= CHUNK_SIZE)
         {
             operation_denied(sock, "Incorrect num_file", LIST_DENIED, session_key1, session_key2, nonce);
-
-            free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
             return -1;
         }
         *nonce += 1;
@@ -584,8 +577,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         // Send success message
         operation_succeed(sock, LIST_ACCEPTED, session_key2, nonce);
 
-        free_5(iv, buffer, bufferSupp1, bufferSupp2, msg_to_hash);
-        free_2(digest, plaintext);
+        free_n(3, iv, bufferSupp1, plaintext);
     }
 
     return 1;
