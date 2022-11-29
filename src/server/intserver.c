@@ -772,7 +772,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
                                        iv, IV_LEN);
         if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-        printf("I'm sending to the client the filename's list\n"); 
+        if (num_file != 0) printf("I'm sending to the client a chunk of the filenames list\n"); 
         ret = send(sd, buffer, BUF_LEN, 0); 
         
         free_5(temp, bufferSupp1, buffer, ciphertext, digest);
@@ -800,7 +800,6 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
             printf("Receive failed.\n");
             return -1;
         }
-        printf("Received the client outcome.\n");
 
         bufferSupp1 = (unsigned char*) malloc((strlen(LIST_DENIED)+1)*sizeof(unsigned char));
         if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -958,6 +957,13 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     if (!new_filename) exit_with_failure("Malloc new_filename failed", 0);
     memcpy(new_filename, &*(plaintext+old_offset), len_newfn);
     *(new_filename+len_newfn) = '\0';
+    if (strcmp(new_filename, "")==0)
+    {
+        printf("The new filename sent by the client is missing. Request denied...\n");
+        operation_denied(sd, "New filename is missing", RENAME_DENIED, session_key1, session_key2, nonce);
+        free_3(plaintext, filename, new_filename);
+        return -1;
+    }
     printf("The new filename should be %s\n", new_filename);
                    
     ret = filename_sanitization (filename);
@@ -1076,23 +1082,38 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     filename = (char*) malloc((len_fn+1)*sizeof(char));
     if (!filename) exit_with_failure("Malloc filename failed", 0);
     memcpy(filename, plaintext, len_fn+1); 
+    if (strcmp(filename, "")==0) 
+    {
+        operation_denied(sd, "Filename is missing", DELETE_DENIED, session_key1, session_key2, nonce);
+        free_2(plaintext, filename);
+        return -1;
+    }
 
     // Sanitize the filename
     ret = filename_sanitization(filename);
     if (ret != 1) {
-        operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, nonce);
+        operation_denied(sd, "Filename sanitization failed", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
         return -1;
     }
+
 
     // Remove the file
     ret = chdir("documents/");
     if (ret == -1) exit_with_failure("Can't change directory to path_documents", 1);
     ret = remove(filename);
+    if (ret == -1)
+    {
+        printf("The delete operation went bad...\n");
+        operation_denied(sd, "Something bad happened during the delete operation", DELETE_DENIED, session_key1, session_key2, nonce);
+        free_2(plaintext, filename);
+        return -1;
+    }
+    else printf("Delete operation accomplished...\n\n");
     ret = chdir("../");
     if (ret == -1) 
     {
-        operation_denied(sd, "Something bad happened during the delete operation", RENAME_DENIED, session_key1, session_key2, nonce);
+        operation_denied(sd, "Something bad happened during the delete operation", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
         return -1;
     }
@@ -1211,6 +1232,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     if (!(fd))
     {
         printf("File %s doesn't exist...\n  ", filename);
+        chdir("..");
         operation_denied(sock, "The file doesn't exists", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
@@ -1365,7 +1387,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
             printf("Receive operation gone bad\n");
             return -1;
         }
-        printf("Confirmed! %s\n", (char*)buffer);
+        //printf("Confirmed! %s\n", (char*)buffer);
         free(buffer);
     }
     fclose(fd);
@@ -1511,18 +1533,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (fd)
     {
         printf("File %s already exists...\n  ", filename);
-        close(fd);
+        fclose(fd);
         operation_denied(sock, "The file already exists", UPLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
 
-    //CHECK IF FILE NOT TO LARGE 
-
+    //CHECK IF FILE NOT TOO LARGE 
 
     //NOW we send UPLOAD_ACCEPTED TO CLIENT 
- 
-    
-    
     
     /* ---- Send Upload_accepted to the client ---- */ 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS UPLOAD_ACCEPTED  HASH IV
@@ -1604,7 +1622,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp2, &*(buffer+LEN_SIZE+BLANK_SPACE), encr_len);
 
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN));
         if (!iv) exit_with_failure("Malloc iv failed", 1);
         memcpy(iv, &*(buffer+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
 
@@ -1623,12 +1641,12 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
         digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
-
+        
         ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
         free_5(buffer, bufferSupp3, temp, msg_to_hash, digest);
         if (ret != 0)
         {
-            printf("Wrong download chunk hash\n\n");
+            printf("Wrong upload chunk hash\n\n");
             free_3(bufferSupp1, bufferSupp2, iv);
             return -1;
         }
@@ -1651,14 +1669,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
             printf("Receive operation gone bad\n");
             return -1;
         }
-        printf("Confirmation sent!\n");
+        //printf("Confirmation sent!\n");
         free(buffer);
     }
     fclose(fd);
     
-    /* ---- SEND DOWNLOAD FINISHED MESSAGE ---- */
+    /* ---- SEND UPLOAD FINISHED MESSAGE ---- */
     printf("Send download finished message.\n");
-    operation_succeed(sock, DOWNLOAD_FINISHED, session_key2, nonce);
+    operation_succeed(sock, UPLOAD_FINISHED, session_key2, nonce);
         
     return 1;
 }
@@ -2011,6 +2029,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
             operation_denied(sd, "Error checking share accepted message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return -1;
         }
+        printf("The share request has been accepted!\n\n");
         *nonce_sc += 1;
     }
     else

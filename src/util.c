@@ -764,11 +764,7 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
         printf("Wrong hash\n");
         ret = -1;
     }
-    else
-    {
-        printf("The request has been accepted!\n");
-        ret = 1;
-    }
+    else ret = 1;
 
     free(iv);
     free(digest);

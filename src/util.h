@@ -41,7 +41,7 @@
 #define LOCALHOST "127.0.0.1"
 
 #define TYPE_LEN 8
-#define DH_PUBKEY_SIZE 654
+#define DH_PUBKEY_SIZE 625
 #define NUM_USER 4
 #define LEN_SIZE 10
 #define REST_SIZE 10

@@ -83,6 +83,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &pubkey_len);   
+    printf("The pubkey len is %i\n\n", pubkey_len);
     if (pubkey_len != DH_PUBKEY_SIZE) exit_with_failure("Wrong pubkey len", 0);
 
 
@@ -429,7 +430,6 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             printf("Receive failed.\n");
             return -1;
         }
-        printf("Received chunk of filenames.\n");
 
         // Check if something failed server-side
         bufferSupp1 = (unsigned char*) malloc((strlen(LIST_DENIED)+1)*sizeof(unsigned char));
@@ -472,6 +472,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         memcpy(temp, buffer, LEN_SIZE); // num_file
         num_file = atoi(temp);
         old_offset = LEN_SIZE+BLANK_SPACE;
+        if (num_file != 0) printf("Received chunk of filenames...\n");
 
         memcpy(temp2, &*(buffer+old_offset), LEN_SIZE); // encr. len.
         encr_len = atoi(temp2);
@@ -609,6 +610,17 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     unsigned char* buffer;
     unsigned char* bufferSupp1;
 
+    if (strcmp(filename,"")==0)
+    {
+        printf("Filename is missing. Retry...\n\n");
+        return -1;
+    }
+    if (strcmp(new_filename,"")==0)
+    {
+        printf("New filename is missing. Retry...\n\n");
+        return -1;
+    }
+
     // Generate the IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
@@ -693,6 +705,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     else if (strcmp((char*) bufferSupp1, RENAME_ACCEPTED) == 0)
     {        
         ret = check_reqacc_msg(RENAME_ACCEPTED, buffer, *nonce, session_key2);
+        if (ret != -1) printf("The rename request has been accepted!\n\n");
     }
     else
     {
@@ -815,6 +828,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     else if (strcmp((char*) bufferSupp1, DELETE_ACCEPTED) == 0)
     {        
         ret = check_reqacc_msg(DELETE_ACCEPTED, buffer, *nonce, session_key2);
+        if (ret != -1) printf("the delete request has been accepted!\n");
     }
     else
     {
@@ -923,7 +937,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
     //printf("We received %s\n", (char*)buffer); HEAP OVERFLOW WITHOUT \0
 
     bufferSupp1 = (unsigned char*) malloc((strlen(DOWNLOAD_DENIED)+1)*sizeof(unsigned char));
@@ -1098,7 +1112,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
             printf("Receive operation gone bad\n");
             return -1;
         }
-        printf("Confirmation sent!\n");
+        //printf("Confirmation sent!\n");
     }
     fclose(f1);
 
@@ -1212,7 +1226,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
     // The message in the buffer now is: DOWNLOAD_REQUEST, len_encr, encr, hash, iv. We can send it now
 
-    printf("I'm sending to the server the download request.\n");
+    //printf("I'm sending to the server the download request.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
     
@@ -1231,7 +1245,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
     ret = recv(sock, buffer, BUF_LEN,0);
     if (ret == -1) exit_with_failure("Receive failed", 0);
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
     //printf("We received %s\n", (char*)buffer); HEAP OVERFLOW WITHOUT \0
 
     bufferSupp1 = (unsigned char*) malloc((strlen(UPLOAD_DENIED)+1)*sizeof(unsigned char));
@@ -1306,7 +1320,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
 
             //ENCRYPT THE MESSAGE SENT
-            iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN+1));
+            iv = (unsigned char*) malloc(sizeof(unsigned char)*(IV_LEN));
             if (!iv) exit_with_failure("Malloc iv failed", 1);
             ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
             if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
@@ -1323,8 +1337,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
                                                    iv, IV_LEN,\
                                                    bufferSupp1, LEN_SIZE);
             if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-
-            digest = hmac_sha256(session_key2, 16, buffer, msg_len, &digest_len);
+            
+            digest = hmac_sha256(session_key2, 16, buffer, msg_to_hash_len, &digest_len);
             free(buffer);
 
             // CREATE THE MESSAGE
@@ -1364,7 +1378,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
                 printf("Receive operation gone bad\n");
                 return -1;
             }
-            printf("Confirmed! %s\n", (char*)buffer);
+            //printf("Confirmed! %s\n", (char*)buffer);
             free(buffer);
         }   
         fclose(f1);
@@ -1381,7 +1395,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         }
 
         // DECRYPT THE BUFFER
-        ret = check_reqacc_msg(DOWNLOAD_FINISHED, buffer, *nonce, session_key2);
+        ret = check_reqacc_msg(UPLOAD_FINISHED, buffer, *nonce, session_key2);
         if (ret == -1)
         {
             printf("Check download_finished gone bad.\n\n");
@@ -1518,6 +1532,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     {
         ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_accepted...");
+        else printf("The share request has been accepted!\n");
 
         *nonce += 1;
     }
