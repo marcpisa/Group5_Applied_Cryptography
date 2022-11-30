@@ -975,7 +975,12 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     }
 
     // Execute the rename if possible, otherwise send failed message to client
-    chdir("documents");
+    ret = chdir("documents");
+    if (ret == -1)
+    {
+        printf("Error during the cd of the directory documents...\n\n");
+        return -1;
+    }
     ret = rename(filename, new_filename);
     chdir("..");
     if (ret == -1) {
@@ -1201,7 +1206,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
 
     if (ret != 0)
     {
-        printf("Wrong rename failed hash\n\n");
+        printf("Wrong download failed hash\n\n");
+        free_2(encr_msg, iv);
         return -1;
     } 
     else 
@@ -1222,6 +1228,12 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     // HERE WE SHOULD SANITIZE THE FILENAME
     memset(filename, 0, MAX_LEN_FILENAME);
     memcpy(filename, plaintext, plain_len); 
+    if (strcmp(filename, "")==0)
+    {
+        printf("The filename is missing\n");
+        operation_denied(sock, "The filename is missing", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
 
     free_3(encr_msg, iv, plaintext);
 
@@ -1686,6 +1698,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     int ret;
     int sd_peer;
     int msg_len;
+    int ch, j;
 
     unsigned int len_fn;
     unsigned int len_pn;
@@ -1720,55 +1733,52 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     struct sockaddr_in rcv_addr;
     int rcv_port;
 
+    /*memcpy(rec_mex+BUF_LEN-1, "\0", 1);
+    printf("%s%s\n", rec_mex, rec_mex+strlen(SHARE_REQUEST)+LEN_SIZE+1);*/
     
-
     /* ---- Parse file received ---- */
     // receive, share_req encr_len encr(filename peername) hash(share_req encr iv nonce_cs) iv
     // SHARE REQUEST ALREADY PARSED
-    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    /*temp = (char*) malloc(LEN_SIZE*sizeof(char)); //encr_len
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-    iv = (unsigned char*) malloc(IV_LEN*sizeof(unsigned char));
+    iv = (unsigned char*) malloc(IV_LEN*sizeof(unsigned char)); //iv
     if (!iv) exit_with_failure("Malloc iv failed", 1);
-    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
+    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char)); //hmac
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
     // PARSE ENCRYPTION LENGTH
     memcpy(temp, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE), LEN_SIZE);
     encr_len = atoi(temp);
-    if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
+    if (encr_len < 0 || encr_len > (4*16)) //16 is the dimension of a AES block, 4 the max number of blocks in this case
     {
         free_3(temp, iv, bufferSupp2);
         printf("Encryption length too high.\n");
         return -1;
     }
 
-    // PARSE ENCRYPTED MESSAGE
-    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
+    // PARSE ENCRYPTED MESSAGE : SHARE_REQUEST, encr_len, ciphertext, HMAC, IV
+    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char)); //ciphertext
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE),\
-        encr_len);
+    memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len);
 
     // PARSE IV
-    memcpy(iv, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+\
-        BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+    memcpy(iv, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
 
     // PARSE HASH AND CHECK IT
-    memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE),\
-        HASH_LEN);
+    memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
 
     sprintf(temp, "%u", *nonce_cs);
-    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST),\
-                                               bufferSupp1, encr_len,\
-                                               iv, IV_LEN,\
-                                               temp, LEN_SIZE);
-    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+    //MAC: SHARE_REQUEST, ciphertext, IV, nonce
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST), \
+                                                bufferSupp1, encr_len, \
+                                                iv, IV_LEN, \
+                                                temp, LEN_SIZE);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
         
     free_4(bufferSupp2, temp, msg_to_hash, digest);
-        
     if (ret != 0)
     {
         printf("Wrong share_request hash.\n");
@@ -1779,55 +1789,89 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         printf("Hash is correct.\n");
         *nonce_cs = *nonce_cs + 1;
+    }*/
+
+    bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+    memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE), LEN_SIZE);
+    encr_len = atoi((char*)bufferSupp1);
+    if (encr_len < 0 || encr_len > (4*16)) //16 is the dimension of a AES block, 4 the max number of blocks in this case
+    {
+        free(bufferSupp1);
+        printf("Encryption length too high.\n");
+        return -1;
     }
 
+    // HERE WE TAKE THE ENCRYPTED MESSAGE
+    encr_msg = (unsigned char*)malloc(sizeof(unsigned char)*encr_len);
+    if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
+    memcpy(encr_msg, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len);
+
+    //HERE WE TAKE THE MAC
+    bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+    memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
+
+    //HERE WE TAKE THE IV
+    iv = (unsigned char*)malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
+    memcpy(iv, &*(rec_mex+strlen(DOWNLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+
+    // HERE WE SAVE THE NONCE INTO A STRING
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    sprintf(temp, "%u", *nonce_cs);
+    
+    //Now we prepare the message to hash to compare it with the one we received
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST), \
+                                                encr_msg, encr_len, \
+                                                iv, IV_LEN, \
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
+
+    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+    
+    free_5(bufferSupp1, bufferSupp2, temp, msg_to_hash, digest);
+
+    if (ret != 0)
+    {
+        printf("Wrong share failed hash\n\n");
+        free_2(encr_msg, iv);
+        return -1;
+    } 
+    else *nonce_cs += 1;
+
     // DECRYPT THE MESSAGE
-    decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp1, encr_len, iv, session_key1);
-    free_2(iv, bufferSupp1); 
+    decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
+    free_2(iv, encr_msg);
 
     len_fn = str_ssplit(plaintext, DELIM);
     bufferSupp1 = (unsigned char*) malloc((len_fn+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    memcpy(bufferSupp1, plaintext, len_fn);
+    memcpy(bufferSupp1, plaintext, len_fn); //Here we have the filename
     *(bufferSupp1+len_fn) = '\0';
 
     len_pn = plain_len - len_fn - BLANK_SPACE;
     bufferSupp2 = (unsigned char*) malloc((len_pn+1)*sizeof(unsigned char));
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    memcpy(bufferSupp2, &*(plaintext+len_fn+BLANK_SPACE), len_pn);
+    memcpy(bufferSupp2, &*(plaintext+len_fn+BLANK_SPACE), len_pn); //Here we have the peername
     *(bufferSupp2+len_pn) = '\0';
 
     free(plaintext);
 
-    // sanitize them ???
-
-
-    // NOW WE ARE INSIDE database/username, we should try to move inside database/peername/documents
-    ret = chdir(".."); // database/
-    if (ret == -1)
-    {
-        free_2(bufferSupp1, bufferSupp2);
-        printf("I'm having some problem changing directory...\n");
-        return -1;
-    }
-    ret = chdir((char*) bufferSupp2); // database/peername
-    if (ret == -1)
-    {
-        free_2(bufferSupp1, bufferSupp2);
-        printf("I'm having some problem moving into peername...\n");
-        return -1;
-    }
-    ret = chdir("documents"); // database/peername/documents
+    // now we should sanitize the filename and the peername
+    ret = chdir("documents");
     if (ret == -1)
     {
         free_2(bufferSupp1, bufferSupp2);
         printf("I'm having some problem moving into documents...\n");
         return -1;
     }
-    
-
 
     // TRY TO OPEN PEERNAME'S FILE TO SHARE
+    printf("The file to share is %s\n\n", bufferSupp1);
     f1 = fopen((char*) bufferSupp1, "r");
     if (!f1)
     {
@@ -1866,7 +1910,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         printf("I'm having some problem opening path_temp...\n");
         return -1;
     }
-    ret = fread(temp, sizeof(char), PORT_SIZE, f1);
+    /*ret = fread(temp, sizeof(char), PORT_SIZE, f1);
     if (ret == -1)
     {
         printf("Problem during the reading of the file to share...\n");
@@ -1889,12 +1933,45 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
         operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         return -1;
+    }*/
+    for (j = 0; j < PORT_SIZE; j++)
+    {
+        if ((ch = getc(f1)) == EOF)
+        {
+            *(msg_to_encr+j) = '\0';
+            printf("File over!");
+            break;
+        }
+
+        *(temp+j) = ch;
+    }
+    for (j = 0; j < 16; j++) //session_key1 bytes
+    {
+        if ((ch = getc(f1)) == EOF)
+        {
+            *(msg_to_encr+j) = '\0';
+            printf("File over!");
+            break;
+        }
+
+        *(peer_session_key1+j) = ch;
+    }
+    for (j = 0; j < 16; j++) //session_key2 bytes
+    {
+        if ((ch = getc(f1)) == EOF)
+        {
+            *(msg_to_encr+j) = '\0';
+            printf("File over!");
+            break;
+        }
+
+        *(peer_session_key2+j) = ch;
     }
 
     fclose(f1);
 
     chdir("..");
-    chdir((char*) bufferSupp2);
+    chdir((char*) bufferSupp2); //peername
     chdir("documents");
 
     rcv_port = atoi(temp);
@@ -1931,7 +2008,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
 
-    // CREATE ENCRYPTED MESSAGE
+    // CREATE ENCRYPTED MESSAGE // filename, peername
     msg_to_encr_len = build_msg_2(&msg_to_encr, bufferSupp1, len_fn,\
                                                 bufferSupp2, len_pn+1);
     if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);

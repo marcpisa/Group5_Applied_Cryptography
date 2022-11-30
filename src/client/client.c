@@ -366,7 +366,17 @@ int main(int argc, char* argv[])
                                 break;
                             }
 
-                            printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
+                            //printf("In command2 we have %s and in command3 we have %s\n\n", command2, command3);
+                            if (strcmp(command2, "")==0)
+                            {
+                                printf("The filename is missing... Retry\n\n");
+                                break;
+                            }
+                            if (strcmp(command3, "")==0)
+                            {
+                                printf("The peername is missing... Retry\n\n");
+                                break;
+                            }
 
                             if (strlen(command2) > MAX_LEN_FILENAME || strlen(command3) > MAX_LEN_USERNAME)
                             {

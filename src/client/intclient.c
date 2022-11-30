@@ -207,7 +207,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 
     /* ---- Generate last message for the server (digital signature) ---- */
     msg_len = SIGN_LEN;
-    buffer = (unsigned char*) malloc(msg_len*sizeof(unsigned char));
+    buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
     // Generate digital signature
@@ -216,7 +216,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
     // Compose the message
     memcpy(buffer, signature, SIGN_LEN); // dig. sig.
 
-    ret = send(*sock, buffer, msg_len, 0); 
+    ret = send(*sock, buffer, BUF_LEN, 0); 
 
     free_n(4, K, exp_digsig, signature, buffer);
     if (ret == -1)
@@ -266,7 +266,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         return -1;
     }
 
-    ret = send(*sock, buffer, msg_len, 0); 
+    ret = send(*sock, buffer, BUF_LEN, 0); 
     
     free_n(4, buffer, digest, iv, encr_msg);
     if (ret == -1) 
@@ -741,6 +741,11 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     unsigned char* bufferSupp1;
     char* bufferSupp2;
     
+    if (strcmp(filename, "")==0)
+    {
+        printf("The filename field is missing. Retry...\n\n");
+        return 1;
+    }
 
     // Generate the IV 
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN); 
@@ -882,7 +887,13 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
-
+    f1 = fopen(filename, "r");
+    if (f1)
+    {
+        printf("The filename is already existent...\n\n");
+        fclose(f1);
+        return 1;
+    }
 
 
     /* first message M1: download_request, len encr., encr(filename), hash(download_request, encr, iv, nonce), iv) ---- */    
@@ -1150,6 +1161,12 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
 
+    if (strcmp(filename, "")==0)
+    {
+        printf("The filename is missing...\n\n");
+        return -1;
+    }
+
     // Initialization of IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
@@ -1258,7 +1275,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0)
     {
         ret = check_reqden_msg(UPLOAD_DENIED, buffer, *nonce, session_key1, session_key2);
-        if (ret == -1) printf("Something bad happened checking download_denied message...\n");
+        if (ret == -1) printf("Something bad happened checking upload denied message...\n");
         else 
         {
             printf("Download denied from the server...\n");
@@ -1450,41 +1467,79 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
 
-
-
     /* ---- Build the message for the server ---- */
     // (SHARE_REQ encr_len encr_msg(username, filename, peer_name) hash(req encr iv nonce_cs) iv)
-    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    /*temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
     temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);*/
 
+    msg_to_encr_len = strlen(filename)+strlen(peername)+2;
+    msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
+    if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
+
+    msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
+                                                peername, strlen(peername)+1);
+    encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
+
+    // Create the hash
+    temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
+    temp2 = (char*) malloc(sizeof(char)*LEN_SIZE);
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
+    
+    sprintf(temp, "%u", *nonce); // Now in temp there is the string version of the nonce
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST),\
+                                                encr_msg, encr_len,\
+                                                iv, IV_LEN,\
+                                                temp, LEN_SIZE);
+    if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
+
+    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
+
+    // Now that we have both the encryption and the digest of the hash we can initialize the buffer and send the message
+    sprintf(temp2, "%d", encr_len);
+    msg_len = build_msg_5(&buffer, SHARE_REQUEST, strlen(DOWNLOAD_REQUEST),\
+                                   temp2, LEN_SIZE,\
+                                   encr_msg, encr_len,\
+                                   digest, HASH_LEN,\
+                                   iv, IV_LEN);
+    if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
+
+    printf("I'm sending to the server the download request.\n");
+    ret = send(sock, buffer, BUF_LEN, 0); 
+    if (ret == -1) exit_with_failure("Send failed", 1);
+    
+    *nonce += 1; // message sent, nonce increased for the answer or for other messages
+
+    free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
+    free_2(temp2, iv);
 
     // Build and encrypt the message
-    msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
+    /*msg_to_encr_len = build_msg_2(&msg_to_encr, filename, strlen(filename),\
                                                 peername, strlen(peername)+1);
     if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);
 
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, session_key1);
 
-
     // Build and create the hash
     sprintf(temp, "%u", *nonce);
-    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST),\
-                                                encr_msg, encr_len,\
-                                                iv, IV_LEN,\
+    // MAC: SHARE_REQUEST, ciphertext, IV, nonce
+    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST), \
+                                                encr_msg, encr_len, \
+                                                iv, IV_LEN, \
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
 
 
     // Build the message
-    sprintf(temp2, "%d", encr_len);
-    msg_len = build_msg_5(&buffer, SHARE_REQUEST, strlen(SHARE_REQUEST),\
-                                   temp2, LEN_SIZE,\
-                                   encr_msg, encr_len,\
-                                   digest, HASH_LEN,\
+    sprintf(temp2, "%i", encr_len);
+    // SHARE_REQUEST, encr_len, ciphertext, MAC, IV
+    msg_len = build_msg_5(&buffer, SHARE_REQUEST, strlen(SHARE_REQUEST), \
+                                   temp2, LEN_SIZE, \
+                                   encr_msg, encr_len, \
+                                   digest, HASH_LEN, \
                                    iv, IV_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
 
@@ -1499,7 +1554,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
         return -1;
     }
     *nonce = *nonce+1;
-
+    */
 
 
 
@@ -1520,7 +1575,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_DENIED)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, buffer, strlen(SHARE_DENIED)); // denied or accepted same length
-    *(bufferSupp1+strlen(SHARE_DENIED)) = '\0';
+    memcpy(bufferSupp1+strlen(SHARE_DENIED), "\0", 1);
 
     if (strcmp((char*) bufferSupp1, SHARE_DENIED) == 0)
     {
