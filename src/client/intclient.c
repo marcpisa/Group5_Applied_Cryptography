@@ -560,7 +560,8 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             if (!file_list) printf("No filenames are stored in the cloud.\n");
             else 
             {
-                printf("The client receives the complete file's list (%d filenames):\n", tot_num_file-2);
+                printf("Received the complete files list (%d filenames):\n\n", tot_num_file-2);
+                printf("***********************\n");
                 for (int i = 0; i <= index; i++)
                 {
                     // Skip these two files
@@ -573,7 +574,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
                     printf("%s\n", *(file_list+i));
                     free(*(file_list+i));
                 }
-                printf("\n");
+                printf("************************\n\n");
                 free(file_list);
             }
             
