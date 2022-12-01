@@ -1469,11 +1469,6 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
 
     /* ---- Build the message for the server ---- */
     // (SHARE_REQ encr_len encr_msg(username, filename, peer_name) hash(req encr iv nonce_cs) iv)
-    /*temp = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-    temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);*/
-
     msg_to_encr_len = strlen(filename)+strlen(peername)+2;
     msg_to_encr = (unsigned char*) malloc(msg_to_encr_len*sizeof(unsigned char));
     if (!msg_to_encr) exit_with_failure("Malloc msg_to_encr failed", 1);
@@ -1595,7 +1590,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     else
     {
         printf("We don't know what the server said...\n\n");
-        ret = -1;
+        ret = 1;
     }
 
     free_2(buffer, bufferSupp1);
@@ -1618,21 +1613,18 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
     int msg_to_hash_len;
     unsigned int digest_len;
     unsigned char* msg_to_hash;
+    unsigned char* encr_msg;
     unsigned char* digest;
 
     char* temp;
     unsigned char* iv;
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
-    unsigned char* bufferSupp3;
-
-
+    //unsigned char* bufferSupp3;
 
 
     /* ---- Parse server message ---- */
     printf("Share received, parsing message...\n");
-    
-    // SHARE_PERM encr_len encr(filename, peername) hash(share_perm encr iv nonce_sc) iv
     bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_PERMISSION)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, rec_mex, strlen(SHARE_PERMISSION));
@@ -1640,28 +1632,84 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
     if (strcmp((char*) bufferSupp1, SHARE_PERMISSION) == 0)
     {
-        temp = (char*) malloc(LEN_SIZE*sizeof(char));
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-        if (!iv) exit_with_failure("Malloc iv failed", 1);
-
-        // TAKE ENCR LEN
-        memcpy(temp, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE), LEN_SIZE);
-        encr_len = atoi(temp);
-        if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
+        free(bufferSupp1);
+        bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
+        if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
+        memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE), LEN_SIZE);
+        encr_len = atoi((char*)bufferSupp1);
+        if (encr_len < 0 || encr_len > (4*16)) //16 is the dimension of a AES block, 4 the max number of blocks in this case
         {
-            free_3(bufferSupp1, temp, iv);
+            free(bufferSupp1);
             printf("Encryption length too high.\n");
             return -1;
         }
 
-        // TAKE THE ENCRYPTED MESSAGE
+        // HERE WE TAKE THE ENCRYPTED MESSAGE
+        encr_msg = (unsigned char*)malloc(sizeof(unsigned char)*encr_len);
+        if (!encr_msg) exit_with_failure("Malloc encr_msg failed", 1);
+        memcpy(encr_msg, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len);
+
+        //HERE WE TAKE THE MAC
+        bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
+        if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
+        memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
+
+        //HERE WE TAKE THE IV
+        iv = (unsigned char*)malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
+        memcpy(iv, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+
+        // HERE WE SAVE THE NONCE INTO A STRING
+        temp = (char*) malloc(sizeof(char)*LEN_SIZE);
+        if (!temp) exit_with_failure("Malloc temp failed", 1);
+        sprintf(temp, "%u", *nonce_sc);
+
+        //Now we prepare the message to hash to compare it with the one we received
+        msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION), \
+                                                    encr_msg, encr_len, \
+                                                    iv, IV_LEN, \
+                                                    temp, LEN_SIZE);
+        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
+
+        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len); 
+
+        ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
+
+        free_5(bufferSupp1, bufferSupp2, temp, msg_to_hash, digest);
+
+        if (ret != 0)
+        {
+            printf("Wrong share_permission hash\n\n");
+            free_2(encr_msg, iv);
+            return -1;
+        } 
+        else 
+        {
+            *nonce_sc += 1;
+            //printf("Hash compared correctly: authentication provided...\n");
+        }
+        /*
+        // TAKE ENCRIPTION LENGTH
+        temp = (char*) malloc(LEN_SIZE*sizeof(char));
+        if (!temp) exit_with_failure("Malloc temp failed", 1);
+        memcpy(temp, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE), LEN_SIZE);
+        encr_len = atoi(temp);
+        if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
+        {
+            free_2(bufferSupp1, temp);
+            printf("Encryption length too high.\n");
+            return -1;
+        }
+
+        // TAKE THE CIPHERTEXT
         bufferSupp2 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+\
             LEN_SIZE+BLANK_SPACE), encr_len);
 
         // TAKE THE IV
+        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        if (!iv) exit_with_failure("Malloc iv failed", 1);
         memcpy(iv, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
             BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
 
@@ -1671,6 +1719,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         memcpy(bufferSupp3, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
             BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
 
+        memset(temp, 0, LEN_SIZE);
         sprintf(temp, "%u", *nonce_sc);
         msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
                                                     bufferSupp2, encr_len,\
@@ -1691,11 +1740,12 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
             return -1;
         }
         *nonce_sc += 1;    
-    
+        */
+       
 
         // DECRYPT THE MESSAGE
-        decrypt_AES_128_CBC(&plaintext, &plain_len, bufferSupp2, encr_len, iv, session_key1);
-        free_2(bufferSupp2, iv);
+        decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
+        free_2(encr_msg, iv);
 
         len_fn = str_ssplit(plaintext, DELIM);
         bufferSupp1 = (unsigned char*) malloc((len_fn+1)*sizeof(unsigned char));
@@ -1717,7 +1767,8 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
         free_3(bufferSupp1, bufferSupp2, plaintext);
 
-        if (fgets(line, 2, stdin)) {
+        if (fgets(line, 2, stdin)) 
+        {
             if (1 == sscanf(line, "%c", &s)) {
                 // SEND CONFIRMATION OR NOT TO THE SERVER
                 if (s == 'y' || s == 'Y')
@@ -1727,24 +1778,24 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
                 }
                 else if (s == 'n' || s == 'N')
                 {
-                    operation_denied(sd, "The user hasn't accepted to share the file with you", SHARE_DENIED,\
+                    operation_denied(sd, "The user hasn't accepted to share the file", SHARE_DENIED,\
                         session_key1, session_key2, nonce_sc);
                     ret = 1;
                 }
                 else
                 {
                     printf("We don't know what the user said...\n\n");
-                    ret = -1;
+                    ret = 1;
                 }
             }
         }
-        
     }
+
     else
     {
         printf("We don't know what the server said...\n\n");
         free(bufferSupp1);
-        ret = -1;
+        ret = 1;
     }
 
     return ret;

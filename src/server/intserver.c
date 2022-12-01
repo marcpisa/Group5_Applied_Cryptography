@@ -540,20 +540,7 @@ int loginServer(int sd, char* rec_mex)
                 printf("Something bad happened during the management of the client share request...\n\n");
                 break;
             }
-            else
-            {
-                printf("End of share request management!\n\n");
-                ret = chdir("../../");
-                if (ret == -1) {
-                    printf("Problem changing directory");
-                    break;
-                }
-                ret = chdir(username);
-                if (ret == -1) {
-                    printf("Problem changing directory");
-                    break;
-                }
-            } 
+            else printf("End of share request management!\n\n"); 
         }
 
         else printf("Unknown type of request by the Client...\n");  
@@ -1799,7 +1786,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         free(bufferSupp1);
         printf("Encryption length too high.\n");
-        return -1;
+        return 1;
     }
 
     // HERE WE TAKE THE ENCRYPTED MESSAGE
@@ -1815,7 +1802,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     //HERE WE TAKE THE IV
     iv = (unsigned char*)malloc(sizeof(unsigned char)*IV_LEN);
     if (!iv) exit_with_failure("Malloc iv failed", 1);
-    memcpy(iv, &*(rec_mex+strlen(DOWNLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
+    memcpy(iv, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
 
     // HERE WE SAVE THE NONCE INTO A STRING
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
@@ -1839,7 +1826,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         printf("Wrong share failed hash\n\n");
         free_2(encr_msg, iv);
-        return -1;
+        return 1;
     } 
     else *nonce_cs += 1;
 
@@ -1872,10 +1859,11 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     // TRY TO OPEN PEERNAME'S FILE TO SHARE
     printf("The file to share is %s\n\n", bufferSupp1);
+    printf("The peer to share with is %s\n", bufferSupp2);
     f1 = fopen((char*) bufferSupp1, "r");
     if (!f1)
     {
-        printf("The sharer doesn't have any file called \"%s\"\n", bufferSupp1);
+        printf("The sharer doesn't have any file called %s\n", bufferSupp1);
         // Send denied message to left party
         operation_denied(sd, "No such file", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         free_2(bufferSupp1, bufferSupp2);
@@ -1904,41 +1892,28 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     // Here we take the port and the session keys
     f1 = fopen(path_temp, "r");
+    chdir("../");
+    ret = chdir(username);
+    if (ret == -1)
+    {
+        free_4(bufferSupp1, bufferSupp2, temp, path_temp);
+        printf("I'm having some problem moving into username directory... Need to create another connection\n");
+        return -1;
+    }
     if (!f1) 
     {
+        printf("A peer called %s doesn't exists... Retry\n\n", bufferSupp2);
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        printf("I'm having some problem opening path_temp...\n");
-        return -1;
+        operation_denied(sd, "Peer doesn't exists", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        return 1;
     }
-    /*ret = fread(temp, sizeof(char), PORT_SIZE, f1);
-    if (ret == -1)
-    {
-        printf("Problem during the reading of the file to share...\n");
-        free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-        return -1;
-    }
-    ret = fread(peer_session_key1, sizeof(unsigned char), 16, f1);
-    if (ret == -1)
-    {
-        printf("Problem during the reading of the file to share...\n");
-        free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-        return -1;
-    }
-    ret = fread(peer_session_key2, sizeof(unsigned char), 16, f1);
-    if (ret == -1)
-    {
-        printf("Problem during the reading of the file to share...\n");
-        free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-        return -1;
-    }*/
+
+    //Now we take the information about the peer on the file txt 
     for (j = 0; j < PORT_SIZE; j++)
     {
         if ((ch = getc(f1)) == EOF)
         {
-            *(msg_to_encr+j) = '\0';
+            *(temp+j) = '\0';
             printf("File over!");
             break;
         }
@@ -1949,7 +1924,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         if ((ch = getc(f1)) == EOF)
         {
-            *(msg_to_encr+j) = '\0';
+            *(peer_session_key1+j) = '\0';
             printf("File over!");
             break;
         }
@@ -1960,7 +1935,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         if ((ch = getc(f1)) == EOF)
         {
-            *(msg_to_encr+j) = '\0';
+            *(peer_session_key2+j) = '\0';
             printf("File over!");
             break;
         }
@@ -1970,12 +1945,25 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     fclose(f1);
 
+    //We should go on the directory of the peer
     chdir("..");
     chdir((char*) bufferSupp2); //peername
     chdir("documents");
 
-    rcv_port = atoi(temp);
+    f1 = fopen((char*)bufferSupp1, "r");
+    chdir("../..");
+    chdir(username);
+    if (f1)
+    {
+        printf("The peer already has a file called %s... Share denied\n\n", bufferSupp1);
+        free_4(temp, path_temp, bufferSupp1, bufferSupp2);
+        operation_denied(sd, "Peer doesn't exists", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        return 1;
+    }
 
+    rcv_port = atoi(temp); //This is the port where the peer is listening
+
+    //Configuration of the structure used for the comunication with the second peer
     memset(&rcv_addr, 0, sizeof(rcv_addr));
 	rcv_addr.sin_family = AF_INET;
 	rcv_addr.sin_port = htons(rcv_port);
@@ -1985,8 +1973,9 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     if (connect(sd_peer, (struct sockaddr*)&rcv_addr, sizeof(rcv_addr)) < 0) 
     {
         printf("Connection Failed\n");
-        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-        return -1;
+        free_4(temp, path_temp, bufferSupp1, bufferSupp2);
+        operation_denied(sd, "The peer is not online", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        return 1;
     }
 
     free_2(temp, path_temp);
@@ -1995,11 +1984,6 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     /* ---- Send share_perm to peer ---- */
     // share_perm encr_len encr(filename peername) hash(share_perm encr iv nonce_sc) iv
-    temp = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-    temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
-    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
-
 
     // GENERATE THE IV
     iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
@@ -2016,6 +2000,8 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, peer_session_key1);
 
     // CREATE THE HASH
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
     sprintf(temp, "%u", *nonce_sc);
     msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
                                                 encr_msg, encr_len,\
@@ -2026,6 +2012,8 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     digest = hmac_sha256(peer_session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     // BUILD THE MESSAGE
+    temp2 = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp2) exit_with_failure("Malloc temp2 failed", 1);
     sprintf(temp2, "%d", encr_len);
     msg_len = build_msg_5(&buffer, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
                                    temp2, LEN_SIZE,\
@@ -2084,7 +2072,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         {
             printf("Error checking share denied message.\n");
             operation_denied(sd, "Error checking share denied message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-            ret = -1;
+            ret = 1;
         }
         else 
         {
@@ -2104,7 +2092,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         {
             printf("Error checking share accepted message.\n");
             operation_denied(sd, "Error checking share accepted message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-            return -1;
+            return 1;
         }
         printf("The share request has been accepted!\n\n");
         *nonce_sc += 1;
@@ -2114,7 +2102,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         printf("We don't know what the peer said...\n\n");
         operation_denied(sd, "We don't know what the peer said", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         free_4(buffer, bufferSupp1, bufferSupp2, bufferSupp3);
-        return -1;
+        return 1;
     }
 
     free_2(bufferSupp3, buffer);
@@ -2124,42 +2112,46 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     path_temp = (char*) malloc((6+(len_pn-1)+1+10+len_fn+1)*sizeof(char));
     memcpy(path_temp, "../../", 6);
-    memcpy(&*(path_temp+6), username, strlen(username));
-    memcpy(&*(path_temp+6+strlen(username)), "/", 1);
-    memcpy(&*(path_temp+6+strlen(username)+1), "documents/", 10);
-    memcpy(&*(path_temp+6+strlen(username)+1+10), bufferSupp1, len_fn);
-    memcpy(&*(path_temp+6+strlen(username)+1+10+len_fn), "\0", 1);
+    memcpy(&*(path_temp+6), bufferSupp2, len_pn-1); //peername
+    memcpy(&*(path_temp+6+(len_pn-1)), "/", 1);
+    memcpy(&*(path_temp+6+(len_pn-1)+1), "documents/", 10);
+    memcpy(&*(path_temp+6+(len_pn-1)+1+10), bufferSupp1, len_fn); //filename
+    memcpy(&*(path_temp+6+(len_pn-1)+1+10+len_fn), "\0", 1);
     printf("%s\n%s\n", path_temp, bufferSupp1);
-
-    src_fd = fopen((char*) bufferSupp1, "r");
+    
+    chdir("documents");
+    src_fd = fopen((char*)bufferSupp1, "r");
     f1 = fopen(path_temp, "w");
     if (!src_fd || !f1) 
     {
         free_3(path_temp, bufferSupp1, bufferSupp2);
         printf("Can't open f1 or src_fd...\n");
-        operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
-        return -1;
-    } 
+        operation_denied(sd, "General error: need to recreate the connection", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        return 1;
+    }
 
     buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if (!buffer) exit_with_failure("Malloc buffer failed", 1);
 
-    while (1) {
+    while (1) 
+    {
         ret = fread(buffer, sizeof(unsigned char), BUF_LEN, src_fd);
-        if (ret == -1) {
+        if (ret == -1) 
+        {
             printf("Error reading file.\n");
             free_4(path_temp, buffer, bufferSupp1, bufferSupp2);
-            operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            operation_denied(sd, "General error: need to recreate the connection", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return -1;
         }
     
         if (ret == 0) break;
 
         ret = fwrite(buffer, sizeof(unsigned char), ret, f1);
-        if (ret == -1) {
+        if (ret == -1) 
+        {
             printf("Error writing to file.\n");
             free_4(path_temp, buffer, bufferSupp1, bufferSupp2);
-            operation_denied(sd, "General error", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            operation_denied(sd, "General error: need to recreate the connection", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return -1;
         }
     }

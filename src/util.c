@@ -545,8 +545,8 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     // Calculate the hash
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
-
     sprintf(temp, "%u", *nonce);
+    
     msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
                                                 ciphertext, encr_len,\
                                                 iv, IV_LEN,\
@@ -556,6 +556,7 @@ void operation_denied(int sock, char* reason, char* req_denied, unsigned char* k
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
     // Compose and send the message
+    memset(temp, 0, LEN_SIZE);
     sprintf(temp, "%d", encr_len);    
     msg_len = build_msg_5(&buffer, req_denied, strlen(req_denied),\
                                    temp, LEN_SIZE,\
@@ -647,34 +648,34 @@ int check_reqden_msg (char* req_denied, unsigned char* msg, unsigned int nonce, 
     unsigned char* iv;
 
 
-    // Allocate the dynamic arrays
+    // Parse the message
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
-    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-
-
-    // Parse the message
     offset = strlen(req_denied)+BLANK_SPACE;
     memcpy(temp, &*(msg+offset), LEN_SIZE); // len. encr.
     offset += LEN_SIZE+BLANK_SPACE;
     encr_len = atoi(temp);
+    free(temp);
 
     bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*encr_len);
     if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
-
     memcpy(bufferSupp3, &*(msg+offset), encr_len); // encr.
     offset += encr_len+BLANK_SPACE; 
 
+    bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
+    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
     memcpy(bufferSupp2, &*(msg+offset), HASH_LEN); // hash
     offset += HASH_LEN+BLANK_SPACE;
 
+    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+    if (!iv) exit_with_failure("Malloc iv failed", 1);
     memcpy(iv, &*(msg+offset), IV_LEN); // iv
 
     // Check hash
+    temp = (char*) malloc(LEN_SIZE*sizeof(char));
+    if (!temp) exit_with_failure("Malloc temp failed", 1);
     sprintf(temp, "%u", nonce);
+
     msg_to_hash_len = build_msg_4(&msg_to_hash, req_denied, strlen(req_denied),\
                                                 bufferSupp3, encr_len,\
                                                 iv, IV_LEN,\
