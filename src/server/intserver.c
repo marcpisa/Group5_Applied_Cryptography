@@ -443,6 +443,8 @@ int loginServer(int sd, char* rec_mex)
             else
             {
                 printf("End of logout request management!\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
         }
@@ -458,6 +460,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client list request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
             else printf("End of list request management!\n\n");
@@ -474,6 +478,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client rename request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
             else printf("End of rename request management!\n\n");
@@ -490,6 +496,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client delete request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             } else printf("End of delete request management!\n\n");
         }
@@ -506,6 +514,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client download request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             } 
             else printf("End of download request management!\n\n");
@@ -522,6 +532,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client upload request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
             else printf("End of upload request management!\n\n");
@@ -538,6 +550,8 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client share request...\n\n");
+                ret = remove_info_file(username);
+                if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
             else printf("End of share request management!\n\n"); 
@@ -598,7 +612,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
     if (ret != 0) 
     {
         printf("Wrong logout request hash.\n");
-        return -1;
+        return 1;
     }
 
     free_5(bufferSupp2, bufferSupp3, temp, digest, msg_to_hash);
@@ -669,7 +683,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     if (ret != 0) // If the hash comparison failed
     {
         printf("Wrong list request hash.\n");
-        return -1;
+        return 1;
     }
 
     printf("List request message parsed successfully\n");
@@ -798,7 +812,11 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
             free_2(bufferSupp1, buffer);
             
-            if (ret == -1) return -1;
+            if (ret == -1) 
+            {
+                printf("The check of the hash is gone bad...\n");
+                return 1;
+            }
             else 
             {
                 printf("Received list denied message.\n");
@@ -811,7 +829,11 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
             ret = check_reqacc_msg(LIST_ACCEPTED, buffer, *nonce, session_key2);
             free_2(buffer, bufferSupp1);
 
-            if (ret == -1) return -1;
+            if (ret == -1)
+            {
+                printf("The check of the hash is gone bad\n");
+                return 1;
+            } 
             if (num_file == 0) num_file = -1;
             *nonce += 1;
         }
@@ -819,7 +841,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
         {
             printf("We don't know what the client said...\n\n");
             free_2(bufferSupp1, buffer);
-            return -1;
+            return 1;
         }
     }
 
@@ -902,7 +924,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         printf("Wrong rename request hash.\n");
         free_6(bufferSupp1, bufferSupp2, temp, iv, msg_to_hash, digest);
         free(temp2);
-        return -1;
+        return 1;
     }
 
     *nonce += 1;
@@ -918,9 +940,10 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     len_fn = (int)offset;
     if (len_fn > MAX_LEN_FILENAME) 
     {
+        printf("Dimension of the filename too long...\n\n");
         operation_denied(sd, "Filename too long", RENAME_DENIED, session_key1, session_key2, nonce);
         free(plaintext);
-        return -1;
+        return 1;
     }
 
     filename = (char*) malloc(len_fn*sizeof(char)+1);
@@ -935,9 +958,10 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     len_newfn = (int)offset;
     if (len_newfn > MAX_LEN_FILENAME)
     {
+        printf("Dimension of the new filename too long...\n");
         operation_denied(sd, "New_filename too long", RENAME_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
-        return -1;
+        return 1;
     } 
     
     new_filename = (char*) malloc(len_newfn*sizeof(char)+1);
@@ -949,29 +973,31 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         printf("The new filename sent by the client is missing. Request denied...\n");
         operation_denied(sd, "New filename is missing", RENAME_DENIED, session_key1, session_key2, nonce);
         free_3(plaintext, filename, new_filename);
-        return -1;
+        return 1;
     }
     printf("The new filename should be %s\n", new_filename);
                    
     ret = filename_sanitization (filename);
     ret += filename_sanitization (new_filename);
-    if (ret <= 1) {
+    if (ret <= 1) 
+    {
+        printf("The sanitization of the filename is gone bad\n");
         operation_denied(sd, "Filename sanitization failed", RENAME_DENIED, session_key1, session_key2, nonce);
         free_3(plaintext, filename, new_filename);
-        return -1;
+        return 1;
     }
 
     // Execute the rename if possible, otherwise send failed message to client
     ret = chdir("documents");
     if (ret == -1)
     {
-        printf("Error during the cd of the directory documents...\n\n");
+        printf("Error during the cd of the directory documents... It's necessary to close the connection\n\n");
         return -1;
     }
     ret = rename(filename, new_filename);
     chdir("..");
     if (ret == -1) {
-        printf("Problem moving to parent directory.\n");
+        printf("Problem moving to parent directory... It's necessary to close the connection\n");
         free_3(plaintext, filename, new_filename);
         return -1;
     }
@@ -1054,7 +1080,7 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     {
         printf("Wrong delete request hash.\n");
         free_2(bufferSupp1, iv);
-        return -1;
+        return 1;
     }
     *nonce += 1;
 
@@ -1066,9 +1092,10 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     len_fn = plain_len;
     if (len_fn > MAX_LEN_FILENAME) 
     {
+        printf("The filename is too long...\n");
         operation_denied(sd, "Filename too long", DELETE_DENIED, session_key1, session_key2, nonce);
         free(plaintext);
-        return -1;
+        return 1;
     }
 
     filename = (char*) malloc((len_fn+1)*sizeof(char));
@@ -1076,17 +1103,20 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     memcpy(filename, plaintext, len_fn+1); 
     if (strcmp(filename, "")==0) 
     {
+        printf("The filename is missing...\n");
         operation_denied(sd, "Filename is missing", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
-        return -1;
+        return 1;
     }
 
     // Sanitize the filename
     ret = filename_sanitization(filename);
-    if (ret != 1) {
+    if (ret != 1) 
+    {
+        printf("The sanitization of the filename is gone bad... Bad characters inside of it...\n");
         operation_denied(sd, "Filename sanitization failed", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
-        return -1;
+        return 1;
     }
 
 
@@ -1099,13 +1129,13 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         printf("The delete operation went bad...\n");
         operation_denied(sd, "Something bad happened during the delete operation", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
-        return -1;
+        return 1;
     }
     else printf("Delete operation accomplished...\n\n");
     ret = chdir("../");
     if (ret == -1) 
     {
-        operation_denied(sd, "Something bad happened during the delete operation", DELETE_DENIED, session_key1, session_key2, nonce);
+        operation_denied(sd, "Something bad happened during the delete operation... It's necessary to close the connection", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
         return -1;
     }
@@ -1195,7 +1225,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     {
         printf("Wrong download failed hash\n\n");
         free_2(encr_msg, iv);
-        return -1;
+        return 1;
     } 
     else 
     {
@@ -1209,14 +1239,16 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     if (plain_len > MAX_LEN_FILENAME)
     {
         free_3(encr_msg, iv, plaintext);
+        operation_denied(sock, "The length of the filename is too long", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
         printf("The length of the filename is too big, download management terminated...\n\n");
-        return -1;
+        return 1;
     }
     // HERE WE SHOULD SANITIZE THE FILENAME
     memset(filename, 0, MAX_LEN_FILENAME);
     memcpy(filename, plaintext, plain_len); 
     if (strcmp(filename, "")==0)
     {
+        free_3(encr_msg, iv, plaintext);
         printf("The filename is missing\n");
         operation_denied(sock, "The filename is missing", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
@@ -1411,7 +1443,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     {
         printf("Check download_finished gone bad.\n\n");
         free(buffer);
-        return -1;
+        return 1;
     }
 
     free(buffer);
@@ -1502,7 +1534,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         printf("Wrong rename failed hash\n\n");
         free_6(buffer, bufferSupp1, bufferSupp2, iv, encr_msg, msg_to_hash);
         free(digest);
-        return -1;
+        return 1;
     } 
     else printf("The MAC is been correctly compared!\n");
     *nonce += 1;
@@ -1515,7 +1547,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         free_6(bufferSupp1, bufferSupp2, encr_msg, iv, plaintext, buffer);
         free_2(msg_to_hash, digest);
         printf("The length of the filename is too big, download management terminated...\n\n");
-        return -1;
+        return 1;
     }
     // HERE WE SHOULD SANITIZE THE FILENAME
     memset(filename, 0, MAX_LEN_FILENAME);
@@ -1595,7 +1627,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     chdir("..");
     if (!fd)
     {
-        printf("Error during the operning of the file %s...\n  ", filename);
+        printf("Error during the opening of the file %s...\n  ", filename);
         return -1;
     }
     for (i = 0; i < nchunk; i++)
@@ -1647,7 +1679,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         {
             printf("Wrong upload chunk hash\n\n");
             free_3(bufferSupp1, bufferSupp2, iv);
-            return -1;
+            return 1;
         }
         *nonce += 1;
 
@@ -1886,7 +1918,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     if (ret == -1)
     {
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        printf("I'm having some problem moving into info directory...\n");
+        printf("I'm having some problem moving into info directory... Need to close the connection\n");
         return -1;
     }
 
@@ -1897,7 +1929,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     if (ret == -1)
     {
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
-        printf("I'm having some problem moving into username directory... Need to create another connection\n");
+        printf("I'm having some problem moving into username directory... Need to close the connection\n");
         return -1;
     }
     if (!f1) 

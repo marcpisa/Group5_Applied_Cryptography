@@ -4,6 +4,33 @@
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
 static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
+int remove_info_file(char* username)
+{
+    int ret;
+    char filename[MAX_LEN_FILENAME+4];
+
+    memset(filename, 0, MAX_LEN_FILENAME+4);
+    memcpy(filename, username, strlen(username));
+    memcpy(filename+strlen(username), ".txt\0", 5);
+    ret = chdir("../info");
+    if (ret == -1)
+    {
+        printf("Error changing directory to info...\n");
+        return -1;
+    }
+    ret = remove(filename);
+    if (ret == -1)
+    {
+        printf("Problem during the remotion of %s\n", filename);
+        chdir("..");
+        chdir(username);
+        return -1;
+    }
+    chdir("..");
+    chdir(username);
+    return 1;
+}
+
 int username_sanitization(const char* username) {
     if(strspn(username, allowed_chars) < strlen(username)) return 0;
     return 1;

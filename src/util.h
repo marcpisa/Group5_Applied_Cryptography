@@ -100,6 +100,7 @@
 
 #define DELIM ' '
 
+int remove_info_file(char* username);
 int username_sanitization(const char *username);
 int input_sanitization_commands(const char *input);
 void rec_buffer_sanitization(char *received_buff, char *buff1[]);

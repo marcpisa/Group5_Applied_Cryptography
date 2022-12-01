@@ -443,14 +443,14 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             ret = check_reqden_msg(LIST_DENIED, buffer, *nonce, session_key1, session_key2);
             free_2(bufferSupp1, buffer);
             
-            if (ret == -1) printf("Error checking list denied message.\n");
+            if (ret == -1) printf("Hash of the message not correct.\n");
             else 
             {
                 printf("List denied.\n"); 
                 *nonce += 1;
             }
 
-            return -1;
+            return 1;
         }
 
         free(bufferSupp1);
@@ -506,16 +506,16 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         if (ret != 0)
         {
             operation_denied(sock, "Wrong hash", LIST_DENIED, session_key1, session_key2, nonce);
-
+            printf("MAC received is not correct\n");
             free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
-            return -1;
+            return 1;
         }
         else if (num_file < 0 || num_file >= CHUNK_SIZE)
         {
             operation_denied(sock, "Incorrect num_file", LIST_DENIED, session_key1, session_key2, nonce);
-
+            printf("Number of the file is too high...\n");
             free_6(buffer, digest, bufferSupp1, bufferSupp2, iv, msg_to_hash);
-            return -1;
+            return 1;
         }
         *nonce += 1;
 
@@ -614,12 +614,12 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     if (strcmp(filename,"")==0)
     {
         printf("Filename is missing. Retry...\n\n");
-        return -1;
+        return 1;
     }
     if (strcmp(new_filename,"")==0)
     {
         printf("New filename is missing. Retry...\n\n");
-        return -1;
+        return 1;
     }
 
     // Generate the IV
@@ -671,7 +671,8 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
     free_2(temp2, iv);
     
-    if (ret == -1) {
+    if (ret == -1) 
+    {
         printf("Send failed.\n");
         return -1;
     }
@@ -1027,7 +1028,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         if (ret != 0)
         {
             printf("Wrong download accepted hash\n\n");
-            return -1;
+            return 1;
         } 
         else 
         {
@@ -1040,7 +1041,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         //We don't know what we received
         printf("We received an uncorrect message from the server...\n\n");
         free_2(bufferSupp1, buffer);
-        return -1;
+        return 1;
     }
 
 
@@ -1099,7 +1100,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         {
             printf("Wrong download chunk hash\n\n");
             free_3(bufferSupp1, bufferSupp2, iv);
-            return -1;
+            return 1;
         }
 
         *nonce += 1;
@@ -1164,7 +1165,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     if (strcmp(filename, "")==0)
     {
         printf("The filename is missing...\n\n");
-        return -1;
+        return 1;
     }
 
     // Initialization of IV
@@ -1194,9 +1195,9 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     // If FIle larger than 4GB refuse upload 
     if(st.st_size > 4294967296) 
     {
-        printf("File is more than 4 Gigabyte"); 
+        printf("File is more than 4 Gigabyte... Retry with other files"); 
         free(iv);
-        return -1; 
+        return 1; 
     }
 
     //M1: Send message to request the upload. Message format: 
@@ -1311,8 +1312,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         free(msg_to_hash);
         if (ret != 0)
         {
-            printf("Wrong download chunk hash\n\n");
-            return -1;
+            printf("Wrong download chunk hash\n");
+            return 1;
         }
         *nonce += 1;
 
@@ -1418,7 +1419,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         {
             printf("Check download_finished gone bad.\n\n");
             free(buffer);
-            return -1;
+            return 1;
         }
 
         free(buffer);
@@ -1430,9 +1431,9 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     else
     {
         printf("We don't know what the server responded...\n");
-        return -1;
+        return 1;
     }
-    return -1;    
+    return 1;    
 }
 
 int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2)
@@ -1641,7 +1642,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         {
             free(bufferSupp1);
             printf("Encryption length too high.\n");
-            return -1;
+            return 1;
         }
 
         // HERE WE TAKE THE ENCRYPTED MESSAGE
@@ -1681,7 +1682,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         {
             printf("Wrong share_permission hash\n\n");
             free_2(encr_msg, iv);
-            return -1;
+            return 1;
         } 
         else 
         {
