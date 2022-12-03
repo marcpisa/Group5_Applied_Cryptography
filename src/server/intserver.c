@@ -415,7 +415,7 @@ int loginServer(int sd, char* rec_mex)
     // FUNCTIONAL PART
     // Now that we have the cryptographic elements to have a secure communication with the client we are able to receive function messages
     // Here we are at database/username/
-    printf("Login Request Managed. Client connected!\n\n");
+    printf("Login Request Managed. Client connected!\n");
     
 
     //printf("Now the buffer contains %s\n\n", funcBuff);
@@ -450,7 +450,7 @@ int loginServer(int sd, char* rec_mex)
             if (ret == -1) printf("Something bad happened during the management of the client logout request...\n\n");
             else
             {
-                printf("End of logout request management!\n\n");
+                printf("End of logout request management!\n");
                 ret = remove_info_file(username);
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
@@ -472,7 +472,7 @@ int loginServer(int sd, char* rec_mex)
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
-            else printf("End of list request management!\n\n");
+            else printf("End of list request management!\n");
         }
 
 
@@ -490,7 +490,7 @@ int loginServer(int sd, char* rec_mex)
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
-            else printf("End of rename request management!\n\n");
+            else printf("End of rename request management!\n");
         }
 
 
@@ -507,7 +507,7 @@ int loginServer(int sd, char* rec_mex)
                 ret = remove_info_file(username);
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
-            } else printf("End of delete request management!\n\n");
+            } else printf("End of delete request management!\n");
         }
 
         
@@ -526,7 +526,7 @@ int loginServer(int sd, char* rec_mex)
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             } 
-            else printf("End of download request management!\n\n");
+            else printf("End of download request management!\n");
         }
 
 
@@ -562,7 +562,7 @@ int loginServer(int sd, char* rec_mex)
                 if (ret == -1) printf("Problems removing the info file of the user\n\n");
                 break;
             }
-            else printf("End of share request management!\n\n"); 
+            else printf("End of share request management!\n"); 
         }
 
         else printf("Unknown type of request by the Client...\n");  
