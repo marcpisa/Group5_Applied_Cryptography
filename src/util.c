@@ -4,32 +4,50 @@
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
 static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
-int remove_info_file(char* username)
-{
-    int ret;
-    char filename[MAX_LEN_FILENAME+4];
 
-    memset(filename, 0, MAX_LEN_FILENAME+4);
-    memcpy(filename, username, strlen(username));
-    memcpy(filename+strlen(username), ".txt\0", 5);
-    ret = chdir("../info");
-    if (ret == -1)
+
+
+void from_B_to_H(char** dimension, char* bytes)
+{
+    long int num;
+    char inte[LEN_SIZE+1];
+    char dec[LEN_SIZE+1];
+
+
+    sscanf(bytes, "%ld", &num);
+    *dimension = (char*) malloc((LEN_SIZE+3)*sizeof(char));
+    if (!bytes) exit_with_failure("Malloc dimension failed", 1);
+    if (num/KILO == 0)
     {
-        printf("Error changing directory to info...\n");
-        return -1;
+        sprintf(*dimension, "%ldB", num);
+        memcpy(*dimension+LEN_SIZE, "\0", 1);
     }
-    ret = remove(filename);
-    if (ret == -1)
+    else if (num/MEGA == 0)
     {
-        printf("Problem during the remotion of %s\n", filename);
-        chdir("..");
-        chdir(username);
-        return -1;
+        sprintf(inte, "%li", num/KILO);
+        sprintf(dec, "%li", num%KILO);
+        memcpy(dec+1, "\0", 1);
+        sprintf(*dimension,"%s.%sKB", inte, dec);
+        memcpy(*dimension+LEN_SIZE, "\0", 1);
     }
-    chdir("..");
-    chdir(username);
-    return 1;
+    else if (num/GIGA == 0)
+    {
+        sprintf(inte, "%li", num/MEGA);
+        sprintf(dec, "%li", num%MEGA);
+        memcpy(dec+1, "\0", 1);
+        sprintf(*dimension,"%s.%sMB", inte, dec);
+        memcpy(*dimension+LEN_SIZE, "\0", 1);
+    }
+    else
+    {
+        sprintf(inte, "%li", num/GIGA);
+        sprintf(dec, "%li", num%GIGA);
+        memcpy(dec+1, "\0", 1);
+        sprintf(*dimension,"%s.%sGB", inte, dec);
+        memcpy(*dimension+LEN_SIZE, "\0", 1);
+    }
 }
+
 
 int username_sanitization(const char* username) {
     if(strspn(username, allowed_chars) < strlen(username)) return 0;
@@ -45,7 +63,8 @@ int input_sanitization_commands(const char* input) {
     return 0;
 }
 
-void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
+void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) 
+{
     int i;
     i = 0;
     char *token;
@@ -55,12 +74,6 @@ void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) {
         token = strtok(NULL, " ");
         i++;
     }
-
-    //for(j = 1; j < i; j++) {
-        
-    //}
-
-    //SANIFICATION: username it is checked in the if block server side.
 }
 
 int filename_sanitization(const char* file_name) {

@@ -190,14 +190,16 @@ int main(int argc, char* argv[])
                             } 
                             else 
                             {
-                                printf("Login succedded.\n\n");
-                                connected = 1;
-
                                 if (chdir(MAIN_FOLDER_CLIENT) == -1)
                                 {
                                     printf("Main folder of the client unaccessible...\n\n");
                                     exit_flag = 1;
                                 }
+                                reset_nonce_sc(username);
+                                printf("Login succedded.\n\n");
+                                connected = 1;
+
+                                
                             }
                             
                         
@@ -219,6 +221,7 @@ int main(int argc, char* argv[])
                                 connected = 0;
                                 nonce_cs = 0;
                                 nonce_sc = 0;
+                                delete_nonce_sc(username);
 
                                 if (session_key1 != NULL && session_key2 != NULL) 
                                 {
@@ -410,7 +413,7 @@ int main(int argc, char* argv[])
                             printf("\n"); 
                             break; 
 
-                        case 10:
+                        case 10: //********** EXIT ***********//
                                 if(connected == 1)
                                 {
                                     ret = logoutClient(connectedSock, &nonce_cs, session_key2);
@@ -421,6 +424,8 @@ int main(int argc, char* argv[])
                                         connected = 0;
                                     }
                                     else printf("Logout failed.\n\n");
+
+                                    delete_nonce_sc(username);
 
                                     if (session_key1 != NULL && session_key2 != NULL) 
                                     {
@@ -446,6 +451,7 @@ int main(int argc, char* argv[])
                     ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret == -1)
                     {
+                        delete_nonce_sc(username);
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
@@ -458,9 +464,10 @@ int main(int argc, char* argv[])
                     }
                     if (pid == 0)
                     {
+                        nonce_sc = take_nonce_sc(username);
                         close(listenerTCP);
                         //We are in the son part of code
-                        ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2);
+                        ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2, username);
                         if (ret == -1)
                         {
                             printf("Error during received share request!\n\n");
@@ -476,7 +483,7 @@ int main(int argc, char* argv[])
             }
         }
     }
-
+    delete_nonce_sc(username);
     close(listenerTCP);
     X509_STORE_free(ca_store);
     

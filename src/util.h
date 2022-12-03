@@ -52,6 +52,10 @@
 #define MAIN_FOLDER_CLIENT "../../download/"
 #define INFO_FOLDER_SERVER "../../database/info/"
 
+#define KILO 1024
+#define MEGA 1048576
+#define GIGA 1073741824
+
 #define LOGIN "login"
 #define LOGOUT "logout"
 #define RENAME "rename"
@@ -100,7 +104,7 @@
 
 #define DELIM ' '
 
-int remove_info_file(char* username);
+void from_B_to_H(char** dimension, char* bytes);
 int username_sanitization(const char *username);
 int input_sanitization_commands(const char *input);
 void rec_buffer_sanitization(char *received_buff, char *buff1[]);

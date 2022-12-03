@@ -21,7 +21,6 @@ int createSocket()
 int loginServer(int sd, char* rec_mex)
 {
     unsigned int nonce_cs = 0;
-    unsigned int nonce_sc = 0;
     
     unsigned char* buffer;
     unsigned char* msg_to_sign;
@@ -70,6 +69,7 @@ int loginServer(int sd, char* rec_mex)
     unsigned char* digest;
     unsigned int plain_len;
 
+    char nonce_buff[BUF_LEN+1];
     char username[MAX_LEN_USERNAME+1];
     char path_cert_client_rsa[5+MAX_LEN_USERNAME+4+1];
     unsigned char pk_buff[DH_PUBKEY_SIZE];
@@ -383,6 +383,14 @@ int loginServer(int sd, char* rec_mex)
         free_n(3, path_temp, session_key1, session_key2);
         return -1; 
     }
+    memset(nonce_buff, 0, LEN_SIZE);
+    sprintf(nonce_buff, "0");
+    ret = fwrite(nonce_buff, sizeof(char), LEN_SIZE, fd_1);
+    if (ret == -1)
+    {
+        printf("Fwrite failed.\n");
+        free_n(3, path_temp, session_key1, session_key2);
+    }
 
     free(path_temp);
     fclose(fd_1);
@@ -546,7 +554,7 @@ int loginServer(int sd, char* rec_mex)
             printf("\nA share request has came up...\n\n");
             // SHARE MANAGER: SERVER SIDE
 
-            ret = shareServer(sd, funcBuff, username, &nonce_cs, &nonce_sc, session_key1, session_key2);            
+            ret = shareServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);            
             if (ret == -1)
             {
                 printf("Something bad happened during the management of the client share request...\n\n");
@@ -1243,7 +1251,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         printf("The length of the filename is too big, download management terminated...\n\n");
         return 1;
     }
-    // HERE WE SHOULD SANITIZE THE FILENAME
+    
     memset(filename, 0, MAX_LEN_FILENAME);
     memcpy(filename, plaintext, plain_len); 
     if (strcmp(filename, "")==0)
@@ -1251,6 +1259,14 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         free_3(encr_msg, iv, plaintext);
         printf("The filename is missing\n");
         operation_denied(sock, "The filename is missing", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
+    ret = filename_sanitization (filename);
+    if (ret == 0) 
+    {
+        printf("The sanitization of the filename is gone bad\n");
+        operation_denied(sock, "Filename sanitization failed", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
+        free_3(encr_msg, iv, plaintext);
         return 1;
     }
 
@@ -1549,12 +1565,20 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         printf("The length of the filename is too big, download management terminated...\n\n");
         return 1;
     }
-    // HERE WE SHOULD SANITIZE THE FILENAME
+    
     memset(filename, 0, MAX_LEN_FILENAME);
     memcpy(filename, plaintext, plain_len); 
 
     free_6(bufferSupp1, bufferSupp2, msg_to_hash, encr_msg, plaintext, iv);
     free_3(buffer, digest, bufferSupp3);
+
+    ret = filename_sanitization (filename);
+    if (ret == 0) 
+    {
+        printf("The sanitization of the filename is gone bad\n");
+        operation_denied(sock, "Filename sanitization failed", UPLOAD_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
 
     //CHECK OF FILE NAME ALREADY EXISTS 
     ret = chdir("documents");
@@ -1712,12 +1736,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     return 1;
 }
 
-int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
+int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     int sd_peer;
     int msg_len;
     int ch, j;
+
+    unsigned int nonce_sc;
 
     unsigned int len_fn;
     unsigned int len_pn;
@@ -1745,70 +1771,15 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     unsigned char peer_session_key1[16];
     unsigned char peer_session_key2[16];
+    unsigned char nonce_sc_buffer[LEN_SIZE+1];
 
     FILE* f1;
     FILE* src_fd;
+    struct stat st;
 
     struct sockaddr_in rcv_addr;
     int rcv_port;
 
-    /*memcpy(rec_mex+BUF_LEN-1, "\0", 1);
-    printf("%s%s\n", rec_mex, rec_mex+strlen(SHARE_REQUEST)+LEN_SIZE+1);*/
-    
-    /* ---- Parse file received ---- */
-    // receive, share_req encr_len encr(filename peername) hash(share_req encr iv nonce_cs) iv
-    // SHARE REQUEST ALREADY PARSED
-    /*temp = (char*) malloc(LEN_SIZE*sizeof(char)); //encr_len
-    if (!temp) exit_with_failure("Malloc temp failed", 1);
-    iv = (unsigned char*) malloc(IV_LEN*sizeof(unsigned char)); //iv
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    bufferSupp2 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char)); //hmac
-    if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-
-    // PARSE ENCRYPTION LENGTH
-    memcpy(temp, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE), LEN_SIZE);
-    encr_len = atoi(temp);
-    if (encr_len < 0 || encr_len > (4*16)) //16 is the dimension of a AES block, 4 the max number of blocks in this case
-    {
-        free_3(temp, iv, bufferSupp2);
-        printf("Encryption length too high.\n");
-        return -1;
-    }
-
-    // PARSE ENCRYPTED MESSAGE : SHARE_REQUEST, encr_len, ciphertext, HMAC, IV
-    bufferSupp1 = (unsigned char*) malloc(encr_len*sizeof(unsigned char)); //ciphertext
-    if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
-    memcpy(bufferSupp1, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), encr_len);
-
-    // PARSE IV
-    memcpy(iv, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
-
-    // PARSE HASH AND CHECK IT
-    memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
-
-    sprintf(temp, "%u", *nonce_cs);
-    //MAC: SHARE_REQUEST, ciphertext, IV, nonce
-    msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_REQUEST, strlen(SHARE_REQUEST), \
-                                                bufferSupp1, encr_len, \
-                                                iv, IV_LEN, \
-                                                temp, LEN_SIZE);
-
-    digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
-
-    ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
-        
-    free_4(bufferSupp2, temp, msg_to_hash, digest);
-    if (ret != 0)
-    {
-        printf("Wrong share_request hash.\n");
-        free_2(bufferSupp1, iv);
-        return -1;
-    } 
-    else 
-    {
-        printf("Hash is correct.\n");
-        *nonce_cs = *nonce_cs + 1;
-    }*/
 
     bufferSupp1 = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -1886,22 +1857,51 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         free_2(bufferSupp1, bufferSupp2);
         printf("I'm having some problem moving into documents...\n");
+        // Send denied message to left party
+        operation_denied(sd, "Problem accessing directories... Need a new connection", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         return -1;
     }
 
     // TRY TO OPEN PEERNAME'S FILE TO SHARE
     printf("The file to share is %s\n\n", bufferSupp1);
     printf("The peer to share with is %s\n", bufferSupp2);
+
+    ret = username_sanitization((char*)bufferSupp2);
+    if (ret == 0)
+    {
+        printf("Peername not accepted after username sanitization... Exiting from the request\n");
+        chdir("..");
+        // Send denied message to left party
+        operation_denied(sd, "Peername not accepted after sanitization", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        free_2(bufferSupp1, bufferSupp2);
+        return 1;
+    }
+    ret = filename_sanitization((char*)bufferSupp1);
+    if (ret == 0)
+    {
+        printf("Filename not accepted after filename sanitization... Exiting from the request\n");
+        chdir("..");
+        // Send denied message to left party
+        operation_denied(sd, "Filename not accepted after sanitization", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        free_2(bufferSupp1, bufferSupp2);
+        return 1;
+    }
+
     f1 = fopen((char*) bufferSupp1, "r");
     if (!f1)
     {
         printf("The sharer doesn't have any file called %s\n", bufferSupp1);
+        chdir("..");
         // Send denied message to left party
         operation_denied(sd, "No such file", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         free_2(bufferSupp1, bufferSupp2);
         return 1;
     }
     fclose(f1);
+
+    stat((char*)bufferSupp1, &st);
+    chdir("..");
+    printf("The size of the file is %ld\n", st.st_size);
 
 
     // We should ask to the receiver whether it wants to allow the share operation
@@ -1914,7 +1914,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    ret = chdir("../../info");
+    ret = chdir("../info");
     if (ret == -1)
     {
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
@@ -1974,7 +1974,20 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
         *(peer_session_key2+j) = ch;
     }
+    memset(nonce_sc_buffer, 0, LEN_SIZE+1);
+    for (j = 0; j < LEN_SIZE+1; j++) //nonce sc bytes
+    {
+        if ((ch = getc(f1)) == EOF)
+        {
+            *(nonce_sc_buffer+j) = '\0';
+            printf("File over!");
+            break;
+        }
 
+        *(nonce_sc_buffer+j) = ch;
+    }
+    sscanf((char*)nonce_sc_buffer, "%u", &nonce_sc);
+    printf("The nonce now is %u\n", nonce_sc); 
     fclose(f1);
 
     //We should go on the directory of the peer
@@ -1989,7 +2002,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     {
         printf("The peer already has a file called %s... Share denied\n\n", bufferSupp1);
         free_4(temp, path_temp, bufferSupp1, bufferSupp2);
-        operation_denied(sd, "Peer doesn't exists", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+        operation_denied(sd, "Peer already have a file with this name", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         return 1;
     }
 
@@ -2024,17 +2037,25 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
     ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
 
+    //Here we put the length of the file
+    bufferSupp3 = (unsigned char*) malloc((LEN_SIZE+1)*sizeof(unsigned char));
+    if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
+    sprintf((char*)bufferSupp3, "%ld", st.st_size);
+    printf("Now in bufferSupp3 there is: %s\n", bufferSupp3);
+    
     // CREATE ENCRYPTED MESSAGE // filename, peername
-    msg_to_encr_len = build_msg_2(&msg_to_encr, bufferSupp1, len_fn,\
-                                                bufferSupp2, len_pn+1);
+    msg_to_encr_len = build_msg_3(&msg_to_encr, bufferSupp1, len_fn,\
+                                                bufferSupp2, len_pn,\
+                                                bufferSupp3, LEN_SIZE+1);
     if (msg_to_encr_len == -1) exit_with_failure("Something bad happened building the message to encrypt...", 0);
+    free(bufferSupp3);
 
     encrypt_AES_128_CBC(&encr_msg, &encr_len, msg_to_encr, msg_to_encr_len, iv, peer_session_key1);
 
     // CREATE THE HASH
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
-    sprintf(temp, "%u", *nonce_sc);
+    sprintf(temp, "%u", nonce_sc);
     msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
                                                 encr_msg, encr_len,\
                                                 iv, IV_LEN,\
@@ -2069,7 +2090,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     else 
     {
         printf("Sent share permission to peer.\n");
-        *nonce_sc = *nonce_sc + 1;
+        nonce_sc = nonce_sc + 1;
     }
 
 
@@ -2099,7 +2120,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     if (strcmp((char*) bufferSupp3, SHARE_DENIED) == 0)
     {
-        ret = check_reqden_msg(SHARE_DENIED, buffer, *nonce_sc, peer_session_key1, peer_session_key2);
+        ret = check_reqden_msg(SHARE_DENIED, buffer, nonce_sc, peer_session_key1, peer_session_key2);
         if (ret == -1) 
         {
             printf("Error checking share denied message.\n");
@@ -2109,17 +2130,17 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         else 
         {
             printf("Share has been denied.\n");
-            *nonce_sc += 1;
+            nonce_sc += 1;
             operation_denied(sd, "Share has been denied", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             ret = 1;
         }
-        
+        if (!save_info_file(username, bufferSupp2, rcv_port, peer_session_key1, peer_session_key2, nonce_sc)) ret = -1;
         free_4(buffer, bufferSupp1, bufferSupp2, bufferSupp3);
         return ret;
     }
     else if (strcmp((char*) bufferSupp3, SHARE_ACCEPTED) == 0)
     {
-        ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce_sc, peer_session_key2);
+        ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, nonce_sc, peer_session_key2);
         if (ret == -1) 
         {
             printf("Error checking share accepted message.\n");
@@ -2127,7 +2148,14 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
             return 1;
         }
         printf("The share request has been accepted!\n\n");
-        *nonce_sc += 1;
+        nonce_sc += 1;
+        if (!save_info_file(username, bufferSupp2, rcv_port, peer_session_key1, peer_session_key2, nonce_sc))
+        {
+            printf("Error saving the info file of %s... We should deny the request\n", bufferSupp2);
+            operation_denied(sd, "Error saving info file", SHARE_DENIED, session_key1, session_key2, nonce_cs);
+            free_4(buffer, bufferSupp1, bufferSupp2, bufferSupp3);
+            return -1;
+        }
     }
     else
     {
@@ -2154,6 +2182,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     chdir("documents");
     src_fd = fopen((char*)bufferSupp1, "r");
     f1 = fopen(path_temp, "w");
+    chdir("..");
     if (!src_fd || !f1) 
     {
         free_3(path_temp, bufferSupp1, bufferSupp2);
@@ -2196,5 +2225,87 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     // Send outcome to left party
     operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_cs);
 
+    return 1;
+}
+
+
+int save_info_file(char* old_username, unsigned char* username, int port, unsigned char* session_key1, unsigned char* session_key2, unsigned int nonce_sc)
+{
+    FILE* f1;
+    char buffer[BUF_LEN];
+    char port_buffer[PORT_SIZE];
+    char nonce_sc_buffer[LEN_SIZE+1];
+
+    sprintf(port_buffer, "%d", port);
+    sprintf(nonce_sc_buffer, "%u", nonce_sc);
+    if (chdir("../info") == -1)
+    {
+        printf("Error moving to the info directory... Need to close the connection\n");
+        return 0;
+    }
+
+    sprintf(buffer, "%s.txt", (char*)username);
+    memcpy(buffer+strlen((char*)username)+4, "\0", 1);
+    f1 = fopen(buffer, "w");
+    chdir("..");
+    chdir(old_username);
+    if (!f1)
+    {
+        printf("Error during the opening in write mode of a file... Need to close the connection\n");
+        return 0;
+    }
+    
+    if (!fwrite(port_buffer, sizeof(char), PORT_SIZE, f1))
+    {
+        printf("Error during the wirting of the file... Need to close the connection\n");
+        fclose(f1);
+        return 0;
+    }
+    if (!fwrite(session_key1, sizeof(unsigned char), 16, f1))
+    {
+        printf("Error during the wirting of the file... Need to close the connection\n");
+        fclose(f1);
+        return 0;
+    }
+    if (!fwrite(session_key2, sizeof(unsigned char), 16, f1))
+    {
+        printf("Error during the wirting of the file... Need to close the connection\n");
+        fclose(f1);
+        return 0;
+    }
+    if (!fwrite(nonce_sc_buffer, sizeof(char), LEN_SIZE+1, f1))
+    {
+        printf("Error during the wirting of the file... Need to close the connection\n");
+        fclose(f1);
+        return 0;
+    } 
+    fclose(f1);
+    return 1;
+}
+
+int remove_info_file(char* username)
+{
+    int ret;
+    char filename[MAX_LEN_FILENAME+4];
+
+    memset(filename, 0, MAX_LEN_FILENAME+4);
+    memcpy(filename, username, strlen(username));
+    memcpy(filename+strlen(username), ".txt\0", 5);
+    ret = chdir("../info");
+    if (ret == -1)
+    {
+        printf("Error changing directory to info...\n");
+        return -1;
+    }
+    ret = remove(filename);
+    if (ret == -1)
+    {
+        printf("Problem during the remotion of %s\n", filename);
+        chdir("..");
+        chdir(username);
+        return -1;
+    }
+    chdir("..");
+    chdir(username);
     return 1;
 }

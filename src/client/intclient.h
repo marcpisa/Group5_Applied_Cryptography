@@ -11,4 +11,8 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
 int downloadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce);
 int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned char* session_key2, unsigned int* nonce);
 int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2);
-int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2);
+int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2, char* username);
+void reset_nonce_sc(char* username);
+int take_nonce_sc(char* username);
+int save_nonce_sc(char* username, unsigned int nonce_sc);
+int delete_nonce_sc(char* username);

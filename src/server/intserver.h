@@ -18,4 +18,6 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2);
 int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2);
 int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* session_key1, unsigned char* session_key2);
-int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2);
+int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, unsigned char* session_key1, unsigned char* session_key2);
+int save_info_file(char* old_username, unsigned char* username, int port, unsigned char* session_key1, unsigned char* session_key2, unsigned int nonce_sc);
+int remove_info_file(char* username);
