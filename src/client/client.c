@@ -486,8 +486,6 @@ int main(int argc, char* argv[])
     delete_nonce_sc(username);
     close(listenerTCP);
     X509_STORE_free(ca_store);
-
-    //test
     
     return 0;
 }
