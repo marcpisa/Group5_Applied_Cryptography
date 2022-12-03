@@ -112,7 +112,7 @@ int main()
                     new_sd = accept(listenerTCP, (struct sockaddr*)&cl_addr, &addrlen);
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
-                    printf("We received and accepted a client connection request.");
+                    printf("\n\nWe received and accepted a client connection request.");
                 }
                 else if (i == fileno(stdin))
                 {
