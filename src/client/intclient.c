@@ -399,7 +399,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
                                    iv, IV_LEN);
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-    printf("Sending List Request to Server.\n\n");
+    //printf("Sending List Request to Server.\n\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
 
     free_5(temp, buffer, msg_to_hash, digest, iv);
@@ -666,7 +666,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     if (msg_len == -1) exit_with_failure("Error during the building of a message", 1);
 
 
-    printf("Sending rename request to the server.\n");
+    //printf("Sending rename request to the server.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
@@ -794,7 +794,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
                                    iv, IV_LEN);
     if(msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-    printf("Sending delete request to the server.\n");
+    //printf("Sending delete request to the server.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, encr_msg, iv);
@@ -1424,7 +1424,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         }
 
         free(buffer);
-        printf("Upload successful!!\n\n");
+        printf("Upload successful!\n\n");
         *nonce += 1;
 
         return 1;
@@ -1524,7 +1524,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
         printf("Receive failed.\n");
         return -1;
     }
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
     
 
     bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_DENIED)+1)*sizeof(unsigned char));

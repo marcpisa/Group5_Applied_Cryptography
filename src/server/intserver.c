@@ -157,7 +157,7 @@ int loginServer(int sd, char* rec_mex)
     strcat(path_cert_client_rsa, ".pem");
     pub_rsa_client = get_client_pubkey(path_cert_client_rsa);
     
-    printf("#1 Login request message is correct.\n");
+    //printf("#1 Login request message is correct.\n");
     
     EVP_PKEY_free(my_prvkey);
     EVP_PKEY_free(peer_pubkey);
@@ -225,7 +225,7 @@ int loginServer(int sd, char* rec_mex)
         printf("Send failed.\n");
         return -1;
     } 
-    else printf("#2 Message sent to client.\n");
+    //else printf("#2 Message sent to client.\n");
 
 
 
@@ -242,7 +242,7 @@ int loginServer(int sd, char* rec_mex)
         printf("Receive failed.\n");
         return -1;
     } 
-    else printf("#3 Response received.\n");
+    //else printf("#3 Response received.\n");
  
     // Parse signature
     memset(sgn_buff, 0, SIGN_LEN);
@@ -279,7 +279,7 @@ int loginServer(int sd, char* rec_mex)
         printf("Receive failed...\n");
         return -1;
     }
-    else printf("#4 Port received by the client.\n");
+    //else printf("#4 Port received by the client.\n");
 
 
     // Parse the message
@@ -415,7 +415,7 @@ int loginServer(int sd, char* rec_mex)
     // FUNCTIONAL PART
     // Now that we have the cryptographic elements to have a secure communication with the client we are able to receive function messages
     // Here we are at database/username/
-    printf("I managed a login request and all was good!\n\n");
+    printf("Login Request Managed. Client connected!\n\n");
     
 
     //printf("Now the buffer contains %s\n\n", funcBuff);
@@ -436,14 +436,14 @@ int loginServer(int sd, char* rec_mex)
         // ************ LOGIN REQUEST MANAGER ***********
         if (strcmp(funcSupp1, LOGIN_REQUEST) == 0)
         {
-            printf("\nWe received a login request but this client is already logged... Something bad happened...\n\n");
+            printf("\nLogin request received, but client already logged in. Something bad happened...\n\n");
         }
 
 
         //************ LOGOUT REQUEST MANAGER ************
         else if (strcmp(funcSupp1, LOGOUT_REQUEST) == 0)
         {
-            printf("\nA logout request has came up...\n\n");
+            printf("\nA logout request has come up...\n\n");
             // LOGOUT MANAGER: SERVER SIDE
                             
             ret = logoutServer(funcBuff, &nonce_cs, session_key2);
@@ -461,7 +461,7 @@ int loginServer(int sd, char* rec_mex)
         // ************* LIST REQUEST MANAGER ***************
         else if (strcmp(funcSupp1, LIST_REQUEST) == 0)
         {
-            printf("\nA list request has came up...\n\n");
+            printf("\nA list request has came up...\n");
             // LIST MANAGER: SERVER SIDE
         
             ret = listServer(sd, funcBuff, path_documents, &nonce_cs, session_key1, session_key2);
@@ -479,7 +479,7 @@ int loginServer(int sd, char* rec_mex)
         //*************** RENAME REQUEST MANAGER *****************
         else if (strcmp(funcSupp1, RENAME_REQUEST) == 0)
         {
-            printf("\nA rename request has came up...\n\n");
+            printf("\nA rename request has came up...\n");
             // RENAME MANAGER: SERVER SIDE
                             
             ret = renameServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
@@ -497,7 +497,7 @@ int loginServer(int sd, char* rec_mex)
         // **************** DELETE REQUEST MANAGER ******************
         else if (strcmp(funcSupp1, DELETE_REQUEST) == 0)
         {
-            printf("\nA delete request has came up...\n\n");
+            printf("\nA delete request has came up...\n");
             // DELETE MANAGER: SERVER SIDE
                             
             ret = deleteServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
@@ -694,7 +694,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
         return 1;
     }
 
-    printf("List request message parsed successfully\n");
+    //printf("List request message parsed successfully\n");
     *nonce += 1;
 
 
@@ -958,7 +958,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     if (!filename) exit_with_failure("Malloc filename failed", 0);
     memcpy(filename, plaintext, len_fn);
     *(filename+len_fn) = '\0';
-    printf("The filename we should change is %s\n", filename);
+    //printf("The filename we should change is %s\n", filename);
 
     // New_filename
     old_offset = offset + BLANK_SPACE;
@@ -983,7 +983,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         free_3(plaintext, filename, new_filename);
         return 1;
     }
-    printf("The new filename should be %s\n", new_filename);
+    printf("File %s changed to new filename %s\n", filename, new_filename);
                    
     ret = filename_sanitization (filename);
     ret += filename_sanitization (new_filename);
@@ -1139,7 +1139,7 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         free_2(plaintext, filename);
         return 1;
     }
-    else printf("Delete operation accomplished...\n\n");
+    else printf("Delete operation accomplished. File %s deleted.\n", filename);
     ret = chdir("../");
     if (ret == -1) 
     {
@@ -1290,8 +1290,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
-    printf("The number of chunk is %i\n", nchunk);
-    printf("The number of rest is %i\n", rest);
+    //printf("The number of chunk is %i\n", nchunk);
+    //printf("The number of rest is %i\n", rest);
 
 
 
@@ -1346,7 +1346,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     free(iv);
     
 
-
+    printf("Sending chunks.\n");
 
     /* ---- Send chunks ---- */
     //NOW WE START TO SEND THE CHUNKS
@@ -1422,7 +1422,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
         }
         *nonce += 1;
            
-        printf("We are sending the chunk number %i\n", i);
+        //printf("We are sending the chunk number %i\n", i);
 
 
 
@@ -1463,7 +1463,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     }
 
     free(buffer);
-    printf("We have completed successfully the donwload operation!\n\n");
+    printf("Download operation completed!\n\n");
     *nonce += 1;
 
     return 1;
@@ -1713,7 +1713,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         fwrite(plaintext, sizeof(unsigned char), plain_len, fd);
         
         free_4(bufferSupp1, bufferSupp2, iv, plaintext);
-        printf("We received correctly the chunk number %i\n", i);
+        //printf("We received correctly the chunk number %i\n", i);
 
         buffer = (unsigned char*)malloc(BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
@@ -1863,8 +1863,8 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     }
 
     // TRY TO OPEN PEERNAME'S FILE TO SHARE
-    printf("The file to share is %s\n\n", bufferSupp1);
-    printf("The peer to share with is %s\n", bufferSupp2);
+    printf("The file to share is %s and the peer to share with is %s.\n", bufferSupp1, bufferSupp2);
+    //printf("The peer to share with is %s\n", bufferSupp2);
 
     ret = username_sanitization((char*)bufferSupp2);
     if (ret == 0)
@@ -1901,7 +1901,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
 
     stat((char*)bufferSupp1, &st);
     chdir("..");
-    printf("The size of the file is %ld\n", st.st_size);
+    //printf("The size of the file is %ld\n", st.st_size);
 
 
     // We should ask to the receiver whether it wants to allow the share operation
@@ -1987,7 +1987,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
         *(nonce_sc_buffer+j) = ch;
     }
     sscanf((char*)nonce_sc_buffer, "%u", &nonce_sc);
-    printf("The nonce now is %u\n", nonce_sc); 
+    //printf("The nonce now is %u\n", nonce_sc); 
     fclose(f1);
 
     //We should go on the directory of the peer
@@ -2041,7 +2041,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     bufferSupp3 = (unsigned char*) malloc((LEN_SIZE+1)*sizeof(unsigned char));
     if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
     sprintf((char*)bufferSupp3, "%ld", st.st_size);
-    printf("Now in bufferSupp3 there is: %s\n", bufferSupp3);
+    //printf("Now in bufferSupp3 there is: %s\n", bufferSupp3);
     
     // CREATE ENCRYPTED MESSAGE // filename, peername
     msg_to_encr_len = build_msg_3(&msg_to_encr, bufferSupp1, len_fn,\
