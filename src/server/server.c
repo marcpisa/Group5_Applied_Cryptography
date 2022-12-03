@@ -160,7 +160,7 @@ int main()
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA login request has came up...\n\n");
+                            printf("\nA login request has come up.\n\n");
                             // LOGIN MANAGER: SERVER SIDE
 
                             ret = loginServer(i, received_buffer);

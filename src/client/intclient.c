@@ -116,7 +116,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Send failed.\n");
         return -1;
     } 
-    else printf("#1 Login request sent to server.\n");    
+    else printf("Login request sent to server.\n");    
 
 
 
@@ -134,7 +134,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Receive failed.\n");
         return -1;
     } 
-    else printf("#2 Server response received.\n");
+    //else printf("#2 Server response received.\n");
     msg_len = ret;
 
 
@@ -225,7 +225,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Send failed.\n");
         return -1;
     } 
-    else printf("#3 Last key establishment message sent to the server.\n");
+    //else printf("#3 Last key establishment message sent to the server.\n");
  
 
 
@@ -275,7 +275,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
         printf("Send failed.\n");
         return -1;   
     }
-    else printf("4# Port sent to the server.\n");
+    //else printf("4# Port sent to the server.\n");
 
     return 1;
 }
@@ -324,7 +324,7 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
                                    iv, IV_LEN);
     if(msg_len== -1) exit_with_failure("Something bad happened building the message...", 0);
 
-    printf("I'm sending to the server the logout message.\n");
+    printf("Sending Logout Request to the server\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_n(5, temp, buffer, msg_to_hash, digest, iv);
@@ -399,7 +399,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
                                    iv, IV_LEN);
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-    printf("I'm sending to the server the list message.\n");
+    printf("Sending List Request to Server.\n\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
 
     free_5(temp, buffer, msg_to_hash, digest, iv);
@@ -473,7 +473,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
         memcpy(temp, buffer, LEN_SIZE); // num_file
         num_file = atoi(temp);
         old_offset = LEN_SIZE+BLANK_SPACE;
-        if (num_file != 0) printf("Received chunk of filenames...\n");
+        //if (num_file != 0) printf("Received chunk of filenames...\n");
 
         memcpy(temp2, &*(buffer+old_offset), LEN_SIZE); // encr. len.
         encr_len = atoi(temp2);
@@ -561,7 +561,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
             if (!file_list) printf("No filenames are stored in the cloud.\n");
             else 
             {
-                printf("Received the complete files list (%d filenames):\n\n", tot_num_file-2);
+                printf("Received the complete files list (%d filenames):\n", tot_num_file-2);
                 printf("***********************\n");
                 for (int i = 0; i <= index; i++)
                 {
@@ -666,7 +666,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     if (msg_len == -1) exit_with_failure("Error during the building of a message", 1);
 
 
-    printf("I'm sending to the server the rename message.\n");
+    printf("Sending rename request to the server.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, msg_to_encr, encr_msg);
@@ -692,7 +692,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
         printf("Receive failed.\n");
         return -1;
     }
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
 
     bufferSupp1 = (unsigned char*) malloc(strlen(RENAME_DENIED)*sizeof(unsigned char)+1);
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -708,7 +708,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     else if (strcmp((char*) bufferSupp1, RENAME_ACCEPTED) == 0)
     {        
         ret = check_reqacc_msg(RENAME_ACCEPTED, buffer, *nonce, session_key2);
-        if (ret != -1) printf("The rename request has been accepted!\n\n");
+        if (ret != -1) printf("File renamed to %s!\n\n", new_filename);
     }
     else
     {
@@ -794,7 +794,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
                                    iv, IV_LEN);
     if(msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-    printf("I'm sending to the server the delete request.\n");
+    printf("Sending delete request to the server.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
     free_6(temp, buffer, msg_to_hash, digest, encr_msg, iv);
@@ -822,7 +822,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
         printf("Receive failed.\n");
         return -1;
     }
-    printf("Received the server's response.\n");
+    //printf("Received the server's response.\n");
 
     bufferSupp1 = (unsigned char*) malloc((strlen(DELETE_DENIED)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -836,7 +836,7 @@ int deleteClient(int sock, char* filename, unsigned char* session_key1, unsigned
     else if (strcmp((char*) bufferSupp1, DELETE_ACCEPTED) == 0)
     {        
         ret = check_reqacc_msg(DELETE_ACCEPTED, buffer, *nonce, session_key2);
-        if (ret != -1) printf("the delete request has been accepted!\n");
+        if (ret != -1) printf("File %s has been deleted!\n", filename);
     }
     else
     {
@@ -892,7 +892,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     f1 = fopen(filename, "r");
     if (f1)
     {
-        printf("The filename is already existent...\n\n");
+        printf("The filename is already existing...\n\n");
         fclose(f1);
         return 1;
     }
@@ -932,7 +932,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
     // The message in the buffer now is: DOWNLOAD_REQUEST, len_encr, encr, hash, iv. We can send it now
 
-    printf("I'm sending to the server the download request.\n");
+    printf("Sending download request of %s to the server.\n", filename);
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
     
@@ -996,7 +996,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         free(temp);
         if (nchunk == 0)
         {
-            printf("The number of chunk is 0, this means that the file is empty. Download refused!\n\n");
+            printf("The number of chunks is 0, this means that the file is empty. Download refused!\n\n");
             free_3(bufferSupp1, bufferSupp2, buffer);
             return 1;
         }
@@ -1033,14 +1033,14 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         } 
         else 
         {
-            printf("The download request has been accepted!\n\n");
+            printf("Download accepted. Downloading, please wait!\n\n");
             *nonce += 1;
         }
     }
     else
     {
         //We don't know what we received
-        printf("We received an uncorrect message from the server...\n\n");
+        printf("Error: We received an incorrect message from the server.\n\n");
         free_2(bufferSupp1, buffer);
         return 1;
     }
@@ -1114,7 +1114,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         fwrite(plaintext, sizeof(unsigned char), plain_len, f1);
         
         free_4(bufferSupp1, bufferSupp2, iv, plaintext);
-        printf("We received correctly the chunk number %i\n", i);
+        //printf("We received correctly the chunk number %i\n", i);
 
         buffer = (unsigned char*)malloc(BUF_LEN);
         if (!buffer) exit_with_failure("Malloc buffer failed", 1 );
@@ -1131,7 +1131,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     fclose(f1);
 
     /* ---- SEND DOWNLOAD FINISHED MESSAGE ---- */
-    printf("Send download finished message.\n");
+    printf("Download is finished.\n");
     operation_succeed(sock, DOWNLOAD_FINISHED, session_key2, nonce);
         
     return 1;
@@ -1186,7 +1186,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         return 1;
     }
     stat(filename, &st);
-    printf("The size of the file is %ld\n", st.st_size);
+    //printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
@@ -1271,6 +1271,8 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     memcpy(bufferSupp1, buffer, strlen(UPLOAD_DENIED)); // denied or accepted same length
     memcpy(&*(bufferSupp1+strlen(UPLOAD_DENIED)), "\0", 1);
 
+    printf("Uploading file %s. Please wait!\n", filename);
+
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0)
     {
@@ -1278,7 +1280,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         if (ret == -1) printf("Something bad happened checking upload denied message...\n");
         else 
         {
-            printf("Download denied from the server...\n");
+            printf("Upload denied from the server...\n");
             *nonce += 1;
         }
 
@@ -1311,7 +1313,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         free(msg_to_hash);
         if (ret != 0)
         {
-            printf("Wrong download chunk hash\n");
+            printf("Wrong Upload chunk hash\n");
             return 1;
         }
         *nonce += 1;
@@ -1383,7 +1385,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
             }
             *nonce += 1;
 
-            printf("We are sending the chunk number %i\n", i);
+            //printf("We are sending the chunk number %i\n", i);
 
             free_6(iv, encr_msg, msg_to_encr, buffer, bufferSupp1, digest);
             free(temp);
@@ -1393,7 +1395,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
             ret = recv (sock, buffer, BUF_LEN, 0);
             if (ret == -1)
             {
-                printf("Receive operation gone bad\n");
+                printf("Send operation gone bad\n");
                 return -1;
             }
             //printf("Confirmed! %s\n", (char*)buffer);
@@ -1407,7 +1409,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         ret = recv(sock, buffer, BUF_LEN, 0);
         if (ret == -1)
         {
-            printf("Receive operation gone bad!\n\n");
+            printf("Send operation gone bad!\n\n");
             free(buffer);
             return -1;
         }
@@ -1416,13 +1418,13 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         ret = check_reqacc_msg(UPLOAD_FINISHED, buffer, *nonce, session_key2);
         if (ret == -1)
         {
-            printf("Check download_finished gone bad.\n\n");
+            printf("Check upload_finished gone bad.\n\n");
             free(buffer);
             return 1;
         }
 
         free(buffer);
-        printf("We have completed successfully the donwload operation!\n\n");
+        printf("Upload successful!!\n\n");
         *nonce += 1;
 
         return 1;
@@ -1501,7 +1503,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
                                    iv, IV_LEN);
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
-    printf("I'm sending to the server the download request.\n");
+    printf("Sending the share request to the server.\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     if (ret == -1) exit_with_failure("Send failed", 1);
     
@@ -1541,7 +1543,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     {
         ret = check_reqacc_msg(SHARE_ACCEPTED, buffer, *nonce, session_key2);
         if (ret == -1) printf("Something bad happened checking the share_accepted...");
-        else printf("The share request has been accepted!\n");
+        else printf("The share request has been accepted by %s!\n", peername);
 
         *nonce += 1;
     }
@@ -1583,13 +1585,13 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
 
     /* ---- Parse server message ---- */
-    printf("Share received, parsing message...\n");
+    printf("Sharing request received.\n");
     bufferSupp1 = (unsigned char*) malloc((strlen(SHARE_PERMISSION)+1)*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
     memcpy(bufferSupp1, rec_mex, strlen(SHARE_PERMISSION));
     *(bufferSupp1+strlen(SHARE_PERMISSION)) = '\0';
 
-    printf("The nonce_sc is %d\n", *nonce_sc);
+    //printf("The nonce_sc is %d\n", *nonce_sc);
 
     if (strcmp((char*) bufferSupp1, SHARE_PERMISSION) == 0)
     {
@@ -1729,15 +1731,15 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         if (!bufferSupp3) exit_with_failure("Malloc bufferSupp2 failed", 1);
         memcpy(bufferSupp3, &*(plaintext+len_fn+BLANK_SPACE+len_pn), LEN_SIZE);
         *(bufferSupp3+LEN_SIZE) = '\0';
-        printf("The dimension we received is: %s\n", bufferSupp3);
+        //printf("The dimension we received is: %s\n", bufferSupp3);
 
 
         // sanitize them????
 
         // CHOOSE WHAT TO DO
         from_B_to_H(&dimension, (char*)bufferSupp3);
-        printf("The user \"%s\" has requested to share the file \"%s\" that is %s big. What do you choose (y/n)?",\
-                bufferSupp2, bufferSupp1, dimension);
+        printf("A user has requested to share the file \"%s\" . What do you choose (y/n)?",\
+                bufferSupp1);
 
         free_5(bufferSupp1, bufferSupp2, plaintext, bufferSupp3, dimension);
 
@@ -1754,7 +1756,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
                         printf("Error saving the nonce_sc... Necessary to close the connection\n\n");
                         return -1;
                     }
-                    printf("\nThe operation has been accepted...\n");
+                    printf("\nFile received and copied to your storage.\n");
                     ret = 1;
                 }
                 else if (s == 'n' || s == 'N')
