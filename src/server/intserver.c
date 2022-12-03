@@ -443,7 +443,7 @@ int loginServer(int sd, char* rec_mex)
         //************ LOGOUT REQUEST MANAGER ************
         else if (strcmp(funcSupp1, LOGOUT_REQUEST) == 0)
         {
-            printf("\nA logout request has come up...\n\n");
+            printf("\nA logout request has come up...\n");
             // LOGOUT MANAGER: SERVER SIDE
                             
             ret = logoutServer(funcBuff, &nonce_cs, session_key2);
@@ -461,7 +461,7 @@ int loginServer(int sd, char* rec_mex)
         // ************* LIST REQUEST MANAGER ***************
         else if (strcmp(funcSupp1, LIST_REQUEST) == 0)
         {
-            printf("\nA list request has came up...\n");
+            printf("\nA list request has come up.\n");
             // LIST MANAGER: SERVER SIDE
         
             ret = listServer(sd, funcBuff, path_documents, &nonce_cs, session_key1, session_key2);
@@ -479,7 +479,7 @@ int loginServer(int sd, char* rec_mex)
         //*************** RENAME REQUEST MANAGER *****************
         else if (strcmp(funcSupp1, RENAME_REQUEST) == 0)
         {
-            printf("\nA rename request has came up...\n");
+            printf("\nA rename request has come up.\n");
             // RENAME MANAGER: SERVER SIDE
                             
             ret = renameServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
@@ -497,7 +497,7 @@ int loginServer(int sd, char* rec_mex)
         // **************** DELETE REQUEST MANAGER ******************
         else if (strcmp(funcSupp1, DELETE_REQUEST) == 0)
         {
-            printf("\nA delete request has came up...\n");
+            printf("\nA delete request has come up.\n");
             // DELETE MANAGER: SERVER SIDE
                             
             ret = deleteServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
@@ -514,7 +514,7 @@ int loginServer(int sd, char* rec_mex)
         // *************** DOWNLOAD REQUEST MANAGER ****************
         else if (strcmp(funcSupp1, DOWNLOAD_REQUEST) == 0)
         {
-            printf("\nA download request has came up...\n\n");
+            printf("\nA download request has come up.\n");
 
             // DOWNLOAD MANAGER: SERVER SIDE
                             
@@ -533,7 +533,7 @@ int loginServer(int sd, char* rec_mex)
         // *************** UPLOAD REQUEST MANAGER ***************
         else if (strcmp(funcSupp1, UPLOAD_REQUEST) == 0)
         {
-            printf("\nAn upload request has came up...\n\n");
+            printf("\nAn upload request has come up.\n");
             // UPLOAD MANAGER: SERVER SIDE
                             
             ret = uploadServer(sd, funcBuff, &nonce_cs, session_key1, session_key2);
@@ -551,7 +551,7 @@ int loginServer(int sd, char* rec_mex)
         // **************** SHARE REQUEST MANAGER ****************
         else if (strcmp(funcSupp1, SHARE_REQUEST) == 0)
         {
-            printf("\nA share request has came up...\n\n");
+            printf("\nA share request has come up.\n");
             // SHARE MANAGER: SERVER SIDE
 
             ret = shareServer(sd, funcBuff, username, &nonce_cs, session_key1, session_key2);            
@@ -1286,7 +1286,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     stat(filename, &st);
     chdir("..");
     printf("The filename is %s\n", filename);
-    printf("The size of the file is %ld\n", st.st_size);
+    //printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
@@ -1463,7 +1463,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     }
 
     free(buffer);
-    printf("Download operation completed!\n\n");
+    printf("Download operation completed!\n");
     *nonce += 1;
 
     return 1;
@@ -1552,7 +1552,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
         free(digest);
         return 1;
     } 
-    else printf("The MAC is been correctly compared!\n");
+    else printf("The MAC has been correctly compared!\n");
     *nonce += 1;
 
 
@@ -1730,7 +1730,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     fclose(fd);
     
     /* ---- SEND UPLOAD FINISHED MESSAGE ---- */
-    printf("Send download finished message.\n");
+    printf("Send upload finished message.\n");
     operation_succeed(sock, UPLOAD_FINISHED, session_key2, nonce);
         
     return 1;
@@ -2000,7 +2000,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     chdir(username);
     if (f1)
     {
-        printf("The peer already has a file called %s... Share denied\n\n", bufferSupp1);
+        printf("The peer already has a file called %s.\nShare denied\n", bufferSupp1);
         free_4(temp, path_temp, bufferSupp1, bufferSupp2);
         operation_denied(sd, "Peer already have a file with this name", SHARE_DENIED, session_key1, session_key2, nonce_cs);
         return 1;
@@ -2147,7 +2147,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
             operation_denied(sd, "Error checking share accepted message", SHARE_DENIED, session_key1, session_key2, nonce_cs);
             return 1;
         }
-        printf("The share request has been accepted!\n\n");
+        printf("The share request has been accepted!\n");
         nonce_sc += 1;
         if (!save_info_file(username, bufferSupp2, rcv_port, peer_session_key1, peer_session_key2, nonce_sc))
         {
@@ -2177,7 +2177,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     memcpy(&*(path_temp+6+(len_pn-1)+1), "documents/", 10);
     memcpy(&*(path_temp+6+(len_pn-1)+1+10), bufferSupp1, len_fn); //filename
     memcpy(&*(path_temp+6+(len_pn-1)+1+10+len_fn), "\0", 1);
-    printf("%s\n%s\n", path_temp, bufferSupp1);
+    //printf("%s\n%s\n", path_temp, bufferSupp1);
     
     chdir("documents");
     src_fd = fopen((char*)bufferSupp1, "r");

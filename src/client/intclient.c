@@ -84,7 +84,7 @@ int loginClient(int *sock, unsigned char** session_key1, unsigned char** session
 
     // Generate DH asymmetric key(s)
     pubkey_byte = gen_dh_keys(path_pubkey, &my_prvkey, &pubkey_len);   
-    printf("The pubkey len is %i\n\n", pubkey_len);
+    //printf("The pubkey len is %i\n\n", pubkey_len);
     if (pubkey_len != DH_PUBKEY_SIZE) exit_with_failure("Wrong pubkey len", 0);
 
 
@@ -575,7 +575,7 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
                     printf("%s\n", *(file_list+i));
                     free(*(file_list+i));
                 }
-                printf("************************\n\n");
+                printf("************************\n");
                 free(file_list);
             }
             
@@ -708,7 +708,7 @@ int renameClient(int sock, char* filename, char* new_filename, unsigned char* se
     else if (strcmp((char*) bufferSupp1, RENAME_ACCEPTED) == 0)
     {        
         ret = check_reqacc_msg(RENAME_ACCEPTED, buffer, *nonce, session_key2);
-        if (ret != -1) printf("File renamed to %s!\n\n", new_filename);
+        if (ret != -1) printf("File renamed to %s!\n", new_filename);
     }
     else
     {
@@ -892,7 +892,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     f1 = fopen(filename, "r");
     if (f1)
     {
-        printf("The filename is already existing...\n\n");
+        printf("The filename already exists.\n");
         fclose(f1);
         return 1;
     }
@@ -1033,7 +1033,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         } 
         else 
         {
-            printf("Download accepted. Downloading, please wait!\n\n");
+            printf("Download accepted. Downloading, please wait!\n");
             *nonce += 1;
         }
     }
@@ -1424,7 +1424,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         }
 
         free(buffer);
-        printf("Upload successful!\n\n");
+        printf("Upload successful!\n");
         *nonce += 1;
 
         return 1;
@@ -1738,7 +1738,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 
         // CHOOSE WHAT TO DO
         from_B_to_H(&dimension, (char*)bufferSupp3);
-        printf("A user has requested to share the file \"%s\" . What do you choose (y/n)?",\
+        printf("A user has requested to share the file %s. What do you choose (y/n)?",
                 bufferSupp1);
 
         free_5(bufferSupp1, bufferSupp2, plaintext, bufferSupp3, dimension);
@@ -1756,7 +1756,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
                         printf("Error saving the nonce_sc... Necessary to close the connection\n\n");
                         return -1;
                     }
-                    printf("\nFile received and copied to your storage.\n");
+                    printf("File received and copied to your storage.\n\n");
                     ret = 1;
                 }
                 else if (s == 'n' || s == 'N')

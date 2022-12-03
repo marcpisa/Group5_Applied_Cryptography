@@ -74,7 +74,7 @@ int main()
         perror("Error during bind phase: ");
         exit(-1);
     }
-    printf("Bind of the socket with address %i and port %i correctly executed", srv_addr.sin_addr.s_addr, SERVER_PORT);
+    //printf("Bind of the socket with address %i and port %i correctly executed", srv_addr.sin_addr.s_addr, SERVER_PORT);
     
     ret = listen(listenerTCP, 10);
     if (ret < 0)
@@ -91,7 +91,7 @@ int main()
     FD_SET(listenerTCP, &master);
     if (listenerTCP > fileno(stdin)) fdmax = listenerTCP;
     else fdmax = fileno(stdin);
-    printf("I'm using the select function to attend for more than one event...\n\n");
+    //printf("I'm using the select function to attend for more than one event...\n\n");
     
     while(!exit_flag)
     {
@@ -112,7 +112,7 @@ int main()
                     new_sd = accept(listenerTCP, (struct sockaddr*)&cl_addr, &addrlen);
                     FD_SET(new_sd, &master);
                     if (new_sd > fdmax) fdmax = new_sd;
-                    printf("We received and accepted a client connection request...\n\n");
+                    printf("We received and accepted a client connection request.");
                 }
                 else if (i == fileno(stdin))
                 {
@@ -160,7 +160,7 @@ int main()
                         {
                             //We are in the son part of code
                             close(listenerTCP);
-                            printf("\nA login request has come up.\n\n");
+                            printf("\nA login request has come up.\n");
                             // LOGIN MANAGER: SERVER SIDE
 
                             ret = loginServer(i, received_buffer);
