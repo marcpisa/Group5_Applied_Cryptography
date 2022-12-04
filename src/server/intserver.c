@@ -587,7 +587,6 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
 
     unsigned char* temp;
     unsigned char* bufferSupp2;
-    unsigned char* bufferSupp3;
     unsigned char* msg_to_hash;
     unsigned char* digest; 
 
@@ -597,21 +596,16 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
     if (!temp) exit_with_failure("Malloc temp failed", 1);   
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);   
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    bufferSupp3 = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);   
-    if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
 
     offset = strlen(LOGOUT_REQUEST)+BLANK_SPACE;
 
     memcpy(bufferSupp2, &*((unsigned char*) rec_mex+offset), HASH_LEN); // hash
     offset += HASH_LEN+BLANK_SPACE;
-    
-    memcpy(bufferSupp3, &*((unsigned char*) rec_mex+offset), IV_LEN); // iv
 
 
     // Check hash correctness
     sprintf((char*)temp, "%u", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), \
-                                                bufferSupp3, IV_LEN, \
+    msg_to_hash_len = build_msg_2(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST), \
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash message...", 0);
 
@@ -623,7 +617,7 @@ int logoutServer(char* rec_mex, unsigned int* nonce, unsigned char* session_key2
         return 1;
     }
 
-    free_5(bufferSupp2, bufferSupp3, temp, digest, msg_to_hash);
+    free_4(bufferSupp2, temp, digest, msg_to_hash);
     return 1;
 }
 

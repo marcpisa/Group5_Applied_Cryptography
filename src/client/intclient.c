@@ -291,18 +291,6 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     unsigned char* buffer;
     unsigned char* msg_to_hash;
     unsigned char* digest;
-    unsigned char* iv;    
-
-
-    // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
-
 
 
     /* ---- Create the first message (request + hash + iv) ---- */
@@ -311,23 +299,21 @@ int logoutClient(int sock, unsigned int* nonce, unsigned char* session_key2)
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
                                                 temp, LEN_SIZE);
     if(msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);    
     
     // Compose the message
-    msg_len = build_msg_3(&buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
-                                   digest, HASH_LEN,\
-                                   iv, IV_LEN);
+    msg_len = build_msg_2(&buffer, LOGOUT_REQUEST, strlen(LOGOUT_REQUEST),\
+                                   digest, HASH_LEN);
     if(msg_len== -1) exit_with_failure("Something bad happened building the message...", 0);
 
     printf("Sending Logout Request to the server\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
     
-    free_n(5, temp, buffer, msg_to_hash, digest, iv);
+    free_n(4, temp, buffer, msg_to_hash, digest);
     
     if (ret == -1) 
     {
