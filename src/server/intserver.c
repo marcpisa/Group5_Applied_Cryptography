@@ -877,6 +877,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
 
+    FILE* f1;
     char* filename;
     int len_fn;
     char* new_filename;
@@ -983,7 +984,6 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         free_3(plaintext, filename, new_filename);
         return 1;
     }
-    printf("File %s changed to new filename %s\n", filename, new_filename);
                    
     ret = filename_sanitization (filename);
     ret += filename_sanitization (new_filename);
@@ -1000,15 +1000,26 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     if (ret == -1)
     {
         printf("Error during the cd of the directory documents... It's necessary to close the connection\n\n");
+        operation_denied(sd, "Error moving to document directory... Need to close the connection", RENAME_DENIED, session_key1, session_key2, nonce);
         return -1;
     }
+    f1 = fopen(filename, "r");
+    if (!f1)
+    {
+        chdir("..");
+        printf("The file %s doesn't exists...\n", filename);
+        operation_denied(sd, "The file doesn't exist", RENAME_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
+    fclose(f1);
     ret = rename(filename, new_filename);
     chdir("..");
     if (ret == -1) {
-        printf("Problem moving to parent directory... It's necessary to close the connection\n");
+        printf("Error during the rename operation... It's necessary to close the connection\n");
         free_3(plaintext, filename, new_filename);
         return -1;
     }
+    printf("File %s changed to new filename %s\n", filename, new_filename);
     
     free_3(plaintext, filename, new_filename);
 
@@ -1039,6 +1050,7 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     unsigned char* bufferSupp1;
     unsigned char* bufferSupp2;
 
+    FILE* f1;
     char* filename; 
     int len_fn; 
 
@@ -1130,10 +1142,26 @@ int deleteServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
 
     // Remove the file
     ret = chdir("documents/");
-    if (ret == -1) exit_with_failure("Can't change directory to path_documents", 1);
+    if (ret == -1)
+    {
+        printf("Cannot move to documents directory... Need to close the connection\n");
+        operation_denied(sd, "Error moving to documents directory... Need to close the connection", DELETE_DENIED, session_key1, session_key2, nonce);
+        free_2(plaintext, filename);
+        return 1;
+    }
+    f1 = fopen(filename, "r");
+    if (!f1)
+    {
+        chdir("..");
+        printf("The file doesn't exist... Cannot delete it\n");
+        operation_denied(sd, "File missing", DELETE_DENIED, session_key1, session_key2, nonce);
+        free_2(plaintext, filename);
+        return 1;
+    }
     ret = remove(filename);
     if (ret == -1)
     {
+        chdir("..");
         printf("The delete operation went bad...\n");
         operation_denied(sd, "Something bad happened during the delete operation", DELETE_DENIED, session_key1, session_key2, nonce);
         free_2(plaintext, filename);
@@ -1289,6 +1317,13 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     //printf("The size of the file is %ld\n", st.st_size);
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
+
+    if (st.st_size > 4294967296)
+    {
+        printf("The file to download is too big...\n");
+        operation_denied(sock, "The file to download is too big", DOWNLOAD_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
 
     //printf("The number of chunk is %i\n", nchunk);
     //printf("The number of rest is %i\n", rest);
@@ -1485,6 +1520,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     unsigned char* msg_to_hash;
     unsigned char* digest;
 
+    long int dimension;
     int msg_len;
     char* temp;
     unsigned char* buffer;
@@ -1526,7 +1562,8 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (!bufferSupp3) exit_with_failure("Malloc iv failed", 1);
     memcpy(bufferSupp3, &*(rec_mex+strlen(UPLOAD_REQUEST)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE+IV_LEN+BLANK_SPACE), LEN_SIZE);
     nchunk = atoi((char*)bufferSupp3);
-    //printf("%s", nchunk); 
+    //printf("%s", nchunk);
+
 
     // HERE WE SAVE THE NONCE INTO A STRING
     buffer = (unsigned char*)malloc(sizeof(unsigned char)*LEN_SIZE);
@@ -1547,21 +1584,31 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
     if (ret != 0)
     {
-        printf("Wrong rename failed hash\n\n");
+        printf("Wrong upload failed hash\n\n");
         free_6(buffer, bufferSupp1, bufferSupp2, iv, encr_msg, msg_to_hash);
         free(digest);
+        operation_denied(sock, "Wrong upload failed hash", UPLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     } 
     else printf("The MAC has been correctly compared!\n");
     *nonce += 1;
 
+    //Check if the file is too big
+    dimension = nchunk*CHUNK_SIZE;
+    if (dimension > 4294967296) //MAGGIORE DI 4 GB
+    {
+        free_5(bufferSupp3, iv, bufferSupp2, encr_msg, bufferSupp1);
+        printf("The dimension of the file to upload is too high... Refuse the request\n");
+        operation_denied(sock, "The dimension of the file to upload is too high", UPLOAD_DENIED, session_key1, session_key2, nonce);
+        return 1;
+    }
 
     //NOW WE CAN DECRYPT AND TAKE THE VALUE OF THE FILENAME DECRYPTED
     decrypt_AES_128_CBC(&plaintext, &plain_len, encr_msg, encr_len, iv, session_key1);
     if (plain_len > MAX_LEN_FILENAME)
     {
         free_6(bufferSupp1, bufferSupp2, encr_msg, iv, plaintext, buffer);
-        free_2(msg_to_hash, digest);
+        free_3(msg_to_hash, digest, bufferSupp3);
         printf("The length of the filename is too big, download management terminated...\n\n");
         return 1;
     }

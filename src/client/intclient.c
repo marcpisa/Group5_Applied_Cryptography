@@ -1192,7 +1192,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
 
 
     // If FIle larger than 4GB refuse upload 
-    if(st.st_size > 4294967296) 
+    if(st.st_size > 4294967296) //MAGGIORE DI 4 GB
     {
         printf("File is more than 4 Gigabyte... Retry with other files"); 
         free(iv);
@@ -1656,59 +1656,6 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
                 return -1;
             }
         }
-        /*
-        // TAKE ENCRIPTION LENGTH
-        temp = (char*) malloc(LEN_SIZE*sizeof(char));
-        if (!temp) exit_with_failure("Malloc temp failed", 1);
-        memcpy(temp, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE), LEN_SIZE);
-        encr_len = atoi(temp);
-        if (encr_len < 0 || encr_len > (MAX_LEN_FILENAME+MAX_LEN_USERNAME+BLOCK_SIZE+1))
-        {
-            free_2(bufferSupp1, temp);
-            printf("Encryption length too high.\n");
-            return -1;
-        }
-
-        // TAKE THE CIPHERTEXT
-        bufferSupp2 = (unsigned char*) malloc(encr_len*sizeof(unsigned char));
-        if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-        memcpy(bufferSupp2, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+\
-            LEN_SIZE+BLANK_SPACE), encr_len);
-
-        // TAKE THE IV
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-        if (!iv) exit_with_failure("Malloc iv failed", 1);
-        memcpy(iv, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
-            BLANK_SPACE+encr_len+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN);
-
-        // TAKE AND CHECK THE HASH
-        bufferSupp3 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
-        if (!bufferSupp3) exit_with_failure("Malloc bufferSupp3 failed", 1);
-        memcpy(bufferSupp3, &*(rec_mex+strlen(SHARE_PERMISSION)+BLANK_SPACE+LEN_SIZE+\
-            BLANK_SPACE+encr_len+BLANK_SPACE), HASH_LEN);
-
-        memset(temp, 0, LEN_SIZE);
-        sprintf(temp, "%u", *nonce_sc);
-        msg_to_hash_len = build_msg_4(&msg_to_hash, SHARE_PERMISSION, strlen(SHARE_PERMISSION),\
-                                                    bufferSupp2, encr_len,\
-                                                    iv, IV_LEN,\
-                                                    temp, LEN_SIZE);
-        if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
-
-        digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
-
-        ret = CRYPTO_memcmp(digest, bufferSupp3, HASH_LEN);
-        
-        free_5(bufferSupp1, bufferSupp3, temp, msg_to_hash, digest);
-        
-        if (ret != 0)
-        {
-            printf("Wrong share_permission hash.\n");
-            free_2(bufferSupp2, iv);
-            return -1;
-        }
-        *nonce_sc += 1;    
-        */
        
 
         // DECRYPT THE MESSAGE
