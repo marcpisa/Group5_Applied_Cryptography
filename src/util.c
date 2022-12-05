@@ -2,8 +2,6 @@
 
 
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
-static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
-
 
 
 
@@ -52,15 +50,6 @@ void from_B_to_H(char** dimension, char* bytes)
 int username_sanitization(const char* username) {
     if(strspn(username, allowed_chars) < strlen(username)) return 0;
     return 1;
-}
-
-int input_sanitization_commands(const char* input) {
-
-    int i;
-    for (i = 0; i < COMM_NUMB; i++) {
-        if (strncmp(commands[i], input, COM_LEN) == 0) return i + 1;
-    }
-    return 0;
 }
 
 void rec_buffer_sanitization(char *received_buff, char *buffer_sanitized[]) 
