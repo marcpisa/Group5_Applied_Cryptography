@@ -978,6 +978,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         free_3(plaintext, filename, new_filename);
         return 1;
     }
+
                    
     ret = filename_sanitization (filename);
     ret += filename_sanitization (new_filename);
@@ -995,6 +996,7 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
     {
         printf("Error during the cd of the directory documents... It's necessary to close the connection\n\n");
         operation_denied(sd, "Error moving to document directory... Need to close the connection", RENAME_DENIED, session_key1, session_key2, nonce);
+        free_3(plaintext, filename, new_filename);
         return -1;
     }
     f1 = fopen(filename, "r");
@@ -1003,9 +1005,19 @@ int renameServer(int sd, char* rec_mex, unsigned int* nonce, unsigned char* sess
         chdir("..");
         printf("The file %s doesn't exists...\n", filename);
         operation_denied(sd, "The file doesn't exist", RENAME_DENIED, session_key1, session_key2, nonce);
+        free_3(plaintext, filename, new_filename);
         return 1;
     }
     fclose(f1);
+    f1 =fopen(new_filename, "r");
+    if (f1)
+    {
+        chdir("..");
+        printf("A file named with the new filename issued alrady exists. Request denied...\n");
+        operation_denied(sd, "New filename already used", RENAME_DENIED, session_key1, session_key2, nonce);
+        free_3(plaintext, filename, new_filename);
+        return 1;
+    }
     ret = rename(filename, new_filename);
     chdir("..");
     if (ret == -1) {
@@ -1640,13 +1652,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     
     /* ---- Send Upload_accepted to the client ---- */ 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS UPLOAD_ACCEPTED  HASH IV
-    //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: UPLOAD_ACCEPTED IV NONCE
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+    //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: UPLOAD_ACCEPTED NONCE
 
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
@@ -1658,16 +1664,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
-    msg_to_hash_len = build_msg_3(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
-    msg_len = build_msg_3(&buffer, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
-                                   digest, HASH_LEN,\
-                                   iv, IV_LEN);
+    msg_len = build_msg_2(&buffer, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
+                                   digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
     
     ret = send(sock, buffer, BUF_LEN, 0);
@@ -1682,7 +1686,6 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     *nonce += 1;
 
     free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
-    free(iv);
     
 
     /* ---- NOW WE CAN BEGIN DOWNLOAD THE CHUNKS ---- */

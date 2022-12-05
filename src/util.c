@@ -625,38 +625,27 @@ void operation_succeed(int sock, char* req_accepted, unsigned char* key2, unsign
     unsigned char* digest;
 
     unsigned char* buffer;
-    unsigned char* iv;
     char* temp;
-
-    // Seed for the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
 
     // Calculate the hash
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 0);
 
     sprintf(temp, "%u", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, req_accepted, strlen(req_accepted),\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
     // Compose the message
-    msg_len = build_msg_3(&buffer, req_accepted, strlen(req_accepted), \
-                                   digest, HASH_LEN, \
-                                   iv, IV_LEN);
+    msg_len = build_msg_2(&buffer, req_accepted, strlen(req_accepted), \
+                                   digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0); 
 
     ret = send(sock, buffer, BUF_LEN, 0);
     
-    free_5(iv, buffer, msg_to_hash, digest, temp);
+    free_4(buffer, msg_to_hash, digest, temp);
 
     if (ret == -1) exit_with_failure("Send failed", 1);
     
@@ -771,7 +760,6 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
 
     size_t offset;
     int ret;
-    unsigned char* iv;
 
 
     // Allocate the dynamic arrays
@@ -779,21 +767,16 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     if (!temp) exit_with_failure("Malloc temp failed", 1);
     bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
     if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
 
         
     // Parse the message
     offset = strlen(req_accepted)+BLANK_SPACE;
     memcpy(bufferSupp2, &*(msg+offset), HASH_LEN); // hash
-    offset += HASH_LEN+BLANK_SPACE;
-    memcpy(iv, &*(msg+offset), IV_LEN); // iv    
         
     // Check hash
     
     sprintf(temp, "%u", nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, req_accepted, strlen(req_accepted),\
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, req_accepted, strlen(req_accepted),\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
@@ -807,7 +790,6 @@ int check_reqacc_msg(char* req_accepted, unsigned char* msg, unsigned int nonce,
     }
     else ret = 1;
 
-    free(iv);
     free(digest);
     free(temp);
     free(msg_to_hash);

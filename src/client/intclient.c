@@ -1283,12 +1283,10 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
         bufferSupp2 = (unsigned char*)malloc(sizeof(unsigned char)*HASH_LEN);
         if(!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
 
-        memcpy(iv, &*(buffer+strlen(UPLOAD_ACCEPTED)+HASH_LEN+BLANK_SPACE*2), IV_LEN);
         memcpy(bufferSupp2, &*(buffer+strlen(UPLOAD_ACCEPTED)+BLANK_SPACE), HASH_LEN);
         sprintf((char*)temp, "%u", *nonce); //nonce is put on temp as a string
 
-        msg_to_hash_len = build_msg_3(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
-                                                    iv, IV_LEN,\
+        msg_to_hash_len = build_msg_2(&msg_to_hash, UPLOAD_ACCEPTED, strlen(UPLOAD_ACCEPTED), \
                                                     temp, LEN_SIZE);
         if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
