@@ -840,7 +840,7 @@ int build_msg_4(unsigned char** buffer, void* param1, unsigned int param1_len, v
     int buff_len;
 
     buff_len = param1_len+param2_len+param3_len+param4_len+(BLANK_SPACE*3);
-    *buffer = (unsigned char*) malloc(buff_len*sizeof(unsigned char));
+    *buffer = (unsigned char*) malloc(BUF_LEN*sizeof(unsigned char));
     if(!(*buffer))
     {
         printf("Malloc buffer failed.\n");
