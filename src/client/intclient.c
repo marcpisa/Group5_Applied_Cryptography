@@ -355,16 +355,6 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     char** file_list;
 
 
-    // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
-
-
-
 
     /* ---- Create the first message (req., hash(req, iv, nonce), iv) ---- */
     // Create the hash
@@ -372,23 +362,21 @@ int listClient(int sock, unsigned char* session_key1, unsigned char* session_key
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%d", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
     
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);   
 
     // Compose the message
-    msg_len = build_msg_3(&buffer, LIST_REQUEST, strlen(LIST_REQUEST),
-                                   digest, HASH_LEN,
-                                   iv, IV_LEN);
+    msg_len = build_msg_2(&buffer, LIST_REQUEST, strlen(LIST_REQUEST),
+                                   digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Error during the building of the message", 1);
 
     //printf("Sending List Request to Server.\n\n");
     ret = send(sock, buffer, BUF_LEN, 0); 
 
-    free_5(temp, buffer, msg_to_hash, digest, iv);
+    free_4(temp, buffer, msg_to_hash, digest);
 
     if (ret == -1)
     {

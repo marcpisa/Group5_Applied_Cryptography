@@ -649,13 +649,6 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     unsigned char* bufferSupp1;
     
 
-    // Generate the IV
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-
-
     /* ---- Parse the list request (req., hash(req, iv, nonce), iv) ---- */
     bufferSupp1 = (unsigned char*) malloc(HASH_LEN*sizeof(unsigned char));
     if (!bufferSupp1) exit_with_failure("Malloc bufferSupp1 failed", 1);
@@ -671,8 +664,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf((char*)temp, "%u", *nonce);
-    msg_to_hash_len = build_msg_3(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
-                                                iv, IV_LEN,\
+    msg_to_hash_len = build_msg_2(&msg_to_hash, LIST_REQUEST, strlen(LIST_REQUEST),\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message", 1);
     
@@ -680,7 +672,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
 
     ret = CRYPTO_memcmp(digest, bufferSupp1, HASH_LEN);
     
-    free_5(iv, bufferSupp1, msg_to_hash, digest, temp);
+    free_4(bufferSupp1, msg_to_hash, digest, temp);
     
     if (ret != 0) // If the hash comparison failed
     {
