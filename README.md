@@ -8,7 +8,7 @@ It is a simple Client-Server cloud storage application that is developed with se
 
 First: git-clone the entire codebase
 
-# Server: 
+#### Server: 
 
 First lets start the server. 
 
@@ -18,7 +18,7 @@ First lets start the server.
 
 The server is now running. Nothing more needs to be done 
 
-# Client 
+#### Client 
 
 Now lets launch the client. 
 
@@ -32,7 +32,7 @@ The client is now logged in.
 
 registeredUsername = One of the usernames that is already present, as described in the project requirements 
 
-# Help 
+#### Help 
 
 The project contains a small manual that can be accessed with the command 'help'. The manual also contains the required formatting of all the available commands. 
 
