@@ -1674,7 +1674,6 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     {
         printf("Send operation gone bad.\n");
         free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
-        free(iv);
         return -1;
     }
     *nonce += 1;
