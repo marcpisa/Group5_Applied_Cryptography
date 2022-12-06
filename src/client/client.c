@@ -168,7 +168,11 @@ int main(int argc, char* argv[])
                     EXIT = 10;
                     WRONG COMMAND = 0;*/
 
-                    s = input_sanitization_commands(command1);
+
+        
+
+
+                    s = select_case_command(command1);
                     switch(s)
                     {
                         case 1: //*********** LOGIN **************

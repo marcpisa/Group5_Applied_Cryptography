@@ -1721,11 +1721,12 @@ void reset_nonce_sc(char* username)
     char buffer[MAX_LEN_USERNAME+11];
     FILE* f1;
 
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        exit(1);
-    }
+    //if (chdir("../clientsFolder")==-1)
+    //{
+    //    printf("Error moving to ClientsFolder... Exiting");
+    //    exit(1);
+    //}
+
     memset(buffer, 0, MAX_LEN_USERNAME+11);
     sprintf(buffer, "%s_nonce.txt", username);
     f1 = fopen(buffer, "w");
@@ -1756,11 +1757,11 @@ int take_nonce_sc(char* username)
     char buffer[MAX_LEN_USERNAME+11];
     FILE* f1;
 
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        exit(0);
-    }
+    //if (chdir("../clientsFolder")==-1)
+    //{
+    //    printf("Error moving to ClientsFolder... Exiting");
+    //    exit(0);
+    //}
     memset(buffer, 0, MAX_LEN_USERNAME+11);
     sprintf(buffer, "%s_nonce.txt", username);
     f1 = fopen(buffer, "r");
@@ -1791,11 +1792,11 @@ int save_nonce_sc(char* username, unsigned int nonce_sc)
     char buffer[MAX_LEN_USERNAME+11];
     FILE* f1;
 
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        return -1;
-    }
+    //if (chdir("../clientsFolder")==-1)
+    //{
+    //    printf("Error moving to ClientsFolder... Exiting");
+    //    return -1;
+    //}
     memset(buffer, 0, MAX_LEN_USERNAME+11);
     sprintf(buffer, "%s_nonce.txt", username);
     f1 = fopen(buffer, "w");
@@ -1826,11 +1827,11 @@ int delete_nonce_sc(char* username)
     char buffer[MAX_LEN_USERNAME+11];
     FILE* f1;
 
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        return -1;
-    }
+    //if (chdir("../clientsFolder")==-1)
+    //{
+    //    printf("Error moving to ClientsFolder... Exiting");
+    //    return -1;
+    //}
     memset(buffer, 0, MAX_LEN_USERNAME+11);
     sprintf(buffer, "%s_nonce.txt", username);
     f1 = fopen(buffer, "w");

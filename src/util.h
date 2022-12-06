@@ -106,6 +106,7 @@
 
 void from_B_to_H(char** dimension, char* bytes);
 int username_sanitization(const char *username);
+int select_case_command(const char *input);
 void rec_buffer_sanitization(char *received_buff, char *buff1[]);
 int filename_sanitization(const char *file_name);
 void exit_with_failure(char *err, int perror_enable);

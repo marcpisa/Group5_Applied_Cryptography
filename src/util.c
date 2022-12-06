@@ -2,8 +2,16 @@
 
 
 static char allowed_chars[] = {"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.-"};
+static char *const commands[] = {LOGIN, LOGOUT, LIST, RENAME, DELETE, DOWNLOAD, UPLOAD, SHARE, HELP, EXIT};
 
+int select_case_command(const char* input) {
 
+    int i;
+    for (i = 0; i < COMM_NUMB; i++) {
+        if (strncmp(commands[i], input, COM_LEN) == 0) return i + 1;
+    }
+    return 0;
+}
 
 void from_B_to_H(char** dimension, char* bytes)
 {
