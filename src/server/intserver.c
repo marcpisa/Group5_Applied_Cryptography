@@ -1526,7 +1526,7 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     unsigned char* msg_to_hash;
     unsigned char* digest;
 
-    long int dimension;
+    long dimension;
     int msg_len;
     char* temp;
     unsigned char* buffer;
@@ -1600,12 +1600,14 @@ int uploadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* se
     *nonce += 1;
 
     //Check if the file is too big
-    dimension = nchunk*CHUNK_SIZE;
-    if (dimension > 4294967296) //MAGGIORE DI 4 GB
-    {
+    dimension = (long)nchunk*CHUNK_SIZE;
+    if (dimension > 4294967807)
+                     //MAGGIORE DI 4 GB
+    {   
+        printf("%ld", dimension); 
         free_5(bufferSupp3, iv, bufferSupp2, encr_msg, bufferSupp1);
         printf("The dimension of the file to upload is too high... Refuse the request\n");
-        operation_denied(sock, "The dimension of the file to upload is too high", UPLOAD_DENIED, session_key1, session_key2, nonce);
+        operation_denied(sock, "Nice try hacker, you managed to bypass the client side control of the maximum file size. But we also check server side.", UPLOAD_DENIED, session_key1, session_key2, nonce);
         return 1;
     }
 

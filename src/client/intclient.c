@@ -1176,11 +1176,10 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     nchunk = (st.st_size/CHUNK_SIZE)+1;
     rest = st.st_size - (nchunk-1)*CHUNK_SIZE; // This is the number of bits of the final chunk
 
-
     // If FIle larger than 4GB refuse upload 
     if(st.st_size > 4294967296) //MAGGIORE DI 4 GB
     {
-        printf("File is more than 4 Gigabyte... Retry with other files"); 
+        printf("Upload rejected: File is more than 4 Gigabyte and therefore to large. If you want to upload larger files please purchase a premium plan."); 
         free(iv);
         return 1; 
     }
@@ -1257,7 +1256,7 @@ int uploadClient(int sock, char* filename, unsigned char* session_key1, unsigned
     memcpy(bufferSupp1, buffer, strlen(UPLOAD_DENIED)); // denied or accepted same length
     memcpy(&*(bufferSupp1+strlen(UPLOAD_DENIED)), "\0", 1);
 
-    printf("Uploading file %s. Please wait!\n", filename);
+    printf("Uploading file %s. Please wait! If this is large file it can take a while.\n", filename);
 
     // Parse the message based on the server response
     if (strcmp((char*)bufferSupp1, UPLOAD_DENIED) == 0)
