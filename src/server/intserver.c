@@ -657,7 +657,7 @@ int listServer(int sd, char* rec_mex, char* path_documents, unsigned int* nonce,
     old_offset = strlen(LIST_REQUEST)+BLANK_SPACE;
     memcpy(bufferSupp1, &*(rec_mex+old_offset), HASH_LEN); // hash
     old_offset += HASH_LEN+BLANK_SPACE;
-    memcpy(iv, &*(rec_mex+old_offset), IV_LEN); // iv
+
 
     // Compare the hash
     temp = (char*) malloc(sizeof(char)*LEN_SIZE);
