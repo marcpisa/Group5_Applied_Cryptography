@@ -958,8 +958,8 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         if (!temp) exit_with_failure("Malloc bufferSupp1 for nchunk failed", 1);
         bufferSupp2 = (unsigned char*) malloc(sizeof(unsigned char)*HASH_LEN);
         if (!bufferSupp2) exit_with_failure("Malloc bufferSupp2 failed", 1);
-        iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-        if (!iv) exit_with_failure("Malloc iv failed", 1);
+        //iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
+        //if (!iv) exit_with_failure("Malloc iv failed", 1);
 
         //SETTING OF THE NCHUNK AND THE REST VARIABLE RECEIVED BY THE SERVER
         // the format of the message received should be: DOWNLOAD_ACCEPTED, nchunk, rest, hash, iv
@@ -977,7 +977,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
         //HERE WE TAKE THE HASH AND THE IV
         memcpy(bufferSupp2, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE), HASH_LEN); // hash
-        memcpy(iv, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
+        //memcpy(iv, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE+REST_SIZE+BLANK_SPACE+HASH_LEN+BLANK_SPACE), IV_LEN); // iv
 
         // HERE WE SHOULD CHECK THE HASH
         temp = (char*) malloc(sizeof(char)*LEN_SIZE); //Here we save the nonce
@@ -988,10 +988,9 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
         sprintf(temp, "%u", *nonce); //nonce strring format
         memcpy(bufferSupp3, &*(buffer+strlen(DOWNLOAD_ACCEPTED)+BLANK_SPACE+LEN_SIZE+BLANK_SPACE), REST_SIZE); //rest string format
 
-        msg_to_hash_len = build_msg_5(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED),\
+        msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED),\
                                                     bufferSupp1, LEN_SIZE,\
                                                     bufferSupp3, REST_SIZE,\
-                                                    iv, IV_LEN,\
                                                     temp, LEN_SIZE);
         if (msg_to_hash_len == -1) exit_with_failure("Error during the building of the message...", 1);
 
@@ -999,7 +998,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
 
         ret = CRYPTO_memcmp(digest, bufferSupp2, HASH_LEN);
         free_6(digest, temp, buffer, msg_to_hash, bufferSupp1, bufferSupp2);
-        free_2(bufferSupp3, iv);
+        free(bufferSupp3);
         if (ret != 0)
         {
             printf("Wrong download accepted hash\n\n");

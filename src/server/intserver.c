@@ -1332,12 +1332,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     /* ---- Send download_accepted to the client ---- */ 
     //THE FORMAT OF THE MESSAGE WE SHOULD SEND IS DOWNLOAD_ACCEPTED NCHUNK REST HASH IV
     //FIRST OF ALL WE SHOULD CALCULATE THE DIGEST OF THE HASH FOR THE MAC: DOWNLOAD_ACCEPTED NCHUNK REST IV NONCE
-    iv = (unsigned char*) malloc(sizeof(unsigned char)*IV_LEN);
-    if (!iv) exit_with_failure("Malloc iv failed", 1);
-    ret = RAND_poll(); // Seed OpenSSL PRNG
-    if (ret != 1) exit_with_failure("RAND_poll failed\n", 0);
-    ret = RAND_bytes((unsigned char*)&iv[0], IV_LEN);
-    if (ret != 1) exit_with_failure("RAND_bytes failed\n", 0);
+
 
     bufferSupp1 = (unsigned char*)malloc(LEN_SIZE);
     if (!bufferSupp1) exit_with_failure("Malloc buffSupp1 failed", 1);
@@ -1349,20 +1344,18 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     sprintf(temp, "%u", *nonce); //nonce is put on temp as a string
     sprintf((char*)bufferSupp1, "%i", nchunk); //nchunk is put on bufferSupp1 as a string
     sprintf((char*)bufferSupp2, "%i", rest); //rest is put on bufferSUpp2 as a string
-    msg_to_hash_len = build_msg_5(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
+    msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
                                                 bufferSupp1, LEN_SIZE,\
                                                 bufferSupp2, REST_SIZE,\
-                                                iv, IV_LEN,\
                                                 temp, LEN_SIZE);
     if (msg_to_hash_len == -1) exit_with_failure("Something bad happened building the hash...", 0);
 
     digest = hmac_sha256(session_key2, 16, msg_to_hash, msg_to_hash_len, &digest_len);
 
-    msg_len = build_msg_5(&buffer, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
+    msg_len = build_msg_4(&buffer, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
                                    bufferSupp1, LEN_SIZE, \
                                    bufferSupp2, REST_SIZE, \
-                                   digest, HASH_LEN,\
-                                   iv, IV_LEN);
+                                   digest, HASH_LEN);
     if (msg_len == -1) exit_with_failure("Something bad happened building the message...", 0);
     
     ret = send(sock, buffer, BUF_LEN, 0);
@@ -1370,13 +1363,11 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     {
         printf("Send operation gone bad.\n");
         free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
-        free(iv);
         return -1;
     }
     *nonce += 1;
 
     free_6(buffer, bufferSupp1, bufferSupp2, msg_to_hash, temp, digest);
-    free(iv);
     
 
     printf("Sending chunks.\n");
