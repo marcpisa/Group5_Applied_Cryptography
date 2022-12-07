@@ -50,7 +50,7 @@
 
 #define MAIN_FOLDER_SERVER "../../database/"
 #define MAIN_FOLDER_CLIENT "../../download/"
-#define INFO_FOLDER_SERVER "../../database/info/"
+#define INFO_FOLDER_SERVER "../info/"
 
 #define KILO 1024
 #define MEGA 1048576

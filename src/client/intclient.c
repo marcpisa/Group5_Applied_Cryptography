@@ -1710,7 +1710,7 @@ void reset_nonce_sc(char* username)
     if (chdir("../clientsFolder")==-1)
     {
         printf("Error moving to ClientsFolder... Exiting");
-        exit(1);
+        exit(0);
     }
 
     memset(buffer, 0, MAX_LEN_USERNAME+11);
@@ -1719,7 +1719,7 @@ void reset_nonce_sc(char* username)
     if (!f1)
     {
         printf("Error during the opening of the nonce file\n");
-        exit(1);
+        exit(0);
     }
     memset(buffer, 0, MAX_LEN_USERNAME+11);
     sprintf(buffer, "0");
@@ -1727,13 +1727,13 @@ void reset_nonce_sc(char* username)
     {
         printf("Error during write operation..\n");
         fclose(f1);
-        exit(1);
+        exit(0);
     }
     fclose(f1);
     if (chdir("../download")==-1)
     {
         printf("Error moving to download folder... Need to close the connection\n\n");
-        exit(1);
+        exit(0);
     }
 }
 
