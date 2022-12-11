@@ -1942,7 +1942,7 @@ int shareServer(int sd, char* rec_mex, char* username, unsigned int* nonce_cs, u
     temp = (char*) malloc(LEN_SIZE*sizeof(char));
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
-    ret = chdir("INFO_FOLDER_SERVER");
+    ret = chdir(INFO_FOLDER_SERVER);
     if (ret == -1)
     {
         free_4(bufferSupp1, bufferSupp2, temp, path_temp);
@@ -2266,7 +2266,7 @@ int save_info_file(char* old_username, unsigned char* username, int port, unsign
 
     sprintf(port_buffer, "%d", port);
     sprintf(nonce_sc_buffer, "%u", nonce_sc);
-    if (chdir("INFO_FOLDER_SERVER") == -1)
+    if (chdir(INFO_FOLDER_SERVER) == -1)
     {
         printf("Error moving to the info directory... Need to close the connection\n");
         return 0;
@@ -2319,7 +2319,7 @@ int remove_info_file(char* username)
     memset(filename, 0, MAX_LEN_FILENAME+4);
     memcpy(filename, username, strlen(username));
     memcpy(filename+strlen(username), ".txt\0", 5);
-    ret = chdir("INFO_FOLDER_SERVER");
+    ret = chdir(INFO_FOLDER_SERVER);
     if (ret == -1)
     {
         printf("Error changing directory to info...\n");

@@ -1528,7 +1528,7 @@ int shareClient(int sock, char* filename, char* peername, unsigned int* nonce, u
     return ret;
 }
 
-int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2, char* username)
+int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned char* session_key1, unsigned char* session_key2)
 {
     int ret;
     char s;
@@ -1616,16 +1616,7 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
             free_2(encr_msg, iv);
             return 1;
         } 
-        else 
-        {
-            *nonce_sc += 1;
-            ret = save_nonce_sc(username, *nonce_sc);
-            if (ret == -1)
-            {
-                printf("Error saving the nonce_sc... Necessary to close the connection\n\n");
-                return -1;
-            }
-        }
+        else *nonce_sc += 1;
        
 
         // DECRYPT THE MESSAGE
@@ -1650,29 +1641,30 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
         *(bufferSupp3+LEN_SIZE) = '\0';
         //printf("The dimension we received is: %s\n", bufferSupp3);
 
-
-        // sanitize them????
+        ret = filename_sanitization((char*)bufferSupp1);
+        if (ret != 1) 
+        {
+            printf("The sanitization of the filename or of the peername is gone bad\n");
+            operation_denied(sd, "Filename sanitization failed", SHARE_DENIED, session_key1, session_key2, nonce_sc);
+            free_5(bufferSupp1, bufferSupp2, plaintext, bufferSupp3, dimension);            
+            return 1;
+        }
 
         // CHOOSE WHAT TO DO
         from_B_to_H(&dimension, (char*)bufferSupp3);
-        printf("A user has requested to share the file %s. What do you choose (y/n)?",
-                bufferSupp1);
+        printf("A user has requested to share the file %s, it is %s big. What do you choose (y/n)?",
+                bufferSupp1, dimension);
 
         free_5(bufferSupp1, bufferSupp2, plaintext, bufferSupp3, dimension);
 
         if (fgets(line, 2, stdin)) 
         {
+            fflush(stdin);
             if (1 == sscanf(line, "%c", &s)) {
                 // SEND CONFIRMATION OR NOT TO THE SERVER
                 if (s == 'y' || s == 'Y')
                 {
                     operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
-                    ret = save_nonce_sc(username, *nonce_sc);
-                    if (ret == -1)
-                    {
-                        printf("Error saving the nonce_sc... Necessary to close the connection\n\n");
-                        return -1;
-                    }
                     printf("File received and copied to your storage.\n\n");
                     ret = 1;
                 }
@@ -1699,139 +1691,4 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
     }
 
     return ret;
-}
-
-
-void reset_nonce_sc(char* username)
-{
-    char buffer[MAX_LEN_USERNAME+11];
-    FILE* f1;
-
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        exit(0);
-    }
-
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "%s_nonce.txt", username);
-    f1 = fopen(buffer, "w");
-    if (!f1)
-    {
-        printf("Error during the opening of the nonce file\n");
-        exit(0);
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "0");
-    if (!fwrite(buffer, sizeof(char), 2, f1))
-    {
-        printf("Error during write operation..\n");
-        fclose(f1);
-        exit(0);
-    }
-    fclose(f1);
-    if (chdir("../download")==-1)
-    {
-        printf("Error moving to download folder... Need to close the connection\n\n");
-        exit(0);
-    }
-}
-
-int take_nonce_sc(char* username)
-{
-    unsigned int nonce_sc;
-    char buffer[MAX_LEN_USERNAME+11];
-    FILE* f1;
-
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        exit(0);
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "%s_nonce.txt", username);
-    f1 = fopen(buffer, "r");
-    if (!f1)
-    {
-        printf("Error during the opening of the file of the nonce... This error doesn't allow share operation. Contact us\n");
-        exit(1);
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    if(!fread(buffer, sizeof(char), LEN_SIZE+1, f1))
-    {
-        printf("The file opened is empty... The share operation is not allowed. Contact us\n");
-        fclose(f1);
-        exit(1);
-    }
-    fclose(f1);
-    if (chdir("../download")==-1)
-    {
-        printf("Error moving to download folder... Need to close the connection\n\n");
-        exit(1);
-    }
-    sscanf(buffer, "%u", &nonce_sc); //Here we save the nonce used for the communication that begin from the server
-    return nonce_sc;
-}
-
-int save_nonce_sc(char* username, unsigned int nonce_sc)
-{
-    char buffer[MAX_LEN_USERNAME+11];
-    FILE* f1;
-
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        return -1;
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "%s_nonce.txt", username);
-    f1 = fopen(buffer, "w");
-    if (!f1)
-    {
-        printf("Error during the opening of the nonce file\n");
-        return -1;
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "%d", nonce_sc);
-    if (!fwrite(buffer, sizeof(char), LEN_SIZE+1, f1))
-    {
-        printf("Error during write operation..\n");
-        fclose(f1);
-        return -1;
-    }
-    fclose(f1);
-    if (chdir("../download")==-1)
-    {
-        printf("Error moving to download folder... Need to close the connection\n\n");
-        return -1;
-    }
-    return 1;
-}
-
-int delete_nonce_sc(char* username)
-{
-    char buffer[MAX_LEN_USERNAME+11];
-    FILE* f1;
-
-    if (chdir("../clientsFolder")==-1)
-    {
-        printf("Error moving to ClientsFolder... Exiting");
-        return -1;
-    }
-    memset(buffer, 0, MAX_LEN_USERNAME+11);
-    sprintf(buffer, "%s_nonce.txt", username);
-    f1 = fopen(buffer, "w");
-    if (!f1)
-    {
-        printf("Error during the opening of the nonce file\n");
-        return -1;
-    }
-    remove(buffer);
-    fclose(f1);
-    if (chdir("../download")==-1)
-    {
-        printf("Error moving to download folder... Need to close the connection\n\n");
-        return -1;
-    }
-    return 1;
 }

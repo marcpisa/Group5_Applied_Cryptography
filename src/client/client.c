@@ -7,7 +7,7 @@ int main(int argc, char* argv[])
     int connected = 0; // Variable to know if I already logged on the Server
     fd_set read_fds, master;
     int connectedSock;
-    int new_sd, listenerTCP, ret, fdmax, pid, port, s;
+    int new_sd, listenerTCP, ret, fdmax, port, s;
     struct sockaddr_in my_addr, srv_addr, srv_addr2;
     socklen_t addrlen;
     int exit_flag = 0;
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
                 {
                     //INPUT HANDLING AND SANITIZATION (Here we must study the theory and fix it)
                     strcpy(command1, ""); strcpy(command2, ""); strcpy(command3, "");
-                    fgets(buffer, 3*COM_LEN+3, stdin); //We should fix this later
+                    fgets(buffer, 3*COM_LEN+3, stdin);
                     fflush(stdin);
 
                     sscanf(buffer, "%s %s %s", command1, command2, command3);
@@ -199,7 +199,6 @@ int main(int argc, char* argv[])
                                     printf("Main folder of the client unaccessible...\n\n");
                                     exit_flag = 1;
                                 }
-                                reset_nonce_sc(username);
                                 printf("Login succedded.\n\n");
                                 connected = 1;
 
@@ -225,7 +224,6 @@ int main(int argc, char* argv[])
                                 connected = 0;
                                 nonce_cs = 0;
                                 nonce_sc = 0;
-                                delete_nonce_sc(username);
 
                                 if (session_key1 != NULL && session_key2 != NULL) 
                                 {
@@ -429,8 +427,6 @@ int main(int argc, char* argv[])
                                     }
                                     else printf("Logout failed.\n\n");
 
-                                    delete_nonce_sc(username);
-
                                     if (session_key1 != NULL && session_key2 != NULL) 
                                     {
                                         free(session_key1);
@@ -451,43 +447,23 @@ int main(int argc, char* argv[])
                 }
                 else //MANAGER FOR AN ACCEPTED COMMUNICATION
                 {
-                    memset(buffer, 0, strlen(buffer));
+                    memset(buffer, 0, BUF_LEN);
                     ret = recv(i, buffer, BUF_LEN, 0);
                     if (ret == -1)
                     {
-                        delete_nonce_sc(username);
                         printf("Error during recieve function!\n\n");
                         exit(1);
                     }
 
-                    pid = fork();
-                    if (pid < 0)
-                    {
-                        perror("Error during fork execution: ");
-                        exit(-1);
-                    }
-                    if (pid == 0)
-                    {
-                        nonce_sc = take_nonce_sc(username);
-                        close(listenerTCP);
-                        //We are in the son part of code
-                        ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2, username);
-                        if (ret == -1)
-                        {
-                            printf("Error during received share request!\n\n");
-                            exit(1);
-                        }
-
-                        close(i);
-                        exit(0);
-                    }
+                    ret = shareReceivedClient(i, buffer, &nonce_sc, session_key1, session_key2);
+                    if (ret == -1) printf("Error during received share request!\n\n");
                     close(i);
 					FD_CLR(i, &master);
+                    fflush(stdin);
                 }
             }
         }
     }
-    delete_nonce_sc(username);
     close(listenerTCP);
     X509_STORE_free(ca_store);
     
