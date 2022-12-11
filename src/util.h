@@ -44,7 +44,7 @@
 #define DH_PUBKEY_SIZE 625
 #define NUM_USER 4
 #define LEN_SIZE 11
-#define REST_SIZE 10
+#define REST_SIZE 11
 #define MAX_CERT_LEN 2048
 #define BLANK_SPACE 1
 

@@ -1532,7 +1532,6 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
 {
     int ret;
     char s;
-    char line[2];
     unsigned int len_fn;
     unsigned int len_pn;
 
@@ -1656,29 +1655,24 @@ int shareReceivedClient(int sd, char* rec_mex, unsigned int* nonce_sc, unsigned 
                 bufferSupp1, dimension);
 
         free_5(bufferSupp1, bufferSupp2, plaintext, bufferSupp3, dimension);
-
-        if (fgets(line, 2, stdin)) 
+        
+        fflush(stdin);
+        while ((s = fgetc(stdin)) != EOF)
         {
             fflush(stdin);
-            if (1 == sscanf(line, "%c", &s)) {
-                // SEND CONFIRMATION OR NOT TO THE SERVER
-                if (s == 'y' || s == 'Y')
-                {
-                    operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
-                    printf("File received and copied to your storage.\n\n");
-                    ret = 1;
-                }
-                else if (s == 'n' || s == 'N')
-                {
-                    operation_denied(sd, "The user hasn't accepted to share the file", SHARE_DENIED,\
-                        session_key1, session_key2, nonce_sc);
-                    ret = 1;
-                }
-                else
-                {
-                    printf("We don't know what the user said...\n\n");
-                    ret = 1;
-                }
+            if (s == 'y' || s == 'Y')
+            {
+                operation_succeed(sd, SHARE_ACCEPTED, session_key2, nonce_sc);
+                printf("File received and copied to your storage.\n\n");
+                ret = 1;
+                break;
+            }
+            else if (s == 'n' || s == 'N')
+            {
+                operation_denied(sd, "The user hasn't accepted to share the file", SHARE_DENIED,\
+                    session_key1, session_key2, nonce_sc);
+                ret = 1;
+                break;
             }
         }
     }
