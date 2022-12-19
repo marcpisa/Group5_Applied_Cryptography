@@ -188,6 +188,8 @@ int main(int argc, char* argv[])
                                 printf("Login failed.\n\n");
                                 if(session_key1 != NULL && session_key2 != NULL)
                                 {
+                                    memset(session_key1, 0, 16*sizeof(unsigned char));
+                                    memset(session_key2, 0, 16*sizeof(unsigned char));
                                     free(session_key1);
                                     free(session_key2);
                                 }
@@ -227,6 +229,8 @@ int main(int argc, char* argv[])
 
                                 if (session_key1 != NULL && session_key2 != NULL) 
                                 {
+                                    memset(session_key1, 0, 16*sizeof(unsigned char));
+                                    memset(session_key2, 0, 16*sizeof(unsigned char));
                                     free(session_key1);
                                     free(session_key2);
                                 }

@@ -256,6 +256,8 @@ int loginServer(int sd, char* rec_mex)
     EVP_PKEY_free(pub_rsa_client);
     if (ret != 1) 
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Signature verification failed.\n");
         return -1;
@@ -292,6 +294,8 @@ int loginServer(int sd, char* rec_mex)
     free(buffer);
     if (ret == -1)
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Problem parsing the message...\n");
         return -1;
@@ -329,6 +333,8 @@ int loginServer(int sd, char* rec_mex)
     ret = chdir("..");
     if (ret == -1) 
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Problem changing directory...\n");
         return -1;
@@ -336,6 +342,8 @@ int loginServer(int sd, char* rec_mex)
     ret = chdir("info");
     if (ret == -1) 
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Problem moving directory into info...\n");
         return -1;
@@ -399,6 +407,8 @@ int loginServer(int sd, char* rec_mex)
     ret = chdir("..");
     if (ret == -1) 
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Problem moving back to parent directory...\n");
         return -1; 
@@ -406,6 +416,8 @@ int loginServer(int sd, char* rec_mex)
     ret = chdir(username);
     if (ret == -1) 
     {
+        memset(session_key1, 0, 16*sizeof(unsigned char));
+        memset(session_key2, 0, 16*sizeof(unsigned char));
         free_n(2, session_key1, session_key2);
         printf("Problem moving into username directory...\n");
         return -1; 
@@ -571,6 +583,8 @@ int loginServer(int sd, char* rec_mex)
     // Clear session keys from the file
     // ......
 
+    memset(session_key1, 0, 16*sizeof(unsigned char));
+    memset(session_key2, 0, 16*sizeof(unsigned char));
     free_n(2, session_key1, session_key2);
     close(sd);
     
