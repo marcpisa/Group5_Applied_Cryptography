@@ -844,7 +844,7 @@ int downloadClient(int sock, char* filename, unsigned char* session_key1, unsign
     FILE* f1;
 
     int ret, i;
-    int nchunk;
+    long nchunk;
     int msg_len;
     char* temp;
     char* temp2;

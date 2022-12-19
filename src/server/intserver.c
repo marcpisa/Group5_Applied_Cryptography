@@ -1209,7 +1209,7 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     char filename[MAX_LEN_FILENAME];
     struct stat st;
     int i, j, ch, max;
-    int nchunk, rest;
+    long nchunk, rest;
     FILE* fd;
 
 
@@ -1342,8 +1342,8 @@ int downloadServer(int sock, char* rec_mex, unsigned int* nonce, unsigned char* 
     if (!temp) exit_with_failure("Malloc temp failed", 1);
 
     sprintf(temp, "%u", *nonce); //nonce is put on temp as a string
-    sprintf((char*)bufferSupp1, "%i", nchunk); //nchunk is put on bufferSupp1 as a string
-    sprintf((char*)bufferSupp2, "%i", rest); //rest is put on bufferSUpp2 as a string
+    sprintf((char*)bufferSupp1, "%li", nchunk); //nchunk is put on bufferSupp1 as a string
+    sprintf((char*)bufferSupp2, "%li", rest); //rest is put on bufferSUpp2 as a string
     msg_to_hash_len = build_msg_4(&msg_to_hash, DOWNLOAD_ACCEPTED, strlen(DOWNLOAD_ACCEPTED), \
                                                 bufferSupp1, LEN_SIZE,\
                                                 bufferSupp2, REST_SIZE,\
